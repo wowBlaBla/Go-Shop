@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/yonnic/goshop/models"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -12,6 +13,7 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -215,7 +217,224 @@ var RootCmd = &cobra.Command{
 			}
 		}
 		// /Https
-
+		common.Database.AutoMigrate(&models.Category{})
+		common.Database.AutoMigrate(&models.Product{})
+		common.Database.AutoMigrate(&models.Offer{})
+		common.Database.AutoMigrate(&models.Option{})
+		common.Database.AutoMigrate(&models.Property{})
+		// DEMO
+		mode := "create" // create, select
+		if mode == "create" {
+			// Create category Living Areas
+			category1 := &models.Category{
+				Name:  "living-areas",
+				Title: "Living Areas",
+			}
+			if _, err := models.CreateCategory(common.Database, category1); err != nil {
+				logger.Errorf("%v", err)
+			}
+			// Create category Living Areas >> Dining Room
+			subcategory1 := &models.Category{
+				Name:  "dining-room",
+				Title: "Dining Room",
+				Parent: category1,
+			}
+			if _, err := models.CreateCategory(common.Database, subcategory1); err == nil {
+				logger.Errorf("%v", err)
+			}
+			/*if err := models.AddSubcategoryToCategory(common.Database, category1, subcategory1); err != nil {
+				logger.Errorf("%v", err)
+			}*/
+			// Create category Living Areas >> Dining Room >> Dining Tables
+			subsubcategory1 := &models.Category{
+				Name:  "dining-tables",
+				Title: "Dining Tables",
+				Parent: subcategory1,
+			}
+			if _, err := models.CreateCategory(common.Database, subsubcategory1); err == nil {
+				logger.Errorf("%v", err)
+			}
+			/*if err := models.AddSubcategoryToCategory(common.Database, subcategory1, subsubcategory1); err != nil {
+				logger.Errorf("%v", err)
+			}*/
+			// Create product
+			// example: https://www.moebelhausduesseldorf.de/wohnraum/esszimmer/tafel/wei%c3%9fer-esstisch-aus-massivem-kiefernholz-958479
+			product1 := &models.Product{
+				Name:        "white-dining-table",
+				Title:       "White dining table",
+				Description: "Cool table",
+			}
+			if _, err := models.CreateProduct(common.Database, product1); err != nil {
+				logger.Errorf("%v", err)
+			}
+			if err := models.AddProductToCategory(common.Database, subsubcategory1, product1); err != nil {
+				logger.Errorf("%v", err)
+			}
+			// Create option Body Color
+			option1 := &models.Option{
+				Name:  "body-color",
+				Title: "Body Color",
+			}
+			if _, err := models.CreateOption(common.Database, option1); err != nil {
+				logger.Errorf("%v", err)
+			}
+			if err := models.AddOptionToCategory(common.Database, subsubcategory1, option1); err != nil {
+				logger.Errorf("%v", err)
+			}
+			// Create option Plate Color
+			option2 := &models.Option{
+				Name:  "plate-color",
+				Title: "Plate Color",
+			}
+			if _, err := models.CreateOption(common.Database, option2); err != nil {
+				logger.Errorf("%v", err)
+			}
+			if err := models.AddOptionToCategory(common.Database, subsubcategory1, option2); err != nil {
+				logger.Errorf("%v", err)
+			}
+			// Create offer #1
+			offer1 := &models.Offer{
+				Name:       "Body Color RAL9010 and Plate Color RAL9010",
+				Title:      "Body Color Milk White and Plate of Same Color",
+				Properties: []*models.Property{&models.Property{
+					Option: *option1,
+					Value:  "RAL9010",
+				}, &models.Property{
+					Option: *option2,
+					Value:  "RAL9010",
+				}},
+				Price:      1000.0,
+				ProductId:  product1.ID,
+			}
+			if _, err := models.CreateOffer(common.Database, offer1); err != nil {
+				logger.Errorf("%v", err)
+			}
+			// Add Offer #1 to product
+			if err := models.AddOfferToProduct(common.Database, product1, offer1); err != nil {
+				logger.Errorf("%v", err)
+			}
+			// Create offer #2
+			offer2 := &models.Offer{
+				Name:       "Body Color RAL9010 and Plate Color A801",
+				Title:      "Body Color White Milk and Plate Color Soft Gray",
+				Properties: []*models.Property{&models.Property{
+					Option: *option1,
+					Value:  "RAL9010",
+				}, &models.Property{
+					Option: *option2,
+					Value:  "A801",
+				}},
+				Price:      1010.0,
+				ProductId:  product1.ID,
+			}
+			if _, err := models.CreateOffer(common.Database, offer2); err != nil {
+				logger.Errorf("%v", err)
+			}
+			// Add Offer #2 to product
+			if err := models.AddOfferToProduct(common.Database, product1, offer2); err != nil {
+				logger.Errorf("%v", err)
+			}
+		}
+		// ***
+		// Get Products
+		if products, err := models.GetProducts(common.Database); err == nil {
+			logger.Infof("Products: %v", len(products))
+			for _, product := range products {
+				logger.Infof("\t#%v %v %v", product.ID, product.Name, product.Title)
+				if categories, err := models.GetCategoriesOfProduct(common.Database, product); err == nil {
+					logger.Infof("\tCategories: %v", len(categories))
+					for _, category := range categories {
+						var crumbs = []*models.Category{category}
+						for ;category != nil && category.ParentId != 0; {
+							if category = models.GetParentFromCategory(common.Database, category); category != nil {
+								crumbs = append([]*models.Category{category}, crumbs...)
+							}
+						}
+						var p []string
+						for _, category := range crumbs {
+							p = append(p, category.Title)
+						}
+						logger.Infof("\t\tPath: %v", strings.Join(p, " => "))
+					}
+				}
+				if offers, err := models.GetOffersFromProduct(common.Database, product); err == nil {
+					logger.Infof("\tOffers: %v", len(offers))
+					for _, offer := range offers {
+						logger.Infof("\t\t#%v %v $%.2f", offer.ID, offer.Title, offer.Price)
+						if properties, err := models.GetPropertiesFromOffer(common.Database, offer); err == nil {
+							logger.Infof("\t\tProperties: %v", len(properties))
+							for _, property := range properties {
+								logger.Infof("\t\t\t#%v %v = %v", property.Option.ID, property.Option.Name, property.Value)
+							}
+						}
+					}
+				}
+			}
+		}
+		/*cat1 := &models.Category{
+			Name: "cat1",
+			Title: "Category 1",
+		}
+		models.CreateCategory(common.Database, cat1)
+		cat2 := &models.Category{
+			Name: "cat2",
+			Title: "Category 2",
+		}
+		models.CreateCategory(common.Database, cat2)
+		prod1 := &models.Product{
+			Name: "prod1",
+			Title: "Product 1",
+		}
+		models.CreateProduct(common.Database, prod1)
+		if err := models.AddProductToCategory(common.Database, cat1, prod1); err != nil {
+			logger.Errorf("%v", err)
+		}
+		prod2 := &models.Product{
+			Name: "prod2",
+			Title: "Product 2",
+		}
+		models.CreateProduct(common.Database, prod2)
+		if err := models.AddProductToCategory(common.Database, cat1, prod2); err != nil {
+			logger.Errorf("%v", err)
+		}
+		if err := models.DeleteProductFromCategory(common.Database, cat1, prod1); err != nil {
+			logger.Errorf("%v", err)
+		}
+		prod3 := &models.Product{
+			Name: "prod3",
+			Title: "Product 3",
+		}
+		if _, err := models.CreateProduct(common.Database, prod3); err != nil {
+			logger.Errorf("%v", err)
+		}
+		if err := models.AddProductToCategory(common.Database, cat1, prod3); err != nil {
+			logger.Errorf("%v", err)
+		}
+		products, err := models.GetProductsFromCategory(common.Database, cat1)
+		if err != nil {
+			logger.Errorf("%v", err)
+		}
+		logger.Infof("Products: %v", len(products))
+		for i, product := range products {
+			logger.Infof("%d: %+v", i, product)
+		}
+		subcat1 := &models.Category{
+			Name: "subcat1",
+			Title: "Sub Category 1",
+		}
+		models.CreateCategory(common.Database, subcat1)
+		if err := models.AddSubcategoryToCategory(common.Database, cat1, subcat1); err != nil {
+			logger.Errorf("%v", err)
+		}
+		subcategories, err := models.GetSubcategoriesFromCategory(common.Database, cat1)
+		if err != nil {
+			logger.Errorf("%v", err)
+		}
+		logger.Infof("Subcategories: %v", len(subcategories))
+		for i, subcategory := range subcategories {
+			logger.Infof("%d: %+v", i, subcategory)
+		}*/
+		// /DEMO
 		// TODO: Yet another initialization code
 
 		if err := upg.Ready(); err != nil {

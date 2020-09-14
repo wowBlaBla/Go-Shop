@@ -10,7 +10,7 @@ const (
 )
 
 type Token struct {
-	Id uint `gorm:"primaryKey"`
+	gorm.Model
 	Token string
 	Status string
 	ExpiresAt int64
@@ -38,7 +38,7 @@ func CreateToken(connector *gorm.DB, token *Token) (uint, error) {
 	if err := db.Error; err != nil {
 		return 0, err
 	}
-	return token.Id, nil
+	return token.ID, nil
 }
 
 func DeleteTokenByExpiration(connector *gorm.DB) error {
