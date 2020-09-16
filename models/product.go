@@ -8,8 +8,30 @@ type Product struct {
 	Title string
 	Description string
 	Thumbnail string
-	Categories []*Category `gorm:"many2many:category_products;"`
-	Offers []*Offer `gorm:"foreignKey:ProductId"` // Extend Product with extra variations of it affect to price or availability
+	Categories []*Category `gorm:"many2many:categories_products;"`
+	//
+	// Optionally use "Offers" for final count of product variations
+	Offers []*Offer `gorm:"foreignKey:ProductId"`
+	// OR use "Properties" for endless number of product variations
+	//Properties []*ProductProperty `gorm:"foreignKey:ProductId"`
+	// For example:
+	// (1) Offers - iPhone have final number of variations in case of iPhone 11 it is color and storage:
+	// 'black' and '64Gb'
+	// 'black' and '256Gb'
+	// 'black' and '512Gb'
+	// 'black' and '1024Gb'
+	// 'white' and '64Gb'
+	// ...
+	// 'red' and '1024Gb'
+	// You should to create 'Offer' for each of such combination and use it.
+	// (2) Properties - Furniture has huge number of variations depend on material, color, texture. Each of such 'option' linearly effect to price y increasing or decreasing value, if body color:
+	// 'black' $+75
+	// 'white' $+150
+	// plate color:
+	// 'black' $+50
+	// 'white' $+100
+	// ...
+	// final price is build like constructor
 }
 
 func GetProducts(connector *gorm.DB) ([]*Product, error) {

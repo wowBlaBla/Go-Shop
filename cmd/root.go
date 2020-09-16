@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/yonnic/goshop/models"
 	"gorm.io/driver/mysql"
@@ -219,9 +220,11 @@ var RootCmd = &cobra.Command{
 		// /Https
 		common.Database.AutoMigrate(&models.Category{})
 		common.Database.AutoMigrate(&models.Product{})
+		//common.Database.AutoMigrate(&models.ProductProperty{})
 		common.Database.AutoMigrate(&models.Offer{})
-		common.Database.AutoMigrate(&models.Option{})
 		common.Database.AutoMigrate(&models.Property{})
+		common.Database.AutoMigrate(&models.Option{})
+		common.Database.AutoMigrate(&models.Value{})
 		// DEMO
 		mode := "create" // create, select
 		if mode == "create" {
@@ -271,37 +274,84 @@ var RootCmd = &cobra.Command{
 				logger.Errorf("%v", err)
 			}
 			// Create option Body Color
-			option1 := &models.Option{
+			optionBodyColor := &models.Option{
 				Name:  "body-color",
 				Title: "Body Color",
 			}
-			if _, err := models.CreateOption(common.Database, option1); err != nil {
+			if _, err := models.CreateOption(common.Database, optionBodyColor); err != nil {
 				logger.Errorf("%v", err)
 			}
-			if err := models.AddOptionToCategory(common.Database, subsubcategory1, option1); err != nil {
+			/*if err := models.AddOptionToCategory(common.Database, subsubcategory1, option1); err != nil {
+				logger.Errorf("%v", err)
+			}*/
+			// Create values of BodyColor
+			valueBodyColorRAL9010 := &models.Value{
+				Option: *optionBodyColor,
+				Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
+				Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
+				Value: "RAL9010",
+			}
+			if _, err := models.CreateValue(common.Database, valueBodyColorRAL9010); err != nil {
+				logger.Errorf("%v", err)
+			}
+			valueBodyColorRAL9001 := &models.Value{
+				Option: *optionBodyColor,
+				Title: "RAL9001 - Leicht Cremeweiß lackiert",
+				Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9001-leicht-cremeweiss-lackiert-209216-hh-thumb.jpg",
+				Value: "RAL9001",
+			}
+			if _, err := models.CreateValue(common.Database, valueBodyColorRAL9001); err != nil {
+				logger.Errorf("%v", err)
+			}
+			valueBodyColorM803 := &models.Value{
+				Option: *optionBodyColor,
+				Title: "Pearl Grey Pinseleffekt - M803",
+				Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/pearl-grey-pinseleffekt-m803-459219-hh-thumb.jpg",
+				Value: "M803",
+			}
+			if _, err := models.CreateValue(common.Database, valueBodyColorM803); err != nil {
 				logger.Errorf("%v", err)
 			}
 			// Create option Plate Color
-			option2 := &models.Option{
+			optionPlateColor := &models.Option{
 				Name:  "plate-color",
 				Title: "Plate Color",
 			}
-			if _, err := models.CreateOption(common.Database, option2); err != nil {
+			if _, err := models.CreateOption(common.Database, optionPlateColor); err != nil {
 				logger.Errorf("%v", err)
 			}
-			if err := models.AddOptionToCategory(common.Database, subsubcategory1, option2); err != nil {
+			// Create values of BodyColor
+			valuePlateColorRAL9010 := &models.Value{
+				Option: *optionPlateColor,
+				Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
+				Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
+				Value: "RAL9010",
+			}
+			if _, err := models.CreateValue(common.Database, valuePlateColorRAL9010); err != nil {
 				logger.Errorf("%v", err)
 			}
+			valuePlateColorRAL9001 := &models.Value{
+				Option: *optionPlateColor,
+				Title: "RAL9001 - Leicht Cremeweiß lackiert",
+				Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9001-leicht-cremeweiss-lackiert-209216-hh-thumb.jpg",
+				Value: "RAL9001",
+			}
+			if _, err := models.CreateValue(common.Database, valuePlateColorRAL9001); err != nil {
+				logger.Errorf("%v", err)
+			}
+			/*if err := models.AddOptionToCategory(common.Database, subsubcategory1, option2); err != nil {
+				logger.Errorf("%v", err)
+			}*/
 			// Create offer #1
 			offer1 := &models.Offer{
 				Name:       "Body Color RAL9010 and Plate Color RAL9010",
 				Title:      "Body Color Milk White and Plate of Same Color",
-				Properties: []*models.Property{&models.Property{
-					Option: *option1,
-					Value:  "RAL9010",
-				}, &models.Property{
-					Option: *option2,
-					Value:  "RAL9010",
+				Properties: []*models.Property{{
+					Price: 10.0,
+					Value:  *valueBodyColorRAL9010,
+				}, {
+					Price: 15.0,
+					Value:  *valuePlateColorRAL9010,
 				}},
 				Price:      1000.0,
 				ProductId:  product1.ID,
@@ -318,11 +368,11 @@ var RootCmd = &cobra.Command{
 				Name:       "Body Color RAL9010 and Plate Color A801",
 				Title:      "Body Color White Milk and Plate Color Soft Gray",
 				Properties: []*models.Property{&models.Property{
-					Option: *option1,
-					Value:  "RAL9010",
+					Price: 10.0,
+					Value: *valueBodyColorRAL9010,
 				}, &models.Property{
-					Option: *option2,
-					Value:  "A801",
+					Price: 5.0,
+					Value: *valuePlateColorRAL9001,
 				}},
 				Price:      1010.0,
 				ProductId:  product1.ID,
@@ -334,8 +384,70 @@ var RootCmd = &cobra.Command{
 			if err := models.AddOfferToProduct(common.Database, product1, offer2); err != nil {
 				logger.Errorf("%v", err)
 			}
+			//
+			// Create category Living Areas >> Bathroom
+			subcategory2 := &models.Category{
+				Name:  "bathroom",
+				Title: "Bathroom",
+				Parent: category1,
+			}
+			if _, err := models.CreateCategory(common.Database, subcategory2); err == nil {
+				logger.Errorf("%v", err)
+			}
+			// Create product
+			// example: https://www.moebelhausduesseldorf.de/wohnraum/toilette/waschbeckenschrank-wei%c3%9f-f%c3%bcr-das-badezimmer-974057
+			product2 := &models.Product{
+				Name:        "washbasin-cabinet-white-for-the-bathroom",
+				Title:       "Washbasin cabinet white for the bathroom",
+				Description: "Small washbasin",
+			}
+			if _, err := models.CreateProduct(common.Database, product2); err != nil {
+				logger.Errorf("%v", err)
+			}
+			if err := models.AddProductToCategory(common.Database, subcategory2, product2); err != nil {
+				logger.Errorf("%v", err)
+			}
+			// Create offer #3
+			/*offer3 := &models.Offer{
+				Name:       "Washbasin cabinet white for the bathroom with plate of pine",
+				Title:      "Washbasin cabinet white for the bathroom with plate of pine",
+				Properties: []*models.Property{&models.Property{
+					Option: models.Option{
+						Name: "plate-type",
+						Title: "Type of plate",
+					},
+					Value:  "pine",
+				}},
+				Price:      2000.0,
+				ProductId:  product2.ID,
+			}
+			if _, err := models.CreateOffer(common.Database, offer3); err != nil {
+				logger.Errorf("%v", err)
+			}
+			// Create offer #4
+			offer4 := &models.Offer{
+				Name:       "Washbasin cabinet white for the bathroom with plate of oak",
+				Title:      "Washbasin cabinet white for the bathroom with plate of oak",
+				Properties: []*models.Property{&models.Property{
+					Option: models.Option{
+						Name: "plate-type",
+						Title: "Type of plate",
+					},
+					Value:  "oak",
+				}},
+				Price:      2500.0,
+				ProductId:  product2.ID,
+			}
+			if _, err := models.CreateOffer(common.Database, offer4); err != nil {
+				logger.Errorf("%v", err)
+			}*/
 		}
 		// ***
+		// Get Categories
+		tree := models.GetCategoriesTree(nil)
+		if bts, err := json.MarshalIndent(tree, "", "   "); err == nil {
+			logger.Infof("JSON: %+v", string(bts))
+		}
 		// Get Products
 		if products, err := models.GetProducts(common.Database); err == nil {
 			logger.Infof("Products: %v", len(products))
@@ -364,7 +476,7 @@ var RootCmd = &cobra.Command{
 						if properties, err := models.GetPropertiesFromOffer(common.Database, offer); err == nil {
 							logger.Infof("\t\tProperties: %v", len(properties))
 							for _, property := range properties {
-								logger.Infof("\t\t\t#%v %v = %v", property.Option.ID, property.Option.Name, property.Value)
+								logger.Infof("\t\t\t#%v %v = %v +$%.2f", property.Value.ID, property.Value.Option.Title, property.Value.Value, property.Price)
 							}
 						}
 					}

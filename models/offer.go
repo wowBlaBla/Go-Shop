@@ -1,6 +1,8 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+)
 
 type Offer struct {
 	gorm.Model
@@ -10,7 +12,7 @@ type Offer struct {
 	Thumbnail string
 	//Properties []*Property `gorm:"many2many:offer_properties;"`
 	Properties []*Property `gorm:"foreignKey:OfferId"`
-	Price float64 `sql:"type:decimal(8,2);"`
+	Price float64          `sql:"type:decimal(8,2);"`
 	//
 	ProductId uint
 }
@@ -27,7 +29,7 @@ func CreateOffer(connector *gorm.DB, offer *Offer) (uint, error) {
 func GetPropertiesFromOffer(connector *gorm.DB, offer *Offer) ([]*Property, error) {
 	db := connector
 	var properties []*Property
-	if err := db.Model(&offer).Preload("Option").Association("Properties").Find(&properties); err != nil {
+	if err := db.Model(&offer).Preload("Value").Preload("Value.Option").Association("Properties").Find(&properties); err != nil {
 		return nil, err
 	}
 	return properties, nil
