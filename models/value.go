@@ -4,11 +4,13 @@ import "gorm.io/gorm"
 
 type Value struct {
 	gorm.Model
-	Option Option `gorm:"foreignKey:OptionId"`
-	OptionId uint
+	/*Option Option `gorm:"foreignKey:OptionId"`
+	OptionId uint*/
+	PropertyId uint
 	//
 	Title string
 	Thumbnail string
+	Price float64
 	Value string
 }
 

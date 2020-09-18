@@ -17,6 +17,16 @@ type Offer struct {
 	ProductId uint
 }
 
+func GetOffer(connector *gorm.DB, id int) (*Offer, error) {
+	db := connector
+	var offer Offer
+	db.Debug().Preload("Properties").Preload("Properties.Option").Preload("Properties.Values").Find(&offer, id)
+	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return &offer, nil
+}
+
 func CreateOffer(connector *gorm.DB, offer *Offer) (uint, error) {
 	db := connector
 	db.Debug().Create(&offer)
@@ -29,7 +39,7 @@ func CreateOffer(connector *gorm.DB, offer *Offer) (uint, error) {
 func GetPropertiesFromOffer(connector *gorm.DB, offer *Offer) ([]*Property, error) {
 	db := connector
 	var properties []*Property
-	if err := db.Model(&offer).Preload("Value").Preload("Value.Option").Association("Properties").Find(&properties); err != nil {
+	if err := db.Model(&offer).Preload("Option").Preload("Values").Association("Properties").Find(&properties); err != nil {
 		return nil, err
 	}
 	return properties, nil

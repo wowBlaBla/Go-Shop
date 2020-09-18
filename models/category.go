@@ -1,21 +1,31 @@
 package models
 
 import (
-	"github.com/yonnic/goshop/common"
 	"gorm.io/gorm"
 )
 
-type CategoryNode struct {
-	*Category
-	Children []*CategoryNode `json:",omitempty"`
+type CategoryView struct {
+	ID uint
+	Name string
+	Title string
+	Children []*CategoryView `json:",omitempty"`
 }
 
-func GetCategoriesTree(root *CategoryNode) *CategoryNode{
-	if root == nil {
-		root = &CategoryNode{Category: &Category{Name: "root", Title: "Root"}}
+func GetCategoriesView(connector *gorm.DB, id int) (*CategoryView, error) {
+	if id == 0 {
+		return getCategoriesView(connector, &CategoryView{Name: "root", Title: "Root"}), nil
+	} else {
+		if category, err := GetCategory(connector, id); err == nil {
+			return getCategoriesView(connector, &CategoryView{ID:  category.ID, Name: category.Name, Title: category.Title}), nil
+		}else{
+			return nil, err
+		}
 	}
-	for _, category := range GetChildrenOfCategoryById(common.Database, root.ID) {
-		child := GetCategoriesTree(&CategoryNode{Category: category})
+}
+
+func getCategoriesView(connector *gorm.DB, root *CategoryView) *CategoryView {
+	for _, category := range GetChildrenOfCategoryById(connector, root.ID) {
+		child := getCategoriesView(connector, &CategoryView{ID: category.ID, Name: category.Name, Title: category.Title})
 		root.Children = append(root.Children, child)
 	}
 	return root
@@ -32,6 +42,16 @@ type Category struct {
 	//
 	Parent *Category `gorm:"foreignKey:ParentId"`
 	ParentId uint
+}
+
+func GetCategory(connector *gorm.DB, id int) (*Category, error) {
+	db := connector
+	var category Category
+	db.Debug().Find(&category, id)
+	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return &category, nil
 }
 
 func CreateCategory(connector *gorm.DB, category *Category) (uint, error) {

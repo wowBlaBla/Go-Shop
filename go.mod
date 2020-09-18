@@ -4,10 +4,18 @@ go 1.15
 
 require (
 	github.com/BurntSushi/toml v0.3.1
+	github.com/arsmn/fiber-casbin/v2 v2.0.0 // indirect
 	github.com/cloudflare/tableflip v1.2.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/fasthttp/session/v2 v2.2.3 // indirect
 	github.com/fsnotify/fsnotify v1.4.9
+	github.com/gofiber/adaptor/v2 v2.0.0 // indirect
+	github.com/gofiber/fiber/v2 v2.0.1
+	github.com/gofiber/jwt/v2 v2.0.0
+	github.com/gofiber/keyauth/v2 v2.0.0
+	github.com/gofiber/session/v2 v2.0.0
+	github.com/gofiber/template v1.6.1
 	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/google/logger v1.1.0
 	github.com/gorilla/handlers v1.5.0
@@ -24,6 +32,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
 	golang.org/x/net v0.0.0-20200822124328-c89045814202 // indirect
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
+	golang.org/x/sys v0.0.0-20200917073148-efd3b9a0ff20 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/appengine v1.6.6 // indirect
 	google.golang.org/protobuf v1.25.0 // indirect

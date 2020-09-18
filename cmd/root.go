@@ -1,23 +1,8 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yonnic/goshop/models"
-	"gorm.io/driver/mysql"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"path"
-	"path/filepath"
-	"strings"
-	"syscall"
-	"time"
-
 	"github.com/cloudflare/tableflip"
 	"github.com/fsnotify/fsnotify"
 	"github.com/google/logger"
@@ -26,6 +11,17 @@ import (
 	"github.com/yonnic/goshop/common"
 	"github.com/yonnic/goshop/config"
 	"github.com/yonnic/goshop/handler"
+	"github.com/yonnic/goshop/models"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"log"
+	"os"
+	"os/signal"
+	"path"
+	"path/filepath"
+	"strings"
+	"syscall"
 )
 
 var (
@@ -139,7 +135,7 @@ var RootCmd = &cobra.Command{
 		common.Database.DB()
 
 		// Router
-		router := handler.GetRouter()
+		/*router := handler.GetRouter()
 
 		// Http
 		host := common.Config.Host
@@ -218,6 +214,7 @@ var RootCmd = &cobra.Command{
 			}
 		}
 		// /Https
+		*/
 		common.Database.AutoMigrate(&models.Category{})
 		common.Database.AutoMigrate(&models.Product{})
 		//common.Database.AutoMigrate(&models.ProductProperty{})
@@ -284,8 +281,30 @@ var RootCmd = &cobra.Command{
 			/*if err := models.AddOptionToCategory(common.Database, subsubcategory1, option1); err != nil {
 				logger.Errorf("%v", err)
 			}*/
+			/**/
+			/*propertyBodyColor := &models.Property{
+				Option: *optionBodyColor,
+				Values: []*models.Value{
+					{
+						Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
+						Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
+						Price: 10.0,
+						Value: "RAL9010",
+					},
+					{
+						Title: "RAL9001 - Leicht Cremeweiß lackiert",
+						Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9001-leicht-cremeweiss-lackiert-209216-hh-thumb.jpg",
+						Price: 11.0,
+						Value: "RAL9001",
+					},
+				},
+			}
+			if _, err := models.CreateProperty(common.Database, propertyBodyColor); err != nil {
+				logger.Errorf("%v", err)
+			}*/
+			/**/
 			// Create values of BodyColor
-			valueBodyColorRAL9010 := &models.Value{
+			/*valueBodyColorRAL9010 := &models.Value{
 				Option: *optionBodyColor,
 				Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
 				Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
@@ -311,7 +330,7 @@ var RootCmd = &cobra.Command{
 			}
 			if _, err := models.CreateValue(common.Database, valueBodyColorM803); err != nil {
 				logger.Errorf("%v", err)
-			}
+			}*/
 			// Create option Plate Color
 			optionPlateColor := &models.Option{
 				Name:  "plate-color",
@@ -320,8 +339,28 @@ var RootCmd = &cobra.Command{
 			if _, err := models.CreateOption(common.Database, optionPlateColor); err != nil {
 				logger.Errorf("%v", err)
 			}
+			/*propertyPlateColor := &models.Property{
+				Option: *optionPlateColor,
+				Values: []*models.Value{
+					{
+						Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
+						Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
+						Price: 8.0,
+						Value: "RAL9010",
+					},
+					{
+						Title: "Pearl Grey Pinseleffekt - M803",
+						Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/pearl-grey-pinseleffekt-m803-459219-hh-thumb.jpg",
+						Price: 9.0,
+						Value: "M803",
+					},
+				},
+			}
+			if _, err := models.CreateProperty(common.Database, propertyPlateColor); err != nil {
+				logger.Errorf("%v", err)
+			}*/
 			// Create values of BodyColor
-			valuePlateColorRAL9010 := &models.Value{
+			/*valuePlateColorRAL9010 := &models.Value{
 				Option: *optionPlateColor,
 				Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
 				Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
@@ -338,7 +377,7 @@ var RootCmd = &cobra.Command{
 			}
 			if _, err := models.CreateValue(common.Database, valuePlateColorRAL9001); err != nil {
 				logger.Errorf("%v", err)
-			}
+			}*/
 			/*if err := models.AddOptionToCategory(common.Database, subsubcategory1, option2); err != nil {
 				logger.Errorf("%v", err)
 			}*/
@@ -346,12 +385,38 @@ var RootCmd = &cobra.Command{
 			offer1 := &models.Offer{
 				Name:       "Body Color RAL9010 and Plate Color RAL9010",
 				Title:      "Body Color Milk White and Plate of Same Color",
-				Properties: []*models.Property{{
-					Price: 10.0,
-					Value:  *valueBodyColorRAL9010,
-				}, {
-					Price: 15.0,
-					Value:  *valuePlateColorRAL9010,
+				Properties: []*models.Property{&models.Property{
+					Option: *optionBodyColor,
+					Values: []*models.Value{
+						{
+							Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
+							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
+							Price: 10.0,
+							Value: "RAL9010",
+						},
+						{
+							Title: "RAL9001 - Leicht Cremeweiß lackiert",
+							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9001-leicht-cremeweiss-lackiert-209216-hh-thumb.jpg",
+							Price: 11.0,
+							Value: "RAL9001",
+						},
+					},
+				}, &models.Property{
+					Option: *optionPlateColor,
+					Values: []*models.Value{
+						{
+							Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
+							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
+							Price: 8.0,
+							Value: "RAL9010",
+						},
+						{
+							Title: "Pearl Grey Pinseleffekt - M803",
+							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/pearl-grey-pinseleffekt-m803-459219-hh-thumb.jpg",
+							Price: 9.0,
+							Value: "M803",
+						},
+					},
 				}},
 				Price:      1000.0,
 				ProductId:  product1.ID,
@@ -368,11 +433,37 @@ var RootCmd = &cobra.Command{
 				Name:       "Body Color RAL9010 and Plate Color A801",
 				Title:      "Body Color White Milk and Plate Color Soft Gray",
 				Properties: []*models.Property{&models.Property{
-					Price: 10.0,
-					Value: *valueBodyColorRAL9010,
+					Option: *optionBodyColor,
+					Values: []*models.Value{
+						{
+							Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
+							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
+							Price: 10.0,
+							Value: "RAL9010",
+						},
+						{
+							Title: "RAL9001 - Leicht Cremeweiß lackiert",
+							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9001-leicht-cremeweiss-lackiert-209216-hh-thumb.jpg",
+							Price: 11.0,
+							Value: "RAL9001",
+						},
+					},
 				}, &models.Property{
-					Price: 5.0,
-					Value: *valuePlateColorRAL9001,
+					Option: *optionPlateColor,
+					Values: []*models.Value{
+						{
+							Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
+							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
+							Price: 8.0,
+							Value: "RAL9010",
+						},
+						{
+							Title: "Pearl Grey Pinseleffekt - M803",
+							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/pearl-grey-pinseleffekt-m803-459219-hh-thumb.jpg",
+							Price: 9.0,
+							Value: "M803",
+						},
+					},
 				}},
 				Price:      1010.0,
 				ProductId:  product1.ID,
@@ -444,7 +535,7 @@ var RootCmd = &cobra.Command{
 		}
 		// ***
 		// Get Categories
-		tree := models.GetCategoriesTree(nil)
+		tree, _ := models.GetCategoriesView(common.Database, 0)
 		if bts, err := json.MarshalIndent(tree, "", "   "); err == nil {
 			logger.Infof("JSON: %+v", string(bts))
 		}
@@ -476,80 +567,17 @@ var RootCmd = &cobra.Command{
 						if properties, err := models.GetPropertiesFromOffer(common.Database, offer); err == nil {
 							logger.Infof("\t\tProperties: %v", len(properties))
 							for _, property := range properties {
-								logger.Infof("\t\t\t#%v %v = %v +$%.2f", property.Value.ID, property.Value.Option.Title, property.Value.Value, property.Price)
+								logger.Infof("\t\t\t#%v", property.ID)
 							}
 						}
 					}
 				}
 			}
 		}
-		/*cat1 := &models.Category{
-			Name: "cat1",
-			Title: "Category 1",
-		}
-		models.CreateCategory(common.Database, cat1)
-		cat2 := &models.Category{
-			Name: "cat2",
-			Title: "Category 2",
-		}
-		models.CreateCategory(common.Database, cat2)
-		prod1 := &models.Product{
-			Name: "prod1",
-			Title: "Product 1",
-		}
-		models.CreateProduct(common.Database, prod1)
-		if err := models.AddProductToCategory(common.Database, cat1, prod1); err != nil {
-			logger.Errorf("%v", err)
-		}
-		prod2 := &models.Product{
-			Name: "prod2",
-			Title: "Product 2",
-		}
-		models.CreateProduct(common.Database, prod2)
-		if err := models.AddProductToCategory(common.Database, cat1, prod2); err != nil {
-			logger.Errorf("%v", err)
-		}
-		if err := models.DeleteProductFromCategory(common.Database, cat1, prod1); err != nil {
-			logger.Errorf("%v", err)
-		}
-		prod3 := &models.Product{
-			Name: "prod3",
-			Title: "Product 3",
-		}
-		if _, err := models.CreateProduct(common.Database, prod3); err != nil {
-			logger.Errorf("%v", err)
-		}
-		if err := models.AddProductToCategory(common.Database, cat1, prod3); err != nil {
-			logger.Errorf("%v", err)
-		}
-		products, err := models.GetProductsFromCategory(common.Database, cat1)
-		if err != nil {
-			logger.Errorf("%v", err)
-		}
-		logger.Infof("Products: %v", len(products))
-		for i, product := range products {
-			logger.Infof("%d: %+v", i, product)
-		}
-		subcat1 := &models.Category{
-			Name: "subcat1",
-			Title: "Sub Category 1",
-		}
-		models.CreateCategory(common.Database, subcat1)
-		if err := models.AddSubcategoryToCategory(common.Database, cat1, subcat1); err != nil {
-			logger.Errorf("%v", err)
-		}
-		subcategories, err := models.GetSubcategoriesFromCategory(common.Database, cat1)
-		if err != nil {
-			logger.Errorf("%v", err)
-		}
-		logger.Infof("Subcategories: %v", len(subcategories))
-		for i, subcategory := range subcategories {
-			logger.Infof("%d: %+v", i, subcategory)
-		}*/
 		// /DEMO
 		// TODO: Yet another initialization code
 
-		if err := upg.Ready(); err != nil {
+		/*if err := upg.Ready(); err != nil {
 			panic(err)
 		}
 		<-upg.Exit()
@@ -563,7 +591,15 @@ var RootCmd = &cobra.Command{
 		})
 
 		// Wait for connections to drain.
-		server1.Shutdown(context.Background())
+		server1.Shutdown(context.Background())*/
+
+		app := handler.GetFiber()
+		host := common.Config.Host
+		if host == "*" {
+			host = ""
+		}
+		port := common.Config.Port
+		logger.Fatalf("Listening http: %+v", app.Listen(fmt.Sprintf("%v:%d", host, port)))
 	},
 }
 

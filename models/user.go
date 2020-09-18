@@ -42,6 +42,16 @@ func GetUser(connector *gorm.DB, id int) (*User, error){
 	return &user, db.Error
 }
 
+func GetUserByLogin(connector *gorm.DB, login string) (*User, error){
+	db := connector
+	var user User
+	db.Where("login = ?", login).First(&user)
+	if user.Email == "" {
+		return nil, fmt.Errorf("user not found")
+	}
+	return &user, db.Error
+}
+
 func GetUserByLoginAndPassword(connector *gorm.DB, login string, password string) (*User, error){
 	db := connector
 	var user User

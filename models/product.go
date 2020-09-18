@@ -44,6 +44,16 @@ func GetProducts(connector *gorm.DB) ([]*Product, error) {
 	return products, nil
 }
 
+func GetProduct(connector *gorm.DB, id int) (*Product, error) {
+	db := connector
+	var product Product
+	db.Debug().Find(&product, id)
+	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return &product, nil
+}
+
 func CreateProduct(connector *gorm.DB, product *Product) (uint, error) {
 	db := connector
 	db.Debug().Create(&product)

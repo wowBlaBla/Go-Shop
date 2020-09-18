@@ -3,88 +3,142 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/google/logger"
-	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
-	"github.com/yonnic/goshop/models"
-	"os"
-
-	_ "github.com/volatiletech/authboss/v3/auth"
-	_ "github.com/volatiletech/authboss/v3/logout"
-	_ "github.com/volatiletech/authboss/v3/recover"
-	_ "github.com/volatiletech/authboss/v3/register"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/session/v2"
 	"github.com/yonnic/goshop/common"
+	"github.com/yonnic/goshop/models"
 	"net/http"
+	"strconv"
 	"time"
 )
 
-func GetRouter() http.Handler {
-	r := mux.NewRouter()
-	//
-	r.HandleFunc("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t1 := time.Now()
-		defer func() {
-			logger.Infof("%s %s %s ~ %.3f ms", r.RemoteAddr, r.Method, r.URL, float64(time.Since(t1).Nanoseconds())/1000000)
-		}()
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
+var (
+	sessions = session.New(session.Config{
+		Expiration: 24 * 30 * time.Hour,
+	})
+)
 
-		w.Write([]byte(``))
-	}))
-	apiV1 := r.PathPrefix("/api/v1").Subrouter()
-	apiV1.HandleFunc("/info", AuthenticateWrap(func(w http.ResponseWriter, r *AuthenticatedRequest) {
-		t1 := time.Now()
-		defer func() {
-			logger.Infof("%s %s %s ~ %.3f ms", r.RemoteAddr, r.Method, r.URL, float64(time.Since(t1).Nanoseconds()) / 1000000)
-		}()
-		var result struct {
-			Application string
-			Started time.Time
-			User *models.User
+
+func GetFiber() *fiber.App {
+	app, authMulti := CreateFiberAppWithAuthMultiple(nil)
+
+	app.Get("/", authMulti, func(c *fiber.Ctx) error {
+		m := fiber.Map{"Hello": "world"}
+		if v := c.Locals("user"); v != nil {
+			m["User"] = v.(*models.User)
 		}
-		result.Application = fmt.Sprintf("%v v%v %v", common.APPLICATION, common.VERSION, common.COMPILED)
-		result.Started = common.Started
-		result.User = r.User
-		returnStructAsJson(w, http.StatusOK, result)
-		return
-	}))
+		return c.JSON(m)
+	})
 
-	AuthInit(r, "")
+	api := app.Group("/api")
+	v1 := api.Group("/v1")
 
-	return handlers.CORS(
-		handlers.AllowedOrigins([]string{os.Getenv("ORIGIN_ALLOWED")}),
-		handlers.AllowedHeaders([]string{"X-Requested-With"}),
-		handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"}))(r)
-}
+	v1.Get("/info", authMulti, func(c *fiber.Ctx) error {
+		response := fiber.Map{}
+		response["Application"] = fmt.Sprintf("%v v%v %v", common.APPLICATION, common.VERSION, common.COMPILED)
+		response["Started"] = common.Started
+		if v := c.Locals("authorization"); v != nil {
+			response["Authorization"] = v.(string)
+		}
+		if v := c.Locals("expiration"); v != nil {
+			if expiration := v.(int64); expiration > 0 {
+				response["ExpirationAt"] = time.Unix(expiration, 0).Format(time.RFC3339)
+			}
+		}
+		if v := c.Locals("username"); v != nil {
+			if user, err := models.GetUserByLogin(common.Database, v.(string)); err == nil {
+				response["User"] = user
+			}
+		}
+		return c.JSON(response)
+	})
 
-/**/
+	v1.Get("/categories", func(c *fiber.Ctx) error {
+		var id int
+		if v := c.Query("id"); v != "" {
+			id, _ = strconv.Atoi(v)
+		}
+		if view, err := models.GetCategoriesView(common.Database, id); err == nil {
+			return c.JSON(view)
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(fiber.Map{"ERROR": err.Error()})
+		}
+	})
 
-func returnJson(w http.ResponseWriter, code int, body []byte) {
-	w.Header().Add("Content-Category", "application/json")
-	w.WriteHeader(code)
-	w.Write(body)
-}
+	v1.Get("/products/:id", func(c *fiber.Ctx) error {
+		var id int
+		if v := c.Params("id"); v != "" {
+			id, _ = strconv.Atoi(v)
+		}
+		if product, err := models.GetProduct(common.Database, id); err == nil {
+			return c.JSON(struct {
+				ID uint
+				Name string
+				Title string
+				Description string
+				Thumbnail string
+			}{
+				ID: product.ID,
+				Name: product.Name,
+				Title: product.Title,
+				Description: product.Description,
+				Thumbnail: product.Thumbnail,
+			})
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(fiber.Map{"ERROR": err.Error()})
+		}
+	})
 
-func returnStringAsJson(w http.ResponseWriter, code int, body string) {
-	returnJson(w, code, []byte(body))
-}
+	v1.Get("/products/:pid/offers/:id", func(c *fiber.Ctx) error {
+		var id int
+		if v := c.Params("id"); v != "" {
+			id, _ = strconv.Atoi(v)
+		}
+		if offer, err := models.GetOffer(common.Database, id); err == nil {
+			var view struct {
+				ID uint
+				Name string
+				Title string
+				Description string
+				Thumbnail string
+				Properties []struct {
+					ID uint
+					Option struct {
+						ID uint
+						Name string
+						Title string
+						Description string
+					}
+					Values []struct {
+						ID uint
+						Title string
+						Thumbnail string
+						Price float64
+						Value string
+					}
+				}
+				Price float64
+			}
+			if bts, err := json.Marshal(offer); err == nil {
+				if err = json.Unmarshal(bts, &view); err == nil {
+					return c.JSON(view)
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(fiber.Map{"ERROR": err.Error()})
+				}
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(fiber.Map{"ERROR": err.Error()})
+			}
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(fiber.Map{"ERROR": "Something went wrong"})
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(fiber.Map{"ERROR": err.Error()})
+		}
+	})
 
-func returnMapAsJson(w http.ResponseWriter, code int, map_ map[string]interface{}) {
-	var bts []byte
-	var err error
-	if bts, err = json.Marshal(map_); err != nil {
-		returnStringAsJson(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	returnJson(w, code, bts)
-}
-
-func returnStructAsJson(w http.ResponseWriter, code int, v interface{}) {
-	var bts []byte
-	var err error
-	if bts, err = json.Marshal(v); err != nil {
-		returnStringAsJson(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	returnJson(w, code, bts)
+	return app
 }
