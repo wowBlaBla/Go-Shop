@@ -7,6 +7,7 @@ type Option struct {
 	Name string
 	Title string
 	Description string
+	Values []*Value `gorm:"foreignKey:OptionId"`
 }
 
 func CreateOption(connector *gorm.DB, option *Option) (uint, error) {

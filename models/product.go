@@ -54,6 +54,16 @@ func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 	return &product, nil
 }
 
+func GetProductOffers(connector *gorm.DB, id int) ([]*Offer, error) {
+	db := connector
+	var product Product
+	db.Debug().Preload("Offers").Preload("Offers.Properties").Preload("Offers.Properties.Option").Preload("Offers.Properties.Prices").Preload("Offers.Properties.Prices.Value").Find(&product, id)
+	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return product.Offers, nil
+}
+
 func CreateProduct(connector *gorm.DB, product *Product) (uint, error) {
 	db := connector
 	db.Debug().Create(&product)

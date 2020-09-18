@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/session/v2"
+	"github.com/google/logger"
 	"github.com/yonnic/goshop/common"
 	"github.com/yonnic/goshop/models"
 	"net/http"
@@ -72,23 +73,53 @@ func GetFiber() *fiber.App {
 			id, _ = strconv.Atoi(v)
 		}
 		if product, err := models.GetProduct(common.Database, id); err == nil {
-			return c.JSON(struct {
+			var view struct {
 				ID uint
 				Name string
 				Title string
-				Description string
-				Thumbnail string
-			}{
-				ID: product.ID,
-				Name: product.Name,
-				Title: product.Title,
-				Description: product.Description,
-				Thumbnail: product.Thumbnail,
-			})
+				Description string `json:",omitempty"`
+				Thumbnail string `json:",omitempty"`
+				Note string `json:"NOTE"`
+			}
+			if bts, err := json.MarshalIndent(product, "", "   "); err == nil {
+				if err = json.Unmarshal(bts, &view); err == nil {
+					view.Note = fmt.Sprintf("Call /api/v1/product/%d/offers to see the offers", product.ID)
+					return c.JSON(view)
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(fiber.Map{"ERROR": err.Error()})
+				}
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(fiber.Map{"ERROR": err.Error()})
+			}
 		}else{
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(fiber.Map{"ERROR": err.Error()})
 		}
+	})
+
+	v1.Get("/products/:id/offers", func(c *fiber.Ctx) error {
+		var id int
+		if v := c.Params("id"); v != "" {
+			id, _ = strconv.Atoi(v)
+		}
+		if offers, err := models.GetProductOffers(common.Database, id); err == nil {
+			var view []*OfferView
+			if bts, err := json.MarshalIndent(offers, "", "   "); err == nil {
+				if err = json.Unmarshal(bts, &view); err == nil {
+					return c.JSON(view)
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(fiber.Map{"ERROR": err.Error()})
+				}
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(fiber.Map{"ERROR": err.Error()})
+			}
+		}
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "Something went wrong"})
 	})
 
 	v1.Get("/products/:pid/offers/:id", func(c *fiber.Ctx) error {
@@ -97,31 +128,9 @@ func GetFiber() *fiber.App {
 			id, _ = strconv.Atoi(v)
 		}
 		if offer, err := models.GetOffer(common.Database, id); err == nil {
-			var view struct {
-				ID uint
-				Name string
-				Title string
-				Description string
-				Thumbnail string
-				Properties []struct {
-					ID uint
-					Option struct {
-						ID uint
-						Name string
-						Title string
-						Description string
-					}
-					Values []struct {
-						ID uint
-						Title string
-						Thumbnail string
-						Price float64
-						Value string
-					}
-				}
-				Price float64
-			}
-			if bts, err := json.Marshal(offer); err == nil {
+			var view OfferView
+			if bts, err := json.MarshalIndent(offer, "", "   "); err == nil {
+				logger.Infof("JSON: %v", string(bts))
 				if err = json.Unmarshal(bts, &view); err == nil {
 					return c.JSON(view)
 				}else{
@@ -141,4 +150,32 @@ func GetFiber() *fiber.App {
 	})
 
 	return app
+}
+
+type OfferView struct {
+	ID uint
+	Name string
+	Title string
+	Description string `json:",omitempty"`
+	Thumbnail string `json:",omitempty"`
+	Properties []struct {
+		ID uint
+		Option struct {
+			ID uint
+			Name string
+			Title string
+			Description string `json:",omitempty"`
+		}
+		Prices []struct {
+			ID uint
+			Enabled bool
+			Value struct {
+				ID uint
+				Title string
+				Thumbnail string `json:",omitempty"`
+			}
+			Price float64
+		}
+	}
+	Price float64
 }

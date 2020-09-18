@@ -4,14 +4,13 @@ import "gorm.io/gorm"
 
 type Property struct {
 	gorm.Model
+	Name string
+	Title string
 	OfferId uint
-	Option Option `gorm:"foreignKey:OptionId"`
+	Option *Option `gorm:"foreignKey:OptionId"`
 	OptionId uint
-	/*Value Value `gorm:"foreignKey:ValueId"`
-	ValueId uint
-	Price float64
-	*/
-	Values []*Value `gorm:"foreignKey:PropertyId"`
+	//
+	Prices []*Price `gorm:"foreignKey:PropertyId"`
 }
 
 func CreateProperty(connector *gorm.DB, property *Property) (uint, error) {

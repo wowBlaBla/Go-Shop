@@ -20,7 +20,6 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
-	"strings"
 	"syscall"
 )
 
@@ -222,6 +221,7 @@ var RootCmd = &cobra.Command{
 		common.Database.AutoMigrate(&models.Property{})
 		common.Database.AutoMigrate(&models.Option{})
 		common.Database.AutoMigrate(&models.Value{})
+		common.Database.AutoMigrate(&models.Price{})
 		// DEMO
 		mode := "create" // create, select
 		if mode == "create" {
@@ -235,28 +235,22 @@ var RootCmd = &cobra.Command{
 			}
 			// Create category Living Areas >> Dining Room
 			subcategory1 := &models.Category{
-				Name:  "dining-room",
-				Title: "Dining Room",
+				Name:   "dining-room",
+				Title:  "Dining Room",
 				Parent: category1,
 			}
 			if _, err := models.CreateCategory(common.Database, subcategory1); err == nil {
 				logger.Errorf("%v", err)
 			}
-			/*if err := models.AddSubcategoryToCategory(common.Database, category1, subcategory1); err != nil {
-				logger.Errorf("%v", err)
-			}*/
 			// Create category Living Areas >> Dining Room >> Dining Tables
 			subsubcategory1 := &models.Category{
-				Name:  "dining-tables",
-				Title: "Dining Tables",
+				Name:   "dining-tables",
+				Title:  "Dining Tables",
 				Parent: subcategory1,
 			}
 			if _, err := models.CreateCategory(common.Database, subsubcategory1); err == nil {
 				logger.Errorf("%v", err)
 			}
-			/*if err := models.AddSubcategoryToCategory(common.Database, subcategory1, subsubcategory1); err != nil {
-				logger.Errorf("%v", err)
-			}*/
 			// Create product
 			// example: https://www.moebelhausduesseldorf.de/wohnraum/esszimmer/tafel/wei%c3%9fer-esstisch-aus-massivem-kiefernholz-958479
 			product1 := &models.Product{
@@ -270,308 +264,129 @@ var RootCmd = &cobra.Command{
 			if err := models.AddProductToCategory(common.Database, subsubcategory1, product1); err != nil {
 				logger.Errorf("%v", err)
 			}
-			// Create option Body Color
-			optionBodyColor := &models.Option{
-				Name:  "body-color",
-				Title: "Body Color",
-			}
-			if _, err := models.CreateOption(common.Database, optionBodyColor); err != nil {
-				logger.Errorf("%v", err)
-			}
-			/*if err := models.AddOptionToCategory(common.Database, subsubcategory1, option1); err != nil {
-				logger.Errorf("%v", err)
-			}*/
-			/**/
-			/*propertyBodyColor := &models.Property{
-				Option: *optionBodyColor,
-				Values: []*models.Value{
-					{
-						Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
-						Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
-						Price: 10.0,
-						Value: "RAL9010",
-					},
-					{
-						Title: "RAL9001 - Leicht Cremeweiß lackiert",
-						Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9001-leicht-cremeweiss-lackiert-209216-hh-thumb.jpg",
-						Price: 11.0,
-						Value: "RAL9001",
-					},
-				},
-			}
-			if _, err := models.CreateProperty(common.Database, propertyBodyColor); err != nil {
-				logger.Errorf("%v", err)
-			}*/
-			/**/
-			// Create values of BodyColor
-			/*valueBodyColorRAL9010 := &models.Value{
-				Option: *optionBodyColor,
+			//
+			ral9010 := &models.Value{
 				Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
 				Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
 				Value: "RAL9010",
 			}
-			if _, err := models.CreateValue(common.Database, valueBodyColorRAL9010); err != nil {
-				logger.Errorf("%v", err)
-			}
-			valueBodyColorRAL9001 := &models.Value{
-				Option: *optionBodyColor,
+			ral9001 := &models.Value{
 				Title: "RAL9001 - Leicht Cremeweiß lackiert",
 				Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9001-leicht-cremeweiss-lackiert-209216-hh-thumb.jpg",
 				Value: "RAL9001",
 			}
-			if _, err := models.CreateValue(common.Database, valueBodyColorRAL9001); err != nil {
-				logger.Errorf("%v", err)
-			}
-			valueBodyColorM803 := &models.Value{
-				Option: *optionBodyColor,
-				Title: "Pearl Grey Pinseleffekt - M803",
+			m803 := &models.Value{
+				Title: "M803 - Pearl Grey Pinseleffekt",
 				Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/pearl-grey-pinseleffekt-m803-459219-hh-thumb.jpg",
 				Value: "M803",
 			}
-			if _, err := models.CreateValue(common.Database, valueBodyColorM803); err != nil {
-				logger.Errorf("%v", err)
-			}*/
-			// Create option Plate Color
-			optionPlateColor := &models.Option{
-				Name:  "plate-color",
-				Title: "Plate Color",
-			}
-			if _, err := models.CreateOption(common.Database, optionPlateColor); err != nil {
-				logger.Errorf("%v", err)
-			}
-			/*propertyPlateColor := &models.Property{
-				Option: *optionPlateColor,
+			// Option: color
+			color := &models.Option{
+				Name: "color",
+				Title: "Color",
 				Values: []*models.Value{
-					{
-						Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
-						Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
-						Price: 8.0,
-						Value: "RAL9010",
-					},
-					{
-						Title: "Pearl Grey Pinseleffekt - M803",
-						Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/pearl-grey-pinseleffekt-m803-459219-hh-thumb.jpg",
-						Price: 9.0,
-						Value: "M803",
-					},
+					ral9010,
+					ral9001,
+					m803,
 				},
 			}
-			if _, err := models.CreateProperty(common.Database, propertyPlateColor); err != nil {
-				logger.Errorf("%v", err)
-			}*/
-			// Create values of BodyColor
-			/*valuePlateColorRAL9010 := &models.Value{
-				Option: *optionPlateColor,
-				Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
-				Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
-				Value: "RAL9010",
-			}
-			if _, err := models.CreateValue(common.Database, valuePlateColorRAL9010); err != nil {
+			if _, err := models.CreateOption(common.Database, color); err != nil {
 				logger.Errorf("%v", err)
 			}
-			valuePlateColorRAL9001 := &models.Value{
-				Option: *optionPlateColor,
-				Title: "RAL9001 - Leicht Cremeweiß lackiert",
-				Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9001-leicht-cremeweiss-lackiert-209216-hh-thumb.jpg",
-				Value: "RAL9001",
+			logger.Infof("Color: #%v %+v", color.ID, color.Title)
+			if bts, err := json.MarshalIndent(color, "",  "   "); err == nil {
+				logger.Infof("JSON: %+v", string(bts))
 			}
-			if _, err := models.CreateValue(common.Database, valuePlateColorRAL9001); err != nil {
-				logger.Errorf("%v", err)
-			}*/
-			/*if err := models.AddOptionToCategory(common.Database, subsubcategory1, option2); err != nil {
-				logger.Errorf("%v", err)
-			}*/
-			// Create offer #1
+			// Offer 1
 			offer1 := &models.Offer{
-				Name:       "Body Color RAL9010 and Plate Color RAL9010",
+				Name:       "body-color-ral9010-and-plate-color-ral9010",
 				Title:      "Body Color Milk White and Plate of Same Color",
-				Properties: []*models.Property{&models.Property{
-					Option: *optionBodyColor,
-					Values: []*models.Value{
-						{
-							Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
-							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
-							Price: 10.0,
-							Value: "RAL9010",
-						},
-						{
-							Title: "RAL9001 - Leicht Cremeweiß lackiert",
-							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9001-leicht-cremeweiss-lackiert-209216-hh-thumb.jpg",
-							Price: 11.0,
-							Value: "RAL9001",
-						},
-					},
-				}, &models.Property{
-					Option: *optionPlateColor,
-					Values: []*models.Value{
-						{
-							Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
-							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
-							Price: 8.0,
-							Value: "RAL9010",
-						},
-						{
-							Title: "Pearl Grey Pinseleffekt - M803",
-							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/pearl-grey-pinseleffekt-m803-459219-hh-thumb.jpg",
-							Price: 9.0,
-							Value: "M803",
+				Properties: []*models.Property{
+					{
+						Name: "body-color",
+						Title: "Body Color",
+						Option: color,
+						Prices: []*models.Price{
+							{
+								Enabled: true,
+								Value: ral9010,
+								Price: 1.23,
+							},
+							{
+								Enabled: true,
+								Value: ral9001,
+								Price: 2.34,
+							},
 						},
 					},
-				}},
-				Price:      1000.0,
+					{
+						Name: "plate-color",
+						Title: "Plate Color",
+						Option: color,
+						Prices: []*models.Price{
+							{
+								Enabled: true,
+								Value: ral9010,
+								Price: 3.21,
+							},
+							{
+								Enabled: true,
+								Value: ral9001,
+								Price: 4.32,
+							},
+						},
+					},
+				},
+				BasePrice:      1000.0,
 				ProductId:  product1.ID,
 			}
 			if _, err := models.CreateOffer(common.Database, offer1); err != nil {
 				logger.Errorf("%v", err)
 			}
-			// Add Offer #1 to product
-			if err := models.AddOfferToProduct(common.Database, product1, offer1); err != nil {
-				logger.Errorf("%v", err)
-			}
-			// Create offer #2
+			// Offer 2
 			offer2 := &models.Offer{
-				Name:       "Body Color RAL9010 and Plate Color A801",
-				Title:      "Body Color White Milk and Plate Color Soft Gray",
-				Properties: []*models.Property{&models.Property{
-					Option: *optionBodyColor,
-					Values: []*models.Value{
-						{
-							Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
-							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
-							Price: 10.0,
-							Value: "RAL9010",
+				Name:       "plate-color-ral9010-and-plate-color-ral9010",
+				Title:      "Plate Color Milk White and Plate of Same Color",
+				Properties: []*models.Property{
+					{
+						Name: "body-color",
+						Title: "Body Color",
+						Option: color,
+						Prices: []*models.Price{
+							{
+								Enabled: true,
+								Value: ral9010,
+								Price: 3.45,
+							},
+							{
+								Enabled: true,
+								Value: m803,
+								Price: 4.56,
+							},
 						},
-						{
-							Title: "RAL9001 - Leicht Cremeweiß lackiert",
-							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9001-leicht-cremeweiss-lackiert-209216-hh-thumb.jpg",
-							Price: 11.0,
-							Value: "RAL9001",
+					}, {
+						Name: "plate-color",
+						Title: "Plate Color",
+						Option: color,
+						Prices: []*models.Price{
+							{
+								Enabled: true,
+								Value: ral9010,
+								Price: 13.45,
+							},
+							{
+								Enabled: true,
+								Value: m803,
+								Price: 14.56,
+							},
 						},
 					},
-				}, &models.Property{
-					Option: *optionPlateColor,
-					Values: []*models.Value{
-						{
-							Title: "RAL9010 - Weiß lackiert - unsere beliebteste Farbe",
-							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/ral9010-weiss-lackiert-unsere-beliebteste-farbe-209104-hh-thumb.jpg",
-							Price: 8.0,
-							Value: "RAL9010",
-						},
-						{
-							Title: "Pearl Grey Pinseleffekt - M803",
-							Thumbnail: "https://www.moebelhausduesseldorf.de/galleries/pearl-grey-pinseleffekt-m803-459219-hh-thumb.jpg",
-							Price: 9.0,
-							Value: "M803",
-						},
-					},
-				}},
-				Price:      1010.0,
+				},
+				BasePrice:      1100.0,
 				ProductId:  product1.ID,
 			}
 			if _, err := models.CreateOffer(common.Database, offer2); err != nil {
 				logger.Errorf("%v", err)
-			}
-			// Add Offer #2 to product
-			if err := models.AddOfferToProduct(common.Database, product1, offer2); err != nil {
-				logger.Errorf("%v", err)
-			}
-			//
-			// Create category Living Areas >> Bathroom
-			subcategory2 := &models.Category{
-				Name:  "bathroom",
-				Title: "Bathroom",
-				Parent: category1,
-			}
-			if _, err := models.CreateCategory(common.Database, subcategory2); err == nil {
-				logger.Errorf("%v", err)
-			}
-			// Create product
-			// example: https://www.moebelhausduesseldorf.de/wohnraum/toilette/waschbeckenschrank-wei%c3%9f-f%c3%bcr-das-badezimmer-974057
-			product2 := &models.Product{
-				Name:        "washbasin-cabinet-white-for-the-bathroom",
-				Title:       "Washbasin cabinet white for the bathroom",
-				Description: "Small washbasin",
-			}
-			if _, err := models.CreateProduct(common.Database, product2); err != nil {
-				logger.Errorf("%v", err)
-			}
-			if err := models.AddProductToCategory(common.Database, subcategory2, product2); err != nil {
-				logger.Errorf("%v", err)
-			}
-			// Create offer #3
-			/*offer3 := &models.Offer{
-				Name:       "Washbasin cabinet white for the bathroom with plate of pine",
-				Title:      "Washbasin cabinet white for the bathroom with plate of pine",
-				Properties: []*models.Property{&models.Property{
-					Option: models.Option{
-						Name: "plate-type",
-						Title: "Type of plate",
-					},
-					Value:  "pine",
-				}},
-				Price:      2000.0,
-				ProductId:  product2.ID,
-			}
-			if _, err := models.CreateOffer(common.Database, offer3); err != nil {
-				logger.Errorf("%v", err)
-			}
-			// Create offer #4
-			offer4 := &models.Offer{
-				Name:       "Washbasin cabinet white for the bathroom with plate of oak",
-				Title:      "Washbasin cabinet white for the bathroom with plate of oak",
-				Properties: []*models.Property{&models.Property{
-					Option: models.Option{
-						Name: "plate-type",
-						Title: "Type of plate",
-					},
-					Value:  "oak",
-				}},
-				Price:      2500.0,
-				ProductId:  product2.ID,
-			}
-			if _, err := models.CreateOffer(common.Database, offer4); err != nil {
-				logger.Errorf("%v", err)
-			}*/
-		}
-		// ***
-		// Get Categories
-		tree, _ := models.GetCategoriesView(common.Database, 0)
-		if bts, err := json.MarshalIndent(tree, "", "   "); err == nil {
-			logger.Infof("JSON: %+v", string(bts))
-		}
-		// Get Products
-		if products, err := models.GetProducts(common.Database); err == nil {
-			logger.Infof("Products: %v", len(products))
-			for _, product := range products {
-				logger.Infof("\t#%v %v %v", product.ID, product.Name, product.Title)
-				if categories, err := models.GetCategoriesOfProduct(common.Database, product); err == nil {
-					logger.Infof("\tCategories: %v", len(categories))
-					for _, category := range categories {
-						var crumbs = []*models.Category{category}
-						for ;category != nil && category.ParentId != 0; {
-							if category = models.GetParentFromCategory(common.Database, category); category != nil {
-								crumbs = append([]*models.Category{category}, crumbs...)
-							}
-						}
-						var p []string
-						for _, category := range crumbs {
-							p = append(p, category.Title)
-						}
-						logger.Infof("\t\tPath: %v", strings.Join(p, " => "))
-					}
-				}
-				if offers, err := models.GetOffersFromProduct(common.Database, product); err == nil {
-					logger.Infof("\tOffers: %v", len(offers))
-					for _, offer := range offers {
-						logger.Infof("\t\t#%v %v $%.2f", offer.ID, offer.Title, offer.Price)
-						if properties, err := models.GetPropertiesFromOffer(common.Database, offer); err == nil {
-							logger.Infof("\t\tProperties: %v", len(properties))
-							for _, property := range properties {
-								logger.Infof("\t\t\t#%v", property.ID)
-							}
-						}
-					}
-				}
 			}
 		}
 		// /DEMO

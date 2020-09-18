@@ -12,7 +12,7 @@ type Offer struct {
 	Thumbnail string
 	//Properties []*Property `gorm:"many2many:offer_properties;"`
 	Properties []*Property `gorm:"foreignKey:OfferId"`
-	Price float64          `sql:"type:decimal(8,2);"`
+	BasePrice float64          `sql:"type:decimal(8,2);"`
 	//
 	ProductId uint
 }
@@ -20,7 +20,7 @@ type Offer struct {
 func GetOffer(connector *gorm.DB, id int) (*Offer, error) {
 	db := connector
 	var offer Offer
-	db.Debug().Preload("Properties").Preload("Properties.Option").Preload("Properties.Values").Find(&offer, id)
+	db.Preload("Properties").Preload("Properties.Option").Preload("Properties.Prices").Preload("Properties.Prices.Value").Find(&offer, id)
 	if err := db.Error; err != nil {
 		return nil, err
 	}
