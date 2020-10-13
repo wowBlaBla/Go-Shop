@@ -9,29 +9,18 @@ type Product struct {
 	Description string
 	Thumbnail string
 	Categories []*Category `gorm:"many2many:categories_products;"`
-	//
-	// Optionally use "Offers" for final count of product variations
 	Offers []*Offer `gorm:"foreignKey:ProductId"`
-	// OR use "Properties" for endless number of product variations
-	//Properties []*ProductProperty `gorm:"foreignKey:ProductId"`
-	// For example:
-	// (1) Offers - iPhone have final number of variations in case of iPhone 11 it is color and storage:
-	// 'black' and '64Gb'
-	// 'black' and '256Gb'
-	// 'black' and '512Gb'
-	// 'black' and '1024Gb'
-	// 'white' and '64Gb'
-	// ...
-	// 'red' and '1024Gb'
-	// You should to create 'Offer' for each of such combination and use it.
-	// (2) Properties - Furniture has huge number of variations depend on material, color, texture. Each of such 'option' linearly effect to price y increasing or decreasing value, if body color:
-	// 'black' $+75
-	// 'white' $+150
-	// plate color:
-	// 'black' $+50
-	// 'white' $+100
-	// ...
-	// final price is build like constructor
+	Images []*Image `gorm:"many2many:products_images;"`
+}
+
+func SearchProducts(connector *gorm.DB, term string, limit int) ([]*Product, error) {
+	db := connector
+	var products []*Product
+	db.Debug().Preload("Categories").Preload("Offers").Where("name like ? OR title like ? OR description like ?", term, term, term).Limit(limit).Find(&products)
+	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return products, nil
 }
 
 func GetProducts(connector *gorm.DB) ([]*Product, error) {
@@ -49,6 +38,25 @@ func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 	var product Product
 	db.Debug().Find(&product, id)
 	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return &product, nil
+}
+
+func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
+	db := connector
+	var product Product
+	db.Preload("Images").Preload("Offers").Preload("Offers.Properties").Preload("Offers.Properties.Option").Preload("Offers.Properties.Prices").Preload("Offers.Properties.Prices.Value").Find(&product, id)
+	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return &product, nil
+}
+
+func GetProductByName(connector *gorm.DB, name string) (*Product, error) {
+	db := connector
+	var product Product
+	if err := db.Where("name = ?", name).First(&product).Error; err != nil {
 		return nil, err
 	}
 	return &product, nil
@@ -94,4 +102,20 @@ func GetOffersFromProduct(connector *gorm.DB, product *Product) ([]*Offer, error
 func AddOfferToProduct(connector *gorm.DB, product *Product, offer *Offer) error {
 	db := connector
 	return db.Model(&product).Association("Offers").Append(offer)
+}
+
+func AddImageToProduct(connector *gorm.DB, product *Product, image *Image) error {
+	db := connector
+	return db.Model(&product).Association("Images").Append(image)
+}
+
+func DeleteImageFromProduct(connector *gorm.DB, product *Product, image *Image) error {
+	db := connector
+	return db.Model(&product).Association("Images").Delete(image)
+}
+
+func UpdateProduct(connector *gorm.DB, product *Product) error {
+	db := connector
+	db.Debug().Save(&product)
+	return db.Error
 }

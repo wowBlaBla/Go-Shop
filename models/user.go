@@ -9,19 +9,21 @@ import (
 )
 
 const (
-	ROLE_ROOT = "root"
-	ROLE_ADMIN = "admin"
-	ROLE_MANAGER = "manager"
-	ROLE_USER = "user"
+	ROLE_ROOT = iota
+	ROLE_ADMIN
+	ROLE_MANAGER
+	ROLE_USER
 )
 
 type User struct {
 	gorm.Model
-	CreatedAt time.Time
-	Enable    bool
-	Login string
-	Password  string
-	Email     string
+	CreatedAt      time.Time
+	Enabled        bool
+	Login          string
+	Password       string
+	Email          string
+	EmailConfirmed bool
+	Role int
 	//
 	UpdatedAt time.Time
 }
@@ -56,6 +58,26 @@ func GetUserByLoginAndPassword(connector *gorm.DB, login string, password string
 	db := connector
 	var user User
 	db.Where("login = ? and password = ?", login, password).First(&user)
+	if user.Email == "" {
+		return nil, fmt.Errorf("user not found")
+	}
+	return &user, db.Error
+}
+
+func GetUserByEmailAndPassword(connector *gorm.DB, email string, password string) (*User, error){
+	db := connector
+	var user User
+	db.Where("email = ? and password = ?", email, password).First(&user)
+	if user.Email == "" {
+		return nil, fmt.Errorf("user not found")
+	}
+	return &user, db.Error
+}
+
+func GetUserByEmailOrLoginAndPassword(connector *gorm.DB, emailOrLogin string, password string) (*User, error){
+	db := connector
+	var user User
+	db.Where("(login = ? or email = ?) and password = ?", emailOrLogin, emailOrLogin, password).First(&user)
 	if user.Email == "" {
 		return nil, fmt.Errorf("user not found")
 	}

@@ -10,7 +10,6 @@ type Offer struct {
 	Title string
 	Description string
 	Thumbnail string
-	//Properties []*Property `gorm:"many2many:offer_properties;"`
 	Properties []*Property `gorm:"foreignKey:OfferId"`
 	BasePrice float64          `sql:"type:decimal(8,2);"`
 	//

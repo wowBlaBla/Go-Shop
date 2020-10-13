@@ -29,7 +29,7 @@ const (
 
 var (
 	validFrom  = ""
-	validFor   = 365 * 24 * time.Hour
+	validFor   = 10 * 365 * 24 * time.Hour
 	isCA       = true
 	rsaBits    = 2048
 	ecdsaCurve = ""
@@ -83,7 +83,7 @@ func (c *Config) Save() error {
 	return errors.New("unknown file type")
 }
 
-func GenerateSSL(certPath string, keyPath string, host string) error {
+func GenerateSSL(crtPath string, keyPath string, host string) error {
 	var priv interface{}
 	var err error
 	switch ecdsaCurve {
@@ -157,7 +157,7 @@ func GenerateSSL(certPath string, keyPath string, host string) error {
 		return err
 	}
 
-	certOut, err := os.Create(certPath)
+	certOut, err := os.Create(crtPath)
 	if err != nil {
 		return err
 	}

@@ -2,34 +2,8 @@ package models
 
 import (
 	"gorm.io/gorm"
+	"time"
 )
-
-type CategoryView struct {
-	ID uint
-	Name string
-	Title string
-	Children []*CategoryView `json:",omitempty"`
-}
-
-func GetCategoriesView(connector *gorm.DB, id int) (*CategoryView, error) {
-	if id == 0 {
-		return getCategoriesView(connector, &CategoryView{Name: "root", Title: "Root"}), nil
-	} else {
-		if category, err := GetCategory(connector, id); err == nil {
-			return getCategoriesView(connector, &CategoryView{ID:  category.ID, Name: category.Name, Title: category.Title}), nil
-		}else{
-			return nil, err
-		}
-	}
-}
-
-func getCategoriesView(connector *gorm.DB, root *CategoryView) *CategoryView {
-	for _, category := range GetChildrenOfCategoryById(connector, root.ID) {
-		child := getCategoriesView(connector, &CategoryView{ID: category.ID, Name: category.Name, Title: category.Title})
-		root.Children = append(root.Children, child)
-	}
-	return root
-}
 
 type Category struct {
 	gorm.Model
@@ -38,7 +12,6 @@ type Category struct {
 	Description string
 	Thumbnail string
 	Products []*Product `gorm:"many2many:categories_products;"`
-	//Options []*Option `gorm:"many2many:categories_options;"`
 	//
 	Parent *Category `gorm:"foreignKey:ParentId"`
 	ParentId uint
@@ -47,8 +20,16 @@ type Category struct {
 func GetCategory(connector *gorm.DB, id int) (*Category, error) {
 	db := connector
 	var category Category
-	db.Debug().Find(&category, id)
-	if err := db.Error; err != nil {
+	if err := db.Where("id = ?", id).First(&category).Error; err != nil {
+		return nil, err
+	}
+	return &category, nil
+}
+
+func GetCategoryByName(connector *gorm.DB, name string) (*Category, error) {
+	db := connector
+	var category Category
+	if err := db.Where("name = ?", name).First(&category).Error; err != nil {
 		return nil, err
 	}
 	return &category, nil
@@ -61,6 +42,46 @@ func CreateCategory(connector *gorm.DB, category *Category) (uint, error) {
 		return 0, err
 	}
 	return category.ID, nil
+}
+
+func UpdateCategory(connector *gorm.DB, category *Category) error {
+	db := connector
+	db.Debug().Save(&category)
+	return db.Error
+}
+
+func GetBreadcrumbs(connector *gorm.DB, categoryId uint) []*Category {
+	breadcrumbs := &[]*Category{}
+	var f3 func(connector *gorm.DB, id uint)
+	f3 = func(connector *gorm.DB, id uint) {
+		if id != 0 {
+			if category, err := GetCategory(connector, int(id)); err == nil {
+				if category.Thumbnail == "" {
+					if len(*breadcrumbs) > 0 {
+						category.Thumbnail = (*breadcrumbs)[0].Thumbnail
+					}
+				}
+				*breadcrumbs = append([]*Category{category}, *breadcrumbs...)
+				f3(connector, category.ParentId)
+			}
+		}
+	}
+	f3(connector, categoryId)
+	*breadcrumbs = append([]*Category{{Name: "products", Title: "Products", Model: gorm.Model{UpdatedAt: time.Now()}}}, *breadcrumbs...)
+	return *breadcrumbs
+}
+
+func GetChildrenCategories(connector *gorm.DB, category *Category) []*Category {
+	categories := &[]*Category{}
+	getChildrenCategories(connector, category.ID, categories)
+	return *categories
+}
+
+func getChildrenCategories(connector *gorm.DB, id uint, categories *[]*Category) {
+	for _, category := range GetChildrenOfCategoryById(connector, id) {
+		getChildrenCategories(connector, category.ID, categories)
+		*categories = append(*categories, category)
+	}
 }
 
 func GetCategoriesFromCategory(connector *gorm.DB, category *Category) []*Category {
@@ -142,3 +163,9 @@ func DeleteOptionFromCategory(connector *gorm.DB, category *Category, option *Op
 	db := connector
 	return db.Model(&category).Association("Options").Delete(option)
 }*/
+
+func DeleteCategory(connector *gorm.DB, category *Category) error {
+	db := connector
+	db.Debug().Delete(&category)
+	return db.Error
+}

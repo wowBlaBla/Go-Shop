@@ -1,6 +1,8 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+)
 
 type Option struct {
 	gorm.Model
@@ -10,6 +12,16 @@ type Option struct {
 	Values []*Value `gorm:"foreignKey:OptionId"`
 }
 
+func GetOptions(connector *gorm.DB) ([]*Option, error) {
+	db := connector
+	var options []*Option
+	db.Debug().Find(&options)
+	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return options, nil
+}
+
 func CreateOption(connector *gorm.DB, option *Option) (uint, error) {
 	db := connector
 	db.Debug().Create(&option)
@@ -17,4 +29,26 @@ func CreateOption(connector *gorm.DB, option *Option) (uint, error) {
 		return 0, err
 	}
 	return option.ID, nil
+}
+
+func GetOption(connector *gorm.DB, id int) (*Option, error) {
+	db := connector
+	var option Option
+	if err := db.Debug().Preload("Values").Where("id = ?", id).First(&option).Error; err != nil {
+		return nil, err
+	}
+	return &option, nil
+}
+
+func UpdateOption(connector *gorm.DB, option *Option) error {
+	db := connector
+	db.Debug().Save(&option)
+	return db.Error
+}
+
+
+func DeleteOption(connector *gorm.DB, option *Option) error {
+	db := connector
+	db.Debug().Delete(&option)
+	return db.Error
 }

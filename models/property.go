@@ -1,6 +1,9 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"github.com/google/logger"
+	"gorm.io/gorm"
+)
 
 type Property struct {
 	gorm.Model
@@ -13,6 +16,30 @@ type Property struct {
 	Prices []*Price `gorm:"foreignKey:PropertyId"`
 }
 
+func (p *Property) AfterDelete(tx *gorm.DB) error {
+	logger.Infof("AfterDelete")
+	return tx.Model(&Price{}).Where("property_id = ?", p.ID).Unscoped().Delete(&Price{}).Error
+}
+
+func GetProperty(connector *gorm.DB, id int) (*Property, error) {
+	db := connector
+	var property Property
+	db.Debug().Preload("Option").Find(&property, id)
+	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return &property, nil
+}
+
+func GetPropertiesByOfferAndName(connector *gorm.DB, offerId int, name string) ([]*Property, error) {
+	db := connector
+	var properties []*Property
+	if err := db.Where("offer_id = ? and name = ?", offerId, name).Find(&properties).Error; err != nil {
+		return nil, err
+	}
+	return properties, nil
+}
+
 func CreateProperty(connector *gorm.DB, property *Property) (uint, error) {
 	db := connector
 	db.Debug().Create(&property)
@@ -20,4 +47,16 @@ func CreateProperty(connector *gorm.DB, property *Property) (uint, error) {
 		return 0, err
 	}
 	return property.ID, nil
+}
+
+func UpdateProperty(connector *gorm.DB, property *Property) error {
+	db := connector
+	db.Debug().Save(&property)
+	return db.Error
+}
+
+func DeleteProperty(connector *gorm.DB, property *Property) error {
+	db := connector
+	db.Debug().Delete(&property)
+	return db.Error
 }
