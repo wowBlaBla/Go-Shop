@@ -22,7 +22,7 @@ var renderCmd = &cobra.Command{
 	Long:  `Render data to hugo compatible data structures`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger.Infof("Render module")
-		output := path.Join(dir, "content")
+		output := path.Join(dir, "hugo", "content")
 		if flagOutput := cmd.Flag("products").Value.String(); flagOutput != "" {
 			output = flagOutput
 		}
@@ -65,7 +65,11 @@ var renderCmd = &cobra.Command{
 		}
 		f1(common.Database, &CategoryView{Name: "", Title: "Root"})*/
 		//
+		t1 := time.Now()
 		if products, err := models.GetProducts(common.Database); err == nil {
+			if err := os.RemoveAll(output); err != nil {
+				logger.Infof("%v", err)
+			}
 			logger.Infof("Products found: %v", len(products))
 			for i, product := range products {
 				logger.Infof("%d: %+v", i, product)
@@ -138,10 +142,10 @@ var renderCmd = &cobra.Command{
 
 							if len(product.Images) > 0 {
 								for _, image := range product.Images {
-									if image.Path != "" {
-										view.Images = append(view.Images, image.Path)
-									}else if image.Url != "" {
+									if image.Url != "" {
 										view.Images = append(view.Images, image.Url)
+									}else if image.Path != "" {
+										view.Images = append(view.Images, image.Path)
 									}
 								}
 							}
@@ -223,7 +227,6 @@ var renderCmd = &cobra.Command{
 			return
 		}
 		//
-		t1 := time.Now()
 
 		/*result := struct {
 			Title string

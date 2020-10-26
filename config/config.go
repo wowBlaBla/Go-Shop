@@ -25,6 +25,7 @@ const (
 	DEFAULT_HOST = ""
 	DEFAULT_PORT = 18092
 	DEFAULT_HTTPS_PORT = 18492
+	DEFAULT_HUGO = "hugo"
 )
 
 var (
@@ -45,6 +46,7 @@ func NewConfig(file string) *Config {
 type Config struct {
 	path string
 	//
+	Base string
 	Host string
 	Port int
 	Https struct {
@@ -60,6 +62,7 @@ type Config struct {
 		Uri string // "root:password@/db_name?charset=utf8&parseTime=True&loc=Local" or ""
 	}
 	//
+	Hugo string
 	Modified time.Time
 }
 

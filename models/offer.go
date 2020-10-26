@@ -6,6 +6,7 @@ import (
 
 type Offer struct {
 	gorm.Model
+	ID        uint `gorm:"primarykey"`
 	Name string
 	Title string
 	Description string
@@ -14,6 +15,15 @@ type Offer struct {
 	BasePrice float64          `sql:"type:decimal(8,2);"`
 	//
 	ProductId uint
+}
+
+func GetOffersByProductAndName(connector *gorm.DB, productId uint, name string) ([]*Offer, error) {
+	db := connector
+	var offers []*Offer
+	if err := db.Debug().Where("product_id = ? and name = ?", productId, name).Find(&offers).Error; err != nil {
+		return nil, err
+	}
+	return offers, nil
 }
 
 func GetOffer(connector *gorm.DB, id int) (*Offer, error) {
@@ -42,4 +52,16 @@ func GetPropertiesFromOffer(connector *gorm.DB, offer *Offer) ([]*Property, erro
 		return nil, err
 	}
 	return properties, nil
+}
+
+func UpdateOffer(connector *gorm.DB, offer *Offer) error {
+	db := connector
+	db.Debug().Save(&offer)
+	return db.Error
+}
+
+func DeleteOffer(connector *gorm.DB, offer *Offer) error {
+	db := connector
+	db.Debug().Unscoped().Delete(&offer)
+	return db.Error
 }

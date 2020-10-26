@@ -16,3 +16,9 @@ type Item struct {
 	Total       float64          `sql:"type:decimal(8,2);"`
 	OrderId     uint
 }
+
+func DeleteItem(connector *gorm.DB, item *Item) error {
+	db := connector
+	db.Debug().Unscoped().Delete(&item)
+	return db.Error
+}

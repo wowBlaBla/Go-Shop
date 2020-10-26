@@ -57,6 +57,6 @@ func UpdatePrice(connector *gorm.DB, price *Price) error {
 
 func DeletePrice(connector *gorm.DB, price *Price) error {
 	db := connector
-	db.Debug().Delete(&price)
+	db.Debug().Unscoped().Delete(&price)
 	return db.Error
 }

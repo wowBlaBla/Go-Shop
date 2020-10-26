@@ -6,14 +6,20 @@ import (
 
 const (
 	ORDER_STATUS_NEW = "new"
+	ORDER_STATUS_WAITING_FROM_PAYMENT = "waiting for payment"
+	ORDER_STATUS_MANUFACTURING = "manufacturing"
+	ORDER_STATUS_SHIPPING = "shipping"
+	ORDER_STATUS_COMPLETE = "complete"
 )
 
 type Order struct {
 	gorm.Model
 	//
+	Description string
 	Items []*Item `gorm:"foreignKey:OrderId"`
-	Total float64          `sql:"type:decimal(8,2);"`
+	Total float64 `sql:"type:decimal(8,2);"`
 	Status string
+	Comment string
 	//
 	User *User `gorm:"foreignKey:UserId"`
 	UserId uint
@@ -46,4 +52,16 @@ func GetOrder(connector *gorm.DB, id int) (*Order, error) {
 		return nil, err
 	}
 	return &order, nil
+}
+
+func UpdateOrder(connector *gorm.DB, order *Order) error {
+	db := connector
+	db.Debug().Save(&order)
+	return db.Error
+}
+
+func DeleteOrder(connector *gorm.DB, order *Order) error {
+	db := connector
+	db.Debug().Unscoped().Delete(&order)
+	return db.Error
 }

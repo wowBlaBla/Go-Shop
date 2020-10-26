@@ -65,6 +65,6 @@ func UpdateValue(connector *gorm.DB, value *Value) error {
 
 func DeleteValue(connector *gorm.DB, value *Value) error {
 	db := connector
-	db.Debug().Delete(&value)
+	db.Debug().Unscoped().Delete(&value)
 	return db.Error
 }

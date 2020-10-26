@@ -60,6 +60,7 @@ func initConfig() {
 		common.Config.Https.Port = config.DEFAULT_HTTPS_PORT
 		common.Config.Database.Dialer = "sqlite"
 		common.Config.Database.Uri = path.Join(dir, "database.sqlite")
+		common.Config.Hugo = config.DEFAULT_HUGO
 		if err = common.Config.Save(); err != nil {
 			logger.Errorf(" %v", err.Error())
 		}
@@ -156,9 +157,46 @@ var RootCmd = &cobra.Command{
 		common.Database.AutoMigrate(&models.Option{})
 		common.Database.AutoMigrate(&models.Value{})
 		common.Database.AutoMigrate(&models.Price{})
-		//
 		common.Database.AutoMigrate(&models.Order{})
 		common.Database.AutoMigrate(&models.Item{})
+		common.Database.AutoMigrate(&models.Transaction{})
+		//
+		// Project structure
+		if admin := path.Join(dir, "admin"); len(admin) > 0 {
+			if _, err := os.Stat(admin); err != nil {
+				if err = os.MkdirAll(admin, 0755); err != nil {
+					logger.Errorf("%v", err)
+				}
+			}
+			if index := path.Join(admin, "index.html"); len(index) > 0 {
+				if _, err := os.Stat(index); err != nil {
+					if err = ioutil.WriteFile(index, []byte(`Admin UI should be here`), 0644); err != nil {
+						logger.Errorf("%v", err)
+					}
+				}
+			}
+		}
+		if static := path.Join(dir, "hugo", "static"); len(static) > 0 {
+			if _, err := os.Stat(static); err != nil {
+				if err = os.MkdirAll(static, 0755); err != nil {
+					logger.Errorf("%v", err)
+				}
+			}
+		}
+		if public := path.Join(dir, "hugo", "public"); len(public) > 0 {
+			if _, err := os.Stat(public); err != nil {
+				if err = os.MkdirAll(public, 0755); err != nil {
+					logger.Errorf("%v", err)
+				}
+			}
+			if index := path.Join(public, "index.html"); len(index) > 0 {
+				if _, err := os.Stat(index); err != nil {
+					if err = ioutil.WriteFile(index, []byte(`Public content is not generated yet`), 0755); err != nil {
+						logger.Errorf("%v", err)
+					}
+				}
+			}
+		}
 		//
 		app := handler.GetFiber()
 		// Https

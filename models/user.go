@@ -103,7 +103,7 @@ func CreateUser(connector *gorm.DB, user *User) (uint, error) {
 	return user.ID, nil
 }
 
-func UpdateUser(connector *gorm.DB, id int, patch map[string]string) error {
+/*func UpdateUser(connector *gorm.DB, id int, patch map[string]string) error {
 	db := connector
 	var user *User
 	db.Debug().First(&user, id)
@@ -117,11 +117,17 @@ func UpdateUser(connector *gorm.DB, id int, patch map[string]string) error {
 	//
 	db.Debug().Save(&user)
 	return db.Error
+}*/
+
+func UpdateUser(connector *gorm.DB, user *User) error {
+	db := connector
+	db.Debug().Unscoped().Save(&user)
+	return db.Error
 }
 
-func DeleteUser(connector *gorm.DB, id int) error {
+func DeleteUser(connector *gorm.DB, user *User) error {
 	db := connector
-	db.Delete(&User{}, id)
+	db.Debug().Unscoped().Delete(user)
 	return db.Error
 }
 

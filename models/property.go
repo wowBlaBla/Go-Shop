@@ -1,7 +1,6 @@
 package models
 
 import (
-	"github.com/google/logger"
 	"gorm.io/gorm"
 )
 
@@ -17,15 +16,13 @@ type Property struct {
 }
 
 func (p *Property) AfterDelete(tx *gorm.DB) error {
-	logger.Infof("AfterDelete")
 	return tx.Model(&Price{}).Where("property_id = ?", p.ID).Unscoped().Delete(&Price{}).Error
 }
 
 func GetProperty(connector *gorm.DB, id int) (*Property, error) {
 	db := connector
 	var property Property
-	db.Debug().Preload("Option").Find(&property, id)
-	if err := db.Error; err != nil {
+	if err := db.Debug().Preload("Option").First(&property, id).Error; err != nil {
 		return nil, err
 	}
 	return &property, nil
@@ -57,6 +54,6 @@ func UpdateProperty(connector *gorm.DB, property *Property) error {
 
 func DeleteProperty(connector *gorm.DB, property *Property) error {
 	db := connector
-	db.Debug().Delete(&property)
+	db.Debug().Unscoped().Delete(&property)
 	return db.Error
 }

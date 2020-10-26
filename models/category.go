@@ -166,6 +166,6 @@ func DeleteOptionFromCategory(connector *gorm.DB, category *Category, option *Op
 
 func DeleteCategory(connector *gorm.DB, category *Category) error {
 	db := connector
-	db.Debug().Delete(&category)
+	db.Debug().Unscoped().Delete(&category)
 	return db.Error
 }

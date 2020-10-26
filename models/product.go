@@ -1,6 +1,8 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+)
 
 type Product struct {
 	gorm.Model
@@ -46,8 +48,7 @@ func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	db := connector
 	var product Product
-	db.Preload("Images").Preload("Offers").Preload("Offers.Properties").Preload("Offers.Properties.Option").Preload("Offers.Properties.Prices").Preload("Offers.Properties.Prices.Value").Find(&product, id)
-	if err := db.Error; err != nil {
+	if err := db.Preload("Categories").Preload("Images").Preload("Offers").Preload("Offers.Properties").Preload("Offers.Properties.Option").Preload("Offers.Properties.Prices").Preload("Offers.Properties.Prices.Value").First(&product, id).Error; err != nil {
 		return nil, err
 	}
 	return &product, nil
@@ -114,8 +115,19 @@ func DeleteImageFromProduct(connector *gorm.DB, product *Product, image *Image) 
 	return db.Model(&product).Association("Images").Delete(image)
 }
 
+func DeleteAllCategoriesFromProduct(connector *gorm.DB, product *Product) error {
+	db := connector
+	return db.Debug().Unscoped().Model(&product).Association("Categories").Clear()
+}
+
 func UpdateProduct(connector *gorm.DB, product *Product) error {
 	db := connector
-	db.Debug().Save(&product)
+	db.Debug().Unscoped().Save(&product)
+	return db.Error
+}
+
+func DeleteProduct(connector *gorm.DB, product *Product) error {
+	db := connector
+	db.Debug().Unscoped().Delete(&product)
 	return db.Error
 }

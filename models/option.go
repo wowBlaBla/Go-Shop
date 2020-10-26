@@ -12,11 +12,30 @@ type Option struct {
 	Values []*Value `gorm:"foreignKey:OptionId"`
 }
 
+func GetOptionsFull(connector *gorm.DB) ([]*Option, error) {
+	db := connector
+	var options []*Option
+	db.Debug().Preload("Values").Find(&options)
+	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return options, nil
+}
+
 func GetOptions(connector *gorm.DB) ([]*Option, error) {
 	db := connector
 	var options []*Option
 	db.Debug().Find(&options)
 	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return options, nil
+}
+
+func GetOptionsByName(connector *gorm.DB, name string) ([]*Option, error) {
+	db := connector
+	var options []*Option
+	if err := db.Debug().Where("name = ?", name).Find(&options).Error; err != nil {
 		return nil, err
 	}
 	return options, nil
