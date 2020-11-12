@@ -62,7 +62,10 @@ type Config struct {
 		Uri string // "root:password@/db_name?charset=utf8&parseTime=True&loc=Local" or ""
 	}
 	//
-	Hugo string
+	Hugo struct {
+		Home string
+		Theme string
+	}
 	Modified time.Time
 }
 

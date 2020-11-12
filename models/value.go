@@ -11,6 +11,15 @@ type Value struct {
 	Value string
 }
 
+func GetValues(connector *gorm.DB) ([]*Value, error) {
+	db := connector
+	var value []*Value
+	if err := db.Debug().Find(&value).Error; err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+
 func GetValuesByOptionId(connector *gorm.DB, id int) ([]*Value, error) {
 	db := connector
 	var value []*Value

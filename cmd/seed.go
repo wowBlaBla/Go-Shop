@@ -40,7 +40,7 @@ var seedCmd = &cobra.Command{
 		common.Database.AutoMigrate(&models.Product{})
 		common.Database.AutoMigrate(&models.Image{})
 		//common.Database.AutoMigrate(&models.ProductProperty{})
-		common.Database.AutoMigrate(&models.Offer{})
+		common.Database.AutoMigrate(&models.Variation{})
 		common.Database.AutoMigrate(&models.Property{})
 		common.Database.AutoMigrate(&models.Option{})
 		common.Database.AutoMigrate(&models.Value{})
@@ -174,8 +174,8 @@ var seedCmd = &cobra.Command{
 		if _, err := models.CreateOption(common.Database, handle); err != nil {
 			logger.Errorf("%v", err)
 		}
-		// Offer 1
-		offer1 := &models.Offer{
+		// Variation 1
+		variation1 := &models.Variation{
 			Name:       "with-pine-wood-top",
 			Title:      "with Pine Wood Top",
 			Thumbnail: "/img/pine-leaf.svg",
@@ -271,11 +271,11 @@ var seedCmd = &cobra.Command{
 			BasePrice:      1000.0,
 			ProductId:  product1.ID,
 		}
-		if _, err := models.CreateOffer(common.Database, offer1); err != nil {
+		if _, err := models.CreateVariation(common.Database, variation1); err != nil {
 			logger.Errorf("%v", err)
 		}
-		// Offer 2
-		offer2 := &models.Offer{
+		// Variation 2
+		variation2 := &models.Variation{
 			Name:       "with-oak-wood-top",
 			Title:      "with Oak Wood Top",
 			Thumbnail: "/img/oak-leaf.svg",
@@ -371,17 +371,17 @@ var seedCmd = &cobra.Command{
 			BasePrice:      1200.0,
 			ProductId:  product1.ID,
 		}
-		if _, err := models.CreateOffer(common.Database, offer2); err != nil {
+		if _, err := models.CreateVariation(common.Database, variation2); err != nil {
 			logger.Errorf("%v", err)
 		}
-		// Offer 3
-		offer3 := &models.Offer{
+		// Variation 3
+		variation3 := &models.Variation{
 			Name:       "round-washbasin",
 			Title:      "Round Washbasin",
 			BasePrice:      500.0,
 			ProductId:  product1.ID,
 		}
-		if _, err := models.CreateOffer(common.Database, offer3); err != nil {
+		if _, err := models.CreateVariation(common.Database, variation3); err != nil {
 			logger.Errorf("%v", err)
 		}
 		// Create product #2
@@ -445,9 +445,9 @@ var seedCmd = &cobra.Command{
 		if _, err := models.CreateOption(common.Database, antiqueLookOption); err != nil {
 			logger.Errorf("%v", err)
 		}
-		// Offers
-		// Offer 1
-		product2Offer1 := &models.Offer{
+		// Variations
+		// Variation 1
+		product2Variation1 := &models.Variation{
 			Name:       "default",
 			Title:      "Default",
 			Properties: []*models.Property{
@@ -494,7 +494,7 @@ var seedCmd = &cobra.Command{
 			BasePrice:      100.0,
 			ProductId:  product2.ID,
 		}
-		if _, err := models.CreateOffer(common.Database, product2Offer1); err != nil {
+		if _, err := models.CreateVariation(common.Database, product2Variation1); err != nil {
 			logger.Errorf("%v", err)
 		}
 		// Create category Living Areas >> Bathroom
@@ -655,9 +655,9 @@ var seedCmd = &cobra.Command{
 		if _, err := models.CreateOption(common.Database, coatingOption); err != nil {
 			logger.Errorf("%v", err)
 		}
-		// Offers
-		// Offer 1
-		product3Offer1 := &models.Offer{
+		// Variations
+		// Variation 1
+		product3Variation1 := &models.Variation{
 			Name:       "default",
 			Title:      "Default",
 			Properties: []*models.Property{
@@ -731,11 +731,11 @@ var seedCmd = &cobra.Command{
 			BasePrice:      200.0,
 			ProductId:  product3.ID,
 		}
-		if _, err := models.CreateOffer(common.Database, product3Offer1); err != nil {
+		if _, err := models.CreateVariation(common.Database, product3Variation1); err != nil {
 			logger.Errorf("%v", err)
 		}
-		// Offer 2
-		product3Offer2 := &models.Offer{
+		// Variation 2
+		product3Variation2 := &models.Variation{
 			Name:       "metal-frame",
 			Title:      "Metal Frame",
 			Properties: []*models.Property{
@@ -826,7 +826,7 @@ var seedCmd = &cobra.Command{
 			BasePrice:      250.0,
 			ProductId:  product3.ID,
 		}
-		if _, err := models.CreateOffer(common.Database, product3Offer2); err != nil {
+		if _, err := models.CreateVariation(common.Database, product3Variation2); err != nil {
 			logger.Errorf("%v", err)
 		}
 		// Create product #4
@@ -855,15 +855,15 @@ var seedCmd = &cobra.Command{
 		if err := models.AddImageToProduct(common.Database, product4, product4Image1); err != nil {
 			logger.Errorf("%v", err)
 		}
-		// Offer 1
-		product4Offer1 := &models.Offer{
+		// Variation 1
+		product4Variation1 := &models.Variation{
 			Name:       "default",
 			Title:      "Default",
 			Thumbnail: "https://shop.servhost.org/img/lifebuoy-with-mirror/lifebuoy-with-mirror-1.jpg",
 			BasePrice:  75.0,
 			ProductId:  product4.ID,
 		}
-		if _, err := models.CreateOffer(common.Database, product4Offer1); err != nil {
+		if _, err := models.CreateVariation(common.Database, product4Variation1); err != nil {
 			logger.Errorf("%v", err)
 		}
 
@@ -893,15 +893,15 @@ var seedCmd = &cobra.Command{
 		if err := models.AddImageToProduct(common.Database, product5, product5Image1); err != nil {
 			logger.Errorf("%v", err)
 		}
-		// Offer 1
-		product5Offer1 := &models.Offer{
+		// Variation 1
+		product5Variation1 := &models.Variation{
 			Name:       "default",
 			Title:      "Default",
 			Thumbnail: "https://shop.servhost.org/img/country-house-buffet-cabinet/country-house-buffet-cabinet-1.jpg",
 			BasePrice:  1750.0,
 			ProductId:  product5.ID,
 		}
-		if _, err := models.CreateOffer(common.Database, product5Offer1); err != nil {
+		if _, err := models.CreateVariation(common.Database, product5Variation1); err != nil {
 			logger.Errorf("%v", err)
 		}
 		// /DEMO

@@ -14,7 +14,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20201026103623"
+	COMPILED = "20201112152753"
 	//
 	Started          time.Time
 	Config           *config.Config

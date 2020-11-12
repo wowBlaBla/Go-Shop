@@ -6,17 +6,27 @@ import (
 
 type Property struct {
 	gorm.Model
-	Name string
-	Title string
-	OfferId uint
-	Option *Option `gorm:"foreignKey:OptionId"`
-	OptionId uint
+	Type string // select / radio
+	Name        string
+	Title       string
+	VariationId uint
+	Option      *Option `gorm:"foreignKey:OptionId"`
+	OptionId    uint
 	//
 	Prices []*Price `gorm:"foreignKey:PropertyId"`
 }
 
 func (p *Property) AfterDelete(tx *gorm.DB) error {
 	return tx.Model(&Price{}).Where("property_id = ?", p.ID).Unscoped().Delete(&Price{}).Error
+}
+
+func GetProperties(connector *gorm.DB) ([]*Property, error) {
+	db := connector
+	var properties []*Property
+	if err := db.Debug().Find(&properties).Error; err != nil {
+		return nil, err
+	}
+	return properties, nil
 }
 
 func GetProperty(connector *gorm.DB, id int) (*Property, error) {
@@ -28,10 +38,10 @@ func GetProperty(connector *gorm.DB, id int) (*Property, error) {
 	return &property, nil
 }
 
-func GetPropertiesByOfferAndName(connector *gorm.DB, offerId int, name string) ([]*Property, error) {
+func GetPropertiesByVariationAndName(connector *gorm.DB, variationId int, name string) ([]*Property, error) {
 	db := connector
 	var properties []*Property
-	if err := db.Where("offer_id = ? and name = ?", offerId, name).Find(&properties).Error; err != nil {
+	if err := db.Where("variation_id = ? and name = ?", variationId, name).Find(&properties).Error; err != nil {
 		return nil, err
 	}
 	return properties, nil

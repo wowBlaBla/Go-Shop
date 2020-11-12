@@ -6,19 +6,20 @@ import (
 
 type Product struct {
 	gorm.Model
-	Name string `gorm:"size:255;index:idx_name,unique"`
-	Title string
+	Name        string `gorm:"size:255;index:idx_name,unique"`
+	Title       string
 	Description string
-	Thumbnail string
-	Categories []*Category `gorm:"many2many:categories_products;"`
-	Offers []*Offer `gorm:"foreignKey:ProductId"`
-	Images []*Image `gorm:"many2many:products_images;"`
+	Thumbnail   string
+	Categories  []*Category  `gorm:"many2many:categories_products;"`
+	Variations  []*Variation `gorm:"foreignKey:ProductId"`
+	Images      []*Image     `gorm:"many2many:products_images;"`
+	Tags        []*Tag `gorm:"many2many:products_tags;"`
 }
 
 func SearchProducts(connector *gorm.DB, term string, limit int) ([]*Product, error) {
 	db := connector
 	var products []*Product
-	db.Debug().Preload("Categories").Preload("Offers").Where("name like ? OR title like ? OR description like ?", term, term, term).Limit(limit).Find(&products)
+	db.Debug().Preload("Categories").Preload("Variations").Where("name like ? OR title like ? OR description like ?", term, term, term).Limit(limit).Find(&products)
 	if err := db.Error; err != nil {
 		return nil, err
 	}
@@ -48,7 +49,7 @@ func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	db := connector
 	var product Product
-	if err := db.Preload("Categories").Preload("Images").Preload("Offers").Preload("Offers.Properties").Preload("Offers.Properties.Option").Preload("Offers.Properties.Prices").Preload("Offers.Properties.Prices.Value").First(&product, id).Error; err != nil {
+	if err := db.Preload("Categories").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Preload("Tags").First(&product, id).Error; err != nil {
 		return nil, err
 	}
 	return &product, nil
@@ -63,14 +64,14 @@ func GetProductByName(connector *gorm.DB, name string) (*Product, error) {
 	return &product, nil
 }
 
-func GetProductOffers(connector *gorm.DB, id int) ([]*Offer, error) {
+func GetProductVariations(connector *gorm.DB, id int) ([]*Variation, error) {
 	db := connector
 	var product Product
-	db.Debug().Preload("Offers").Preload("Offers.Properties").Preload("Offers.Properties.Option").Preload("Offers.Properties.Prices").Preload("Offers.Properties.Prices.Value").Find(&product, id)
+	db.Debug().Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Find(&product, id)
 	if err := db.Error; err != nil {
 		return nil, err
 	}
-	return product.Offers, nil
+	return product.Variations, nil
 }
 
 func CreateProduct(connector *gorm.DB, product *Product) (uint, error) {
@@ -91,33 +92,19 @@ func GetCategoriesOfProduct(connector *gorm.DB, product *Product) ([]*Category, 
 	return categories, nil
 }
 
-func GetOffersFromProduct(connector *gorm.DB, product *Product) ([]*Offer, error) {
-	db := connector
-	var offers []*Offer
-	if err := db.Model(&product).Association("Offers").Find(&offers); err != nil {
-		return nil, err
-	}
-	return offers, nil
-}
-
-func AddOfferToProduct(connector *gorm.DB, product *Product, offer *Offer) error {
-	db := connector
-	return db.Model(&product).Association("Offers").Append(offer)
-}
-
 func AddImageToProduct(connector *gorm.DB, product *Product, image *Image) error {
 	db := connector
 	return db.Model(&product).Association("Images").Append(image)
 }
 
-func DeleteImageFromProduct(connector *gorm.DB, product *Product, image *Image) error {
-	db := connector
-	return db.Model(&product).Association("Images").Delete(image)
-}
-
 func DeleteAllCategoriesFromProduct(connector *gorm.DB, product *Product) error {
 	db := connector
 	return db.Debug().Unscoped().Model(&product).Association("Categories").Clear()
+}
+
+func DeleteAllTagsFromProduct(connector *gorm.DB, product *Product) error {
+	db := connector
+	return db.Debug().Unscoped().Model(&product).Association("Tags").Clear()
 }
 
 func UpdateProduct(connector *gorm.DB, product *Product) error {

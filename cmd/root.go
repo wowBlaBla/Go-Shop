@@ -60,7 +60,8 @@ func initConfig() {
 		common.Config.Https.Port = config.DEFAULT_HTTPS_PORT
 		common.Config.Database.Dialer = "sqlite"
 		common.Config.Database.Uri = path.Join(dir, "database.sqlite")
-		common.Config.Hugo = config.DEFAULT_HUGO
+		common.Config.Hugo.Home = config.DEFAULT_HUGO
+		common.Config.Hugo.Theme = "default"
 		if err = common.Config.Save(); err != nil {
 			logger.Errorf(" %v", err.Error())
 		}
@@ -143,7 +144,9 @@ var RootCmd = &cobra.Command{
 			dialer = sqlite.Open(uri)
 		}
 		var err error
-		common.Database, err = gorm.Open(dialer, &gorm.Config{})
+		common.Database, err = gorm.Open(dialer, &gorm.Config{
+			DisableForeignKeyConstraintWhenMigrating: true,
+		})
 		if err != nil {
 			logger.Errorf("%v", err)
 			os.Exit(1)
@@ -152,7 +155,7 @@ var RootCmd = &cobra.Command{
 		common.Database.AutoMigrate(&models.Category{})
 		common.Database.AutoMigrate(&models.Product{})
 		common.Database.AutoMigrate(&models.Image{})
-		common.Database.AutoMigrate(&models.Offer{})
+		common.Database.AutoMigrate(&models.Variation{})
 		common.Database.AutoMigrate(&models.Property{})
 		common.Database.AutoMigrate(&models.Option{})
 		common.Database.AutoMigrate(&models.Value{})
@@ -160,6 +163,7 @@ var RootCmd = &cobra.Command{
 		common.Database.AutoMigrate(&models.Order{})
 		common.Database.AutoMigrate(&models.Item{})
 		common.Database.AutoMigrate(&models.Transaction{})
+		common.Database.AutoMigrate(&models.Tag{})
 		//
 		// Project structure
 		if admin := path.Join(dir, "admin"); len(admin) > 0 {

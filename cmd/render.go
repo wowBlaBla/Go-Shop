@@ -10,10 +10,18 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
+)
+
+var (
+	reLeadingDigit = regexp.MustCompile(`^[0-9]+-`)
 )
 
 var renderCmd = &cobra.Command{
@@ -46,36 +54,110 @@ var renderCmd = &cobra.Command{
 		}
 		common.Database.DB()
 		//
-		/*var f1 func (connector *gorm.DB, root *CategoryView) *CategoryView
-		f1 = func (connector *gorm.DB, root *CategoryView) *CategoryView {
-			root.Path = append(root.Path, root.Name)
-			for _, category := range models.GetChildrenOfCategoryById(connector, root.ID) {
-				child := f1(connector, &CategoryView{ID: category.ID, Name: category.Name, Title: category.Title, Path: root.Path})
-				root.Children = append(root.Children, child)
-				if p := path.Join(append([]string{output}, child.Path...)...); len(p) > 0 {
-					if _, err := os.Stat(p); err != nil {
-						if err = os.MkdirAll(p, 0755); err != nil {
+		logger.Infof("Configure Hugo Theme scripts")
+		if p := path.Join(dir, "hugo", "themes", common.Config.Hugo.Theme, "layouts", "partials", "scripts.html"); len(p) > 0 {
+			if _, err = os.Stat(p); err == nil {
+				if bts, err := ioutil.ReadFile(p); err == nil {
+					content := string(bts)
+					content = strings.ReplaceAll(content, "%API_URL%", common.Config.Base)
+					if err = ioutil.WriteFile(p, []byte(content), 0755); err != nil {
+						logger.Warningf("%v", err.Error())
+					}
+				}
+			}else{
+				logger.Warningf("File %v not found!", p)
+			}
+		}
+		//
+		t1 := time.Now()
+		// Categories
+		if categories, err := models.GetCategories(common.Database); err == nil {
+			// Clear existing "products" folder
+			if err := os.RemoveAll(path.Join(output, "products")); err != nil {
+				logger.Infof("%v", err)
+			}
+			logger.Infof("Categories found: %v", len(categories))
+			for i, category := range categories {
+				logger.Infof("Category %d: %+v", i, category)
+				breadcrumbs := &[]*models.Category{}
+				var f3 func(connector *gorm.DB, id uint)
+				f3 = func(connector *gorm.DB, id uint) {
+					if id != 0 {
+						if category, err := models.GetCategory(common.Database, int(id)); err == nil {
+							//*names = append([]string{category.Name}, *names...)
+							if category.Thumbnail == "" {
+								if len(*breadcrumbs) > 0 {
+									category.Thumbnail = (*breadcrumbs)[0].Thumbnail
+								}
+							}
+							*breadcrumbs = append([]*models.Category{category}, *breadcrumbs...)
+							f3(connector, category.ParentId)
+						}
+					}
+				}
+				f3(common.Database, category.ID)
+				*breadcrumbs = append([]*models.Category{{Name: "products", Title: "Products", Model: gorm.Model{UpdatedAt: time.Now()}}}, *breadcrumbs...)
+				var names []string
+				for _, crumb := range *breadcrumbs {
+					names = append(names, crumb.Name)
+				}
+				if p1 := path.Join(append([]string{output}, names...)...); len(p1) > 0 {
+					if _, err := os.Stat(p1); err != nil {
+						if err = os.MkdirAll(p1, 0755); err == nil {
+							logger.Infof("Create directory %v", p1)
+						} else {
 							logger.Errorf("%v", err)
 							os.Exit(2)
 						}
 					}
+					var arr = []string{}
+					for _, category := range *breadcrumbs {
+						arr = append(arr, category.Name)
+						if p2 := path.Join(append(append([]string{output}, arr...), "_index.md")...); len(p2) > 0 {
+							if _, err := os.Stat(p2); err != nil {
+								if bts, err := json.MarshalIndent(&CategoryView{
+									Date:      category.UpdatedAt,
+									Title:     category.Title,
+									Thumbnail: category.Thumbnail,
+									Path:      "/" + path.Join(arr...),
+									Type:      "categories",
+								}, "", "   "); err == nil {
+									// Copy image
+									if category.Thumbnail != "" {
+										if p1 := path.Join(dir, category.Thumbnail); len(p1) > 0 {
+											if fi, err := os.Stat(p1); err == nil {
+												p2 := path.Join(path.Dir(p2), fmt.Sprintf("%v", reLeadingDigit.ReplaceAllString(filepath.Base(p1), "")))
+												logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+												if err = cp(p1, p2); err != nil {
+													logger.Warningf("%v", err)
+												}
+											}
+										}
+									}
+									//
+									if err = ioutil.WriteFile(p2, bts, 0644); err == nil {
+										logger.Infof("Write %v: %v bytes", p2, len(bts))
+									} else {
+										logger.Errorf("%v", err)
+										os.Exit(4)
+									}
+								}
+							}
+						}
+					}
 				}
 			}
-			return root
 		}
-		f1(common.Database, &CategoryView{Name: "", Title: "Root"})*/
-		//
-		t1 := time.Now()
+		// Products
 		if products, err := models.GetProducts(common.Database); err == nil {
-			if err := os.RemoveAll(output); err != nil {
-				logger.Infof("%v", err)
-			}
+			//
 			logger.Infof("Products found: %v", len(products))
 			for i, product := range products {
-				logger.Infof("%d: %+v", i, product)
+				logger.Infof("[%d] Product ID: %+v Name: %v Title: %v", i, product.ID, product.Name, product.Title)
 				product, _ = models.GetProductFull(common.Database, int(product.ID))
 				if categories, err := models.GetCategoriesOfProduct(common.Database, product); err == nil {
-					for _, category := range categories {
+					var canonical string
+					for i, category := range categories {
 						breadcrumbs := &[]*models.Category{}
 						var f3 func(connector *gorm.DB, id uint)
 						f3 = func(connector *gorm.DB, id uint) {
@@ -100,16 +182,21 @@ var renderCmd = &cobra.Command{
 						for _, crumb := range *breadcrumbs {
 							names = append(names, crumb.Name)
 						}
+						if i == 0 {
+							canonical = fmt.Sprintf("/%s/", path.Join(strings.Join(names, "/"), product.Name))
+						}
 						if p1 := path.Join(append([]string{output}, names...)...); len(p1) > 0 {
-							logger.Infof("Directory %v", p1)
 							if _, err := os.Stat(p1); err != nil {
-								if err = os.MkdirAll(p1, 0755); err != nil {
+								if err = os.MkdirAll(p1, 0755); err == nil {
+									logger.Infof("Create directory %v", p1)
+								} else {
 									logger.Errorf("%v", err)
 									os.Exit(2)
 								}
 							}
 							//
 							view := &PageView{
+								ID: product.ID,
 								Date: time.Now(),
 								Title: product.Title,
 								//Tags: []string{"Floor Light"},
@@ -117,11 +204,13 @@ var renderCmd = &cobra.Command{
 								Type: "products",
 								CategoryId: category.ID,
 							}
+							if i > 0 {
+								view.Canonical = canonical
+							}
 							var arr = []string{}
 							for _, category := range *breadcrumbs {
 								arr = append(arr, category.Name)
 								if p2 := path.Join(append(append([]string{output}, arr...), "_index.md")...); len(p2) > 0 {
-									logger.Infof("File %v", p2)
 									if _, err := os.Stat(p2); err != nil {
 										if bts, err := json.MarshalIndent(&CategoryView{
 											Date:      category.UpdatedAt,
@@ -130,7 +219,9 @@ var renderCmd = &cobra.Command{
 											Path:      "/" + path.Join(arr...),
 											Type:      "categories",
 										}, "", "   "); err == nil {
-											if err = ioutil.WriteFile(p2, bts, 0644); err != nil {
+											if err = ioutil.WriteFile(p2, bts, 0644); err == nil {
+												logger.Infof("Write %v %v bytes", p2, len(bts))
+											} else {
 												logger.Errorf("%v", err)
 												os.Exit(4)
 											}
@@ -159,21 +250,22 @@ var renderCmd = &cobra.Command{
 								view.Thumbnail = product.Thumbnail
 								productView.Thumbnail = product.Thumbnail
 							}
-							if len(product.Offers) > 0 {
-								view.BasePrice = fmt.Sprintf("$%.2f", product.Offers[0].BasePrice)
-								for i, offer := range product.Offers {
-									offerView := OfferView{
-										Id: offer.ID,
-										Name:        offer.Name,
-										Title:       offer.Title,
-										Thumbnail: offer.Thumbnail,
-										Description: offer.Description,
-										BasePrice:   offer.BasePrice,
-										Selected: i == 0,
+							if len(product.Variations) > 0 {
+								view.BasePrice = fmt.Sprintf("$%.2f", product.Variations[0].BasePrice)
+								for i, variation := range product.Variations {
+									variationView := VariationView{
+										Id:          variation.ID,
+										Name:        variation.Name,
+										Title:       variation.Title,
+										Thumbnail:   variation.Thumbnail,
+										Description: variation.Description,
+										BasePrice:   variation.BasePrice,
+										Selected:    i == 0,
 									}
-									for _, property := range offer.Properties {
+									for _, property := range variation.Properties {
 										propertyView := PropertyView{
 											Id: property.ID,
+											Type: property.Type,
 											Name:        property.Name,
 											Title:       property.Title,
 										}
@@ -192,13 +284,18 @@ var renderCmd = &cobra.Command{
 											}
 											propertyView.Values = append(propertyView.Values, valueView)
 										}
-										offerView.Properties = append(offerView.Properties, propertyView)
+										variationView.Properties = append(variationView.Properties, propertyView)
 									}
-									productView.Offers = append(productView.Offers, offerView)
+									productView.Variations = append(productView.Variations, variationView)
 								}
 							}
 							productView.Path = "/" + path.Join(append(names, product.Name)...) + "/"
 							view.Product = productView
+							for _, tag := range product.Tags {
+								if tag.Enabled {
+									view.Tags = append(view.Tags, tag.Name)
+								}
+							}
 							if bts, err := json.MarshalIndent(&view, "", "   "); err == nil {
 								file := path.Join(p1, product.Name, fmt.Sprintf("%v.md", "index"))
 								if _, err := os.Stat(path.Dir(file)); err != nil {
@@ -207,11 +304,29 @@ var renderCmd = &cobra.Command{
 										return
 									}
 								}
+								// Copy images
+								if len(product.Images) > 0 {
+									for i, image := range product.Images {
+										if image.Path != "" {
+											p0 := path.Join(dir, p1, product.Name)
+											if p1 := path.Join(dir, image.Path); len(p1) > 0 {
+												if fi, err := os.Stat(p1); err == nil {
+													p2 := path.Join(p0, fmt.Sprintf("%d-%v", i + 1, reLeadingDigit.ReplaceAllString(filepath.Base(p1), "")))
+													logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+													if err = cp(p1, p2); err != nil {
+														logger.Warningf("%v", err)
+													}
+												}
+											}
+										}
+									}
+								}
+								//
 								bts = []byte(fmt.Sprintf(`%s
 
 %s`, string(bts), product.Description))
 								if err = ioutil.WriteFile(file, bts, 0755); err == nil {
-									logger.Infof("File %v wrote %v bytes", file, len(bts))
+									logger.Infof("Write %v %v bytes", file, len(bts))
 								} else {
 									logger.Error("%v", err)
 								}
@@ -332,10 +447,12 @@ type CategoryView struct {
 }
 
 type PageView struct {
+	ID uint
 	Type       string
 	Title      string
 	Date       time.Time
 	Tags       []string
+	Canonical  string
 	Categories []string
 	CategoryId  uint
 	Images     []string
@@ -345,16 +462,16 @@ type PageView struct {
 }
 
 type ProductView struct {
-	Id uint `json:"Id"`
+	Id         uint `json:"Id"`
 	CategoryId uint
-	Name string
-	Title string
-	Thumbnail string
-	Path string
-	Offers []OfferView
+	Name       string
+	Title      string
+	Thumbnail  string
+	Path       string
+	Variations []VariationView
 }
 
-type OfferView struct {
+type VariationView struct {
 	Id uint
 	Name string
 	Title string
@@ -367,6 +484,7 @@ type OfferView struct {
 
 type PropertyView struct {
 	Id uint
+	Type string
 	Name string
 	Title string
 	Description string
@@ -386,4 +504,24 @@ type ValueView struct {
 type PriceView struct {
 	Id uint
 	Price float64
+}
+
+func cp(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
 }

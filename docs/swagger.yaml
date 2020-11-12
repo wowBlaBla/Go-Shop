@@ -1,5 +1,34 @@
 basePath: /
 definitions:
+  handler.AutocompleteRequest:
+    properties:
+      include:
+        type: string
+      search:
+        type: string
+    type: object
+  handler.BuildView:
+    properties:
+      output:
+        type: string
+      status:
+        type: string
+    type: object
+  handler.CategoriesAutocompleteItem:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      path:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.CategoriesAutocompleteResponse:
+    items:
+      $ref: '#/definitions/handler.CategoriesAutocompleteItem'
+    type: array
   handler.CategoriesListItem:
     properties:
       description:
@@ -8,6 +37,8 @@ definitions:
         type: integer
       name:
         type: string
+      products:
+        type: integer
       thumbnail:
         type: string
       title:
@@ -59,9 +90,48 @@ definitions:
         items:
           $ref: '#/definitions/handler.CategoryView'
         type: array
+      products:
+        type: integer
       thumbnail:
         type: string
       title:
+        type: string
+    type: object
+  handler.DashboardView:
+    properties:
+      earnings:
+        type: number
+      items:
+        type: number
+      lastOrders:
+        items:
+          $ref: '#/definitions/handler.LastOrderView'
+        type: array
+      orders:
+        type: number
+      pending:
+        type: number
+      transfers:
+        $ref: '#/definitions/handler.TransferView'
+        type: object
+    type: object
+  handler.ExistingImage:
+    type: object
+  handler.ExistingOrder:
+    properties:
+      comment:
+        type: string
+      status:
+        type: string
+    type: object
+  handler.ExistingTransaction:
+    properties:
+      status:
+        type: string
+    type: object
+  handler.ExistingUser:
+    properties:
+      password:
         type: string
     type: object
   handler.HTTPError:
@@ -76,17 +146,53 @@ definitions:
     type: object
   handler.ImageView:
     properties:
+      created:
+        type: string
       height:
         type: integer
       id:
         type: integer
+      name:
+        type: string
       path:
         type: string
       size:
         type: integer
+      updated:
+        type: string
       url:
         type: string
       width:
+        type: integer
+    type: object
+  handler.ImagesListItem:
+    properties:
+      created:
+        type: string
+      height:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      size:
+        type: integer
+      updated:
+        type: string
+      url:
+        type: string
+      width:
+        type: integer
+    type: object
+  handler.ImagesListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.ImagesListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
         type: integer
     type: object
   handler.InfoView:
@@ -102,6 +208,27 @@ definitions:
       user:
         $ref: '#/definitions/handler.UserView'
         type: object
+    type: object
+  handler.ItemShortView:
+    properties:
+      path:
+        type: string
+      price:
+        type: number
+      properties:
+        items:
+          $ref: '#/definitions/handler.PropertyShortView'
+        type: array
+      quantity:
+        type: integer
+      thumbnail:
+        type: string
+      title:
+        type: string
+      total:
+        type: number
+      uuid:
+        type: string
     type: object
   handler.ItemView:
     properties:
@@ -125,6 +252,17 @@ definitions:
         type: number
       uuid:
         type: string
+    type: object
+  handler.LastOrderView:
+    properties:
+      created:
+        type: string
+      id:
+        type: integer
+      status:
+        type: string
+      total:
+        type: number
     type: object
   handler.ListRequest:
     properties:
@@ -152,6 +290,8 @@ definitions:
       remember:
         type: boolean
     type: object
+  handler.NewBuild:
+    type: object
   handler.NewCategory:
     properties:
       description:
@@ -161,6 +301,13 @@ definitions:
       parentId:
         type: integer
       title:
+        type: string
+    type: object
+  handler.NewImage:
+    properties:
+      image:
+        type: string
+      name:
         type: string
     type: object
   handler.NewItem:
@@ -180,13 +327,11 @@ definitions:
         type: string
       title:
         type: string
-      values:
-        items:
-          $ref: '#/definitions/handler.NewValue'
-        type: array
     type: object
   handler.NewOrder:
     properties:
+      comment:
+        type: string
       created:
         type: string
       items:
@@ -194,14 +339,38 @@ definitions:
           $ref: '#/definitions/handler.NewItem'
         type: array
     type: object
+  handler.NewPrice:
+    properties:
+      enabled:
+        type: boolean
+      price:
+        type: number
+      propertyId:
+        type: integer
+      valueId:
+        type: integer
+    type: object
   handler.NewProduct:
     properties:
+      categories:
+        type: string
       description:
         type: string
       name:
         type: string
       title:
         type: string
+    type: object
+  handler.NewProperty:
+    properties:
+      name:
+        type: string
+      optionId:
+        type: integer
+      title:
+        type: string
+    type: object
+  handler.NewRender:
     type: object
   handler.NewValue:
     properties:
@@ -212,7 +381,479 @@ definitions:
       value:
         type: string
     type: object
-  handler.OfferView:
+  handler.NewVariation:
+    properties:
+      name:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.OptionFullView:
+    properties:
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      title:
+        type: string
+      values:
+        items:
+          $ref: '#/definitions/handler.ValueView'
+        type: array
+    type: object
+  handler.OptionShortView:
+    properties:
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.OptionValuesListItem:
+    properties:
+      id:
+        type: integer
+      thumbnail:
+        type: string
+      title:
+        type: string
+      value:
+        type: string
+    type: object
+  handler.OptionValuesListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.OptionValuesListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.OptionView:
+    properties:
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      title:
+        type: string
+      values:
+        items:
+          $ref: '#/definitions/handler.ValueView'
+        type: array
+    type: object
+  handler.OptionsFullView:
+    items:
+      $ref: '#/definitions/handler.OptionFullView'
+    type: array
+  handler.OptionsListItem:
+    properties:
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      title:
+        type: string
+      valuesValues:
+        type: string
+    type: object
+  handler.OptionsListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.OptionsListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.OrderShortView:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/handler.ItemShortView'
+        type: array
+    type: object
+  handler.OrderView:
+    properties:
+      comment:
+        type: string
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/handler.ItemView'
+        type: array
+      status:
+        type: string
+      total:
+        type: number
+    type: object
+  handler.OrdersListItem:
+    properties:
+      created:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      status:
+        type: string
+      total:
+        type: number
+      userEmail:
+        type: string
+      userId:
+        type: integer
+    type: object
+  handler.OrdersListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.OrdersListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.OrdersView:
+    items:
+      $ref: '#/definitions/handler.OrderView'
+    type: array
+  handler.PriceView:
+    properties:
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      price:
+        type: number
+      propertyId:
+        type: integer
+      valueId:
+        type: integer
+    type: object
+  handler.PricesView:
+    items:
+      $ref: '#/definitions/handler.PriceView'
+    type: array
+  handler.ProductShortView:
+    properties:
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      thumbnail:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.ProductVariationPropertyPricesListItem:
+    properties:
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      price:
+        type: number
+      valueId:
+        type: integer
+      valueTitle:
+        type: string
+    type: object
+  handler.ProductVariationPropertyPricesListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.ProductVariationPropertyPricesListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.ProductView:
+    properties:
+      categories:
+        items:
+          $ref: '#/definitions/handler.CategoryView'
+        type: array
+      description:
+        type: string
+      id:
+        type: integer
+      images:
+        items:
+          $ref: '#/definitions/handler.ImageView'
+        type: array
+      name:
+        type: string
+      thumbnail:
+        type: string
+      title:
+        type: string
+      variations:
+        items:
+          $ref: '#/definitions/handler.VariationView'
+        type: array
+    type: object
+  handler.ProductsListItem:
+    properties:
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      thumbnail:
+        type: string
+      title:
+        type: string
+      variationsIds:
+        type: string
+      variationsTitles:
+        type: string
+    type: object
+  handler.ProductsListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.ProductsListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.ProductsShortView:
+    items:
+      $ref: '#/definitions/handler.ProductShortView'
+    type: array
+  handler.ProfileView:
+    properties:
+      admin:
+        type: boolean
+      email:
+        type: string
+      emailConfirmed:
+        type: boolean
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      login:
+        type: string
+      role:
+        type: integer
+    type: object
+  handler.PropertyShortView:
+    properties:
+      price:
+        type: number
+      title:
+        type: string
+      value:
+        type: string
+    type: object
+  handler.PropertyView:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      optionId:
+        type: integer
+      title:
+        type: string
+    type: object
+  handler.RenderView:
+    properties:
+      output:
+        type: string
+      status:
+        type: string
+    type: object
+  handler.SearchRequest:
+    properties:
+      limit:
+        type: integer
+      term:
+        type: string
+    type: object
+  handler.SearchResult:
+    properties:
+      products:
+        items:
+          $ref: '#/definitions/handler.SearchResultProductView'
+        type: array
+      term:
+        type: string
+    type: object
+  handler.SearchResultProductView:
+    properties:
+      basePrice:
+        type: number
+      categories:
+        items:
+          $ref: '#/definitions/handler.CategoryView'
+        type: array
+      description:
+        type: string
+      id:
+        type: integer
+      images:
+        items:
+          $ref: '#/definitions/handler.ImageView'
+        type: array
+      name:
+        type: string
+      path:
+        type: string
+      thumbnail:
+        type: string
+      title:
+        type: string
+      variations:
+        items:
+          $ref: '#/definitions/handler.VariationView'
+        type: array
+    type: object
+  handler.TransactionView:
+    properties:
+      amount:
+        type: number
+      createdAt:
+        type: string
+      id:
+        type: integer
+      orderId:
+        type: integer
+      status:
+        type: string
+      updatedAt:
+        type: string
+      userId:
+        type: integer
+    type: object
+  handler.TransactionsListItem:
+    properties:
+      amount:
+        type: number
+      createdAt:
+        type: string
+      id:
+        type: integer
+      orderId:
+        type: integer
+      status:
+        type: string
+      updatedAt:
+        type: string
+      userEmail:
+        type: string
+      userId:
+        type: integer
+    type: object
+  handler.TransactionsListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.TransactionsListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.TransferView:
+    properties:
+      labels:
+        items:
+          type: string
+        type: array
+      series:
+        items:
+          items:
+            type: number
+          type: array
+        type: array
+    type: object
+  handler.UserView:
+    properties:
+      email:
+        type: string
+      emailConfirmed:
+        type: boolean
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      login:
+        type: string
+      role:
+        type: integer
+    type: object
+  handler.UsersListItem:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      login:
+        type: string
+      orders:
+        type: integer
+      updatedAt:
+        type: string
+    type: object
+  handler.UsersListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.UsersListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.UsersView:
+    items:
+      $ref: '#/definitions/handler.UserView'
+    type: array
+  handler.ValueView:
+    properties:
+      id:
+        type: integer
+      thumbnail:
+        type: string
+      title:
+        type: string
+      value:
+        type: string
+    type: object
+  handler.ValuesView:
+    items:
+      $ref: '#/definitions/handler.ValueView'
+    type: array
+  handler.VariationView:
     properties:
       basePrice:
         type: number
@@ -222,6 +863,8 @@ definitions:
         type: integer
       name:
         type: string
+      productId:
+        type: integer
       properties:
         items:
           properties:
@@ -269,144 +912,7 @@ definitions:
       title:
         type: string
     type: object
-  handler.OffersView:
-    items:
-      $ref: '#/definitions/handler.OfferView'
-    type: array
-  handler.OptionShortView:
-    properties:
-      description:
-        type: string
-      id:
-        type: integer
-      name:
-        type: string
-      title:
-        type: string
-    type: object
-  handler.OptionView:
-    properties:
-      description:
-        type: string
-      id:
-        type: integer
-      name:
-        type: string
-      title:
-        type: string
-      values:
-        items:
-          $ref: '#/definitions/handler.ValueView'
-        type: array
-    type: object
-  handler.OptionsShortView:
-    items:
-      $ref: '#/definitions/handler.OptionShortView'
-    type: array
-  handler.OrderView:
-    properties:
-      id:
-        type: integer
-      items:
-        items:
-          $ref: '#/definitions/handler.ItemView'
-        type: array
-      status:
-        type: string
-      total:
-        type: number
-    type: object
-  handler.OrdersView:
-    items:
-      $ref: '#/definitions/handler.OrderView'
-    type: array
-  handler.ProductShortView:
-    properties:
-      description:
-        type: string
-      id:
-        type: integer
-      name:
-        type: string
-      thumbnail:
-        type: string
-      title:
-        type: string
-    type: object
-  handler.ProductView:
-    properties:
-      description:
-        type: string
-      id:
-        type: integer
-      images:
-        items:
-          $ref: '#/definitions/handler.ImageView'
-        type: array
-      name:
-        type: string
-      offers:
-        items:
-          $ref: '#/definitions/handler.OfferView'
-        type: array
-      thumbnail:
-        type: string
-      title:
-        type: string
-    type: object
-  handler.ProductsListItem:
-    properties:
-      description:
-        type: string
-      id:
-        type: integer
-      name:
-        type: string
-      offers:
-        type: integer
-      thumbnail:
-        type: string
-      title:
-        type: string
-    type: object
-  handler.ProductsListResponse:
-    properties:
-      data:
-        items:
-          $ref: '#/definitions/handler.ProductsListItem'
-        type: array
-      filtered:
-        type: integer
-      total:
-        type: integer
-    type: object
-  handler.ProductsShortView:
-    items:
-      $ref: '#/definitions/handler.ProductShortView'
-    type: array
-  handler.ProfileView:
-    properties:
-      user:
-        $ref: '#/definitions/handler.UserView'
-        type: object
-    type: object
-  handler.SearchRequest:
-    properties:
-      limit:
-        type: integer
-      term:
-        type: string
-    type: object
-  handler.SearchResult:
-    properties:
-      products:
-        items:
-          $ref: '#/definitions/handler.SearchResultProductView'
-        type: array
-      term:
-        type: string
-    type: object
-  handler.SearchResultProductView:
+  handler.VariationsListItem:
     properties:
       basePrice:
         type: number
@@ -414,53 +920,36 @@ definitions:
         type: string
       id:
         type: integer
-      images:
-        items:
-          $ref: '#/definitions/handler.ImageView'
-        type: array
       name:
         type: string
-      offers:
+      productId:
+        type: integer
+      productTitle:
+        type: string
+      propertiesIds:
+        type: string
+      propertiesTitles:
+        type: string
+      thumbnail:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.VariationsListResponse:
+    properties:
+      data:
         items:
-          $ref: '#/definitions/handler.OfferView'
+          $ref: '#/definitions/handler.VariationsListItem'
         type: array
-      path:
-        type: string
-      thumbnail:
-        type: string
-      title:
-        type: string
-    type: object
-  handler.UserView:
-    properties:
-      email:
-        type: string
-      emailConfirmed:
-        type: boolean
-      enabled:
-        type: boolean
-      id:
+      filtered:
         type: integer
-      login:
-        type: string
-      role:
+      total:
         type: integer
     type: object
-  handler.UsersView:
+  handler.VariationsView:
     items:
-      $ref: '#/definitions/handler.UserView'
+      $ref: '#/definitions/handler.VariationView'
     type: array
-  handler.ValueView:
-    properties:
-      id:
-        type: integer
-      thumbnail:
-        type: string
-      title:
-        type: string
-      value:
-        type: string
-    type: object
 host: localhost:18092
 info:
   contact:
@@ -510,19 +999,23 @@ paths:
       consumes:
       - multipart/form-data
       parameters:
+      - description: Product id
+        in: query
+        name: pid
+        type: integer
       - description: body
         in: body
         name: category
         required: true
         schema:
-          $ref: '#/definitions/handler.NewProduct'
+          $ref: '#/definitions/handler.NewImage'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.ProductView'
+            $ref: '#/definitions/handler.HTTPMessage'
         "404":
           description: Not Found
           schema:
@@ -533,7 +1026,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Create product
+      summary: Create image
   /api/v1/categories/{id}:
     put:
       consumes:
@@ -563,6 +1056,35 @@ paths:
       security:
       - BasicAuth: []
       summary: Update category
+  /api/v1/categories/autocomplete:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AutocompleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CategoriesAutocompleteResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search categories autocomplete
   /api/v1/categories/list:
     post:
       consumes:
@@ -592,6 +1114,143 @@ paths:
       security:
       - BasicAuth: []
       summary: Search products
+  /api/v1/dashboard:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.DashboardView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get dashboard
+  /api/v1/images/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Image ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete image
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Image ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ImageView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get image
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ExistingImage'
+      - description: Image ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update image
+  /api/v1/images/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ImagesListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search images
   /api/v1/info:
     get:
       consumes:
@@ -675,7 +1334,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.OptionsShortView'
+            $ref: '#/definitions/handler.OptionsFullView'
         "404":
           description: Not Found
           schema:
@@ -804,6 +1463,33 @@ paths:
       - BasicAuth: []
       summary: update option
   /api/v1/options/{id}/values:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Option ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ValuesView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: get option values
     post:
       consumes:
       - application/json
@@ -837,6 +1523,40 @@ paths:
       security:
       - BasicAuth: []
       summary: Create option value
+  /api/v1/options/{id}/values/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Option ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.OptionValuesListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search option values
   /api/v1/options/{oid}/values/{id}:
     delete:
       consumes:
@@ -940,6 +1660,332 @@ paths:
       security:
       - BasicAuth: []
       summary: update option value
+  /api/v1/options/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.OptionsListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search options
+  /api/v1/orders/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete order
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.OrderView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get order
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ExistingOrder'
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.OrderShortView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update order
+  /api/v1/orders/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: order
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.OrdersListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search orders
+  /api/v1/prices:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Property ID
+        in: path
+        name: property_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PriceView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get prices
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Property id
+        in: query
+        name: property_id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewPrice'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PriceView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create categories
+  /api/v1/prices/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Price ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete price
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Price ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PricesView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get price
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Price ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewPrice'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PriceView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Update price
+  /api/v1/prices/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Property ID
+        in: path
+        name: property_id
+        type: integer
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ProductVariationPropertyPricesListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search product variation property prices
   /api/v1/products:
     get:
       consumes:
@@ -963,6 +2009,33 @@ paths:
       - BasicAuth: []
       summary: Get products
   /api/v1/products/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete product
     get:
       consumes:
       - application/json
@@ -990,23 +2063,27 @@ paths:
       security:
       - BasicAuth: []
       summary: Get product
-  /api/v1/products/{id}/offers:
-    get:
+    put:
       consumes:
-      - application/json
+      - multipart/form-data
       parameters:
-      - description: Product ID
-        in: path
+      - description: Product id
+        in: query
         name: id
-        required: true
         type: integer
+      - description: body
+        in: body
+        name: product
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewProduct'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.OffersView'
+            $ref: '#/definitions/handler.ProductView'
         "404":
           description: Not Found
           schema:
@@ -1017,8 +2094,35 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Get product offers
-  /api/v1/products/{pid}/offers/{id}:
+      summary: Update product
+  /api/v1/properties/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Property id
+        in: query
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete price
     get:
       consumes:
       - application/json
@@ -1028,7 +2132,12 @@ paths:
         name: pid
         required: true
         type: integer
-      - description: Offer ID
+      - description: Variation ID
+        in: path
+        name: oid
+        required: true
+        type: integer
+      - description: Property ID
         in: path
         name: id
         required: true
@@ -1039,7 +2148,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.OfferView'
+            $ref: '#/definitions/handler.PropertyView'
         "404":
           description: Not Found
           schema:
@@ -1050,7 +2159,188 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Get product offer
+      summary: Get property
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Property ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewPrice'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PriceView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Update price
+  /api/v1/properties/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Variation ID
+        in: path
+        name: variation_id
+        type: integer
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.VariationsListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search product variations
+  /api/v1/transactions/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete transaction
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TransactionView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get transaction
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ExistingTransaction'
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TransactionView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update transaction
+  /api/v1/transactions/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TransactionsListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search transactions
   /api/v1/users:
     get:
       consumes:
@@ -1074,6 +2364,299 @@ paths:
       security:
       - BasicAuth: []
       summary: Get users
+  /api/v1/users/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete user
+    get:
+      consumes:
+      - application/json
+      description: get string
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.UserView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get user
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ExistingUser'
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.UserView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update user
+  /api/v1/users/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.UsersListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search users
+  /api/v1/variations:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.VariationsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get product variations
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewVariation'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.VariationView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create variation
+  /api/v1/variations/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Variation ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete variation
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Variation ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.VariationView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get variation
+    put:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Variation id
+        in: query
+        name: id
+        type: integer
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewVariation'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.VariationView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Update variation
+  /api/v1/variations/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Product ID
+        in: query
+        name: id
+        type: integer
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.VariationsListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search variations
   /order:
     post:
       consumes:
@@ -1170,6 +2753,69 @@ paths:
       security:
       - BasicAuth: []
       summary: Get profile
+  /properties:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Variation id
+        in: query
+        name: variation_id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: property
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewProperty'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PropertyView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create property
+  /render:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewBuild'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.BuildView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Make build
   /search:
     post:
       consumes:

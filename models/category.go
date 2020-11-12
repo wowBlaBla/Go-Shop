@@ -17,6 +17,16 @@ type Category struct {
 	ParentId uint
 }
 
+func GetCategories(connector *gorm.DB) ([]*Category, error) {
+	db := connector
+	var categories []*Category
+	db.Debug().Find(&categories)
+	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return categories, nil
+}
+
 func GetCategory(connector *gorm.DB, id int) (*Category, error) {
 	db := connector
 	var category Category
@@ -82,6 +92,13 @@ func getChildrenCategories(connector *gorm.DB, id uint, categories *[]*Category)
 		getChildrenCategories(connector, category.ID, categories)
 		*categories = append(*categories, category)
 	}
+}
+
+func GetRootCategories(connector *gorm.DB) []*Category {
+	db := connector
+	var categories []*Category
+	db.Where("parent_id = ?", 0).Find(&categories)
+	return categories
 }
 
 func GetCategoriesFromCategory(connector *gorm.DB, category *Category) []*Category {
@@ -152,6 +169,11 @@ func AddProductToCategory(connector *gorm.DB, category *Category, product *Produ
 func DeleteProductFromCategory(connector *gorm.DB, category *Category, product *Product) error {
 	db := connector
 	return db.Model(&category).Association("Products").Delete(product)
+}
+
+func AddProductToTag(connector *gorm.DB, tag *Tag, product *Product) error {
+	db := connector
+	return db.Model(&tag).Association("Products").Append(product)
 }
 
 /*func AddOptionToCategory(connector *gorm.DB, category *Category, option *Option) error {
