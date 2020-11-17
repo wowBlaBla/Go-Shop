@@ -165,6 +165,9 @@ var RootCmd = &cobra.Command{
 		common.Database.AutoMigrate(&models.Transaction{})
 		common.Database.AutoMigrate(&models.Tag{})
 		//
+		common.Database.AutoMigrate(&models.CacheProduct{})
+		common.Database.AutoMigrate(&models.CacheImage{})
+		//
 		// Project structure
 		if admin := path.Join(dir, "admin"); len(admin) > 0 {
 			if _, err := os.Stat(admin); err != nil {

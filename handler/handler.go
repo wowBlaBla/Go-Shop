@@ -196,6 +196,7 @@ func GetFiber() *fiber.App {
 	v1.Post("/orders", authMulti, postOrdersHandler)
 	v1.Get("/orders/:id", authMulti, getUserOrderHandler)
 	//
+	v1.Post("/filter", postFilterHandler)
 	v1.Post("/search", postSearchHandler)
 
 	//app.Get("/session", func(c *fiber.Ctx) error {
@@ -238,14 +239,14 @@ func GetFiber() *fiber.App {
 	app.Static("/admin", admin)
 	app.Static("/admin/*", path.Join(admin, "index.html"))
 	// Static
-	static := path.Join(dir, "hugo", "static")
-	app.Static("/static", static)
+	storage := path.Join(dir, "storage")
+	app.Static("/storage", storage)
 	// Public
 	public := path.Join(dir, "hugo", "public")
 	app.Static("/", public)
 	app.Static("*", public)
 	//
-	/*static := path.Join(dir, "static")
+	/*static := path.Join(dir, "storage")
 	if _, err := os.Stat(static); err != nil {
 		if err = os.MkdirAll(static, 0755); err != nil {
 			logger.Errorf("%v", err)
@@ -514,7 +515,7 @@ func postCategoriesHandler(c *fiber.Ctx) error {
 			category := &models.Category{Name: name, Title: title, Description: description, ParentId: request.ParentId}
 			if id, err := models.CreateCategory(common.Database, category); err == nil {
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
-					p := path.Join(dir, "hugo", "static", "categories")
+					p := path.Join(dir, "storage", "categories")
 					if _, err := os.Stat(p); err != nil {
 						if err = os.MkdirAll(p, 0755); err != nil {
 							logger.Errorf("%v", err)
@@ -534,7 +535,7 @@ func postCategoriesHandler(c *fiber.Ctx) error {
 								return c.JSON(HTTPError{err.Error()})
 							}
 							// TODO: Update category with Thumbnail
-							category.Thumbnail = "/" + path.Join("static", "categories", filename)
+							category.Thumbnail = "/" + path.Join("storage", "categories", filename)
 							if err = models.UpdateCategory(common.Database, category); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
@@ -803,7 +804,7 @@ func postCategoriesListHandler(c *fiber.Ctx) error {
 		common.Database.Debug().Model(&models.Category{}).Where(strings.Join(keys1, " and "), values1...).Count(&response.Filtered)
 		common.Database.Debug().Model(&models.Category{}).Count(&response.Total)
 	}else{
-		common.Database.Debug().Model(&models.Category{}).Count(&response.Filtered)
+		common.Database.Debug().Model(&models.Category{}).Where("parent_id = ?", id).Count(&response.Filtered)
 		response.Total = response.Filtered
 	}
 	//
@@ -956,7 +957,7 @@ func putCategoryHandler(c *fiber.Ctx) error {
 			category.Title = title
 			category.Description = description
 			if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
-				p := path.Join(dir, "hugo", "static", "categories")
+				p := path.Join(dir, "storage", "categories")
 				if _, err := os.Stat(p); err != nil {
 					if err = os.MkdirAll(p, 0755); err != nil {
 						logger.Errorf("%v", err)
@@ -976,7 +977,7 @@ func putCategoryHandler(c *fiber.Ctx) error {
 							return c.JSON(HTTPError{err.Error()})
 						}
 						// TODO: Update category with Thumbnail
-						category.Thumbnail = "/" + path.Join("static", "categories", filename)
+						category.Thumbnail = "/" + path.Join("storage", "categories", filename)
 					}
 				}
 			}
@@ -1595,7 +1596,7 @@ func postProductsHandler(c *fiber.Ctx) error {
 			product := &models.Product{Name: name, Title: title, Description: description}
 			if id, err := models.CreateProduct(common.Database, product); err == nil {
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
-					p := path.Join(dir, "hugo", "static", "products")
+					p := path.Join(dir, "storage", "products")
 					if _, err := os.Stat(p); err != nil {
 						if err = os.MkdirAll(p, 0755); err != nil {
 							logger.Errorf("%v", err)
@@ -1614,7 +1615,7 @@ func postProductsHandler(c *fiber.Ctx) error {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
 							}
-							product.Thumbnail = "/" + path.Join("static", "products", filename)
+							product.Thumbnail = "/" + path.Join("storage", "products", filename)
 							if err = models.UpdateProduct(common.Database, product); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
@@ -1672,6 +1673,7 @@ type ProductsListItem struct {
 	Description string
 	VariationsIds string
 	VariationsTitles string
+	CategoryId uint `json:",omitempty"`
 }
 
 // @security BasicAuth
@@ -1679,11 +1681,12 @@ type ProductsListItem struct {
 // @Summary Search products
 // @Accept json
 // @Produce json
+// @Param id query int false "Category id"
 // @Param category body ListRequest true "body"
 // @Success 200 {object} ProductsListResponse
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
-// @Router /api/v1/categories/list [post]
+// @Router /api/v1/products/list [post]
 func postProductsListHandler(c *fiber.Ctx) error {
 	var id int
 	if v := c.Query("id"); v != "" {
@@ -1695,7 +1698,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 		return err
 	}
 	if len(request.Sort) == 0 {
-		request.Sort["ID"] = "desc"
+		request.Sort = map[string]string{"ID": "desc"}
 	}
 	if request.Length == 0 {
 		request.Length = 10
@@ -1773,13 +1776,13 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	}
 	logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Name, products.Title, products.Thumbnail, products.Description, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Name, products.Title, products.Thumbnail, products.Description, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles, category_id as CategoryId").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
 				var item ProductsListItem
 				if err = common.Database.ScanRows(rows, &item); err == nil {
-					
+
 					response.Data = append(response.Data, item)
 				} else {
 					logger.Errorf("%v", err)
@@ -1790,7 +1793,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Name, products.Title, products.Thumbnail, products.Description, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Name, products.Title, products.Thumbnail, products.Description, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles, category_id as CategoryId").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -1900,7 +1903,7 @@ func putProductHandler(c *fiber.Ctx) error {
 				}
 			}else if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
 				// New file
-				p := path.Join(dir, "hugo", "static", "products")
+				p := path.Join(dir, "storage", "products")
 				if _, err := os.Stat(p); err != nil {
 					if err = os.MkdirAll(p, 0755); err != nil {
 						logger.Errorf("%v", err)
@@ -1919,7 +1922,7 @@ func putProductHandler(c *fiber.Ctx) error {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
 						}
-						product.Thumbnail = "/" + path.Join("static", "products", filename)
+						product.Thumbnail = "/" + path.Join("storage", "products", filename)
 					}
 				}
 			}
@@ -2084,7 +2087,7 @@ func postVariationsListHandler(c *fiber.Ctx) error {
 				case "ProductTitle":
 					keys2 = append(keys2, fmt.Sprintf("%v like ?", key))
 					values2 = append(values2, "%" + strings.TrimSpace(value) + "%")
-				case "Properties":
+				case "Options":
 					v := strings.TrimSpace(value)
 					if strings.Index(v, ">=") == 0 {
 						if vv, err := strconv.Atoi(v[2:]); err == nil {
@@ -2137,7 +2140,7 @@ func postVariationsListHandler(c *fiber.Ctx) error {
 		for key, value := range request.Sort {
 			if key != "" && value != "" {
 				switch key {
-				case "Properties":
+				case "Options":
 					orders = append(orders, fmt.Sprintf("%v %v", key, value))
 				default:
 					orders = append(orders, fmt.Sprintf("properties.%v %v", key, value))
@@ -2284,7 +2287,7 @@ func postVariationHandler(c *fiber.Ctx) error {
 			variation := &models.Variation{Name: name, Title: title, Description: description, BasePrice: basePrice, ProductId: product.ID}
 			if id, err := models.CreateVariation(common.Database, variation); err == nil {
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
-					p := path.Join(dir, "hugo", "static", "variations")
+					p := path.Join(dir, "storage", "variations")
 					if _, err := os.Stat(p); err != nil {
 						if err = os.MkdirAll(p, 0755); err != nil {
 							logger.Errorf("%v", err)
@@ -2303,7 +2306,7 @@ func postVariationHandler(c *fiber.Ctx) error {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
 							}
-							variation.Thumbnail = "/" + path.Join("static", "variations", filename)
+							variation.Thumbnail = "/" + path.Join("storage", "variations", filename)
 							if err = models.UpdateVariation(common.Database, variation); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
@@ -2394,7 +2397,7 @@ func putVariationHandler(c *fiber.Ctx) error {
 					variation.Thumbnail = ""
 				}
 			}else if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
-				p := path.Join(dir, "hugo", "static", "variations")
+				p := path.Join(dir, "storage", "variations")
 				if _, err := os.Stat(p); err != nil {
 					if err = os.MkdirAll(p, 0755); err != nil {
 						logger.Errorf("%v", err)
@@ -2413,7 +2416,7 @@ func putVariationHandler(c *fiber.Ctx) error {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
 						}
-						variation.Thumbnail = "/" + path.Join("static", "variations", filename)
+						variation.Thumbnail = "/" + path.Join("storage", "variations", filename)
 					}
 				}
 			}
@@ -2498,7 +2501,7 @@ type VariationsListItem struct {
 	ProductTitle string
 	PropertiesIds string
 	PropertiesTitles string
-	//Properties int
+	//Options int
 }
 
 type ValuesListResponse struct {
@@ -2572,7 +2575,7 @@ func postValuesListHandler(c *fiber.Ctx) error {
 		for key, value := range request.Sort {
 			if key != "" && value != "" {
 				switch key {
-				case "Properties":
+				case "Options":
 					orders = append(orders, fmt.Sprintf("%v %v", key, value))
 				default:
 					orders = append(orders, fmt.Sprintf("`values`.%v %v", key, value))
@@ -2685,7 +2688,7 @@ func postPropertyHandler(c *fiber.Ctx) error {
 	var variation *models.Variation
 	if variation, err = models.GetVariation(common.Database, id); err != nil {
 		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{"Property already define, edit existing"})
+		return c.JSON(HTTPError{"Option already define, edit existing"})
 	}
 	var view PropertyView
 	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
@@ -2698,7 +2701,7 @@ func postPropertyHandler(c *fiber.Ctx) error {
 			if properties, err := models.GetPropertiesByVariationAndName(common.Database, id, request.Name); err == nil {
 				if len(properties) > 0 {
 					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{"Property already define, edit existing"})
+					return c.JSON(HTTPError{"Option already define, edit existing"})
 				}
 			}
 			//
@@ -2795,7 +2798,7 @@ func postPropertiesListHandler(c *fiber.Ctx) error {
 				case "VariationTitle":
 					keys2 = append(keys2, fmt.Sprintf("%v like ?", key))
 					values2 = append(values2, "%" + strings.TrimSpace(value) + "%")
-				case "Properties":
+				case "Options":
 					v := strings.TrimSpace(value)
 					if strings.Index(v, ">=") == 0 {
 						if vv, err := strconv.Atoi(v[2:]); err == nil {
@@ -2912,7 +2915,7 @@ type PropertyView struct {
 // @Produce json
 // @Param pid path int true "Product ID"
 // @Param oid path int true "Variation ID"
-// @Param id path int true "Property ID"
+// @Param id path int true "Option ID"
 // @Success 200 {object} PropertyView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
@@ -2946,7 +2949,7 @@ func getPropertyHandler(c *fiber.Ctx) error {
 // @Summary Update price
 // @Accept json
 // @Produce json
-// @Param id path int true "Property ID"
+// @Param id path int true "Option ID"
 // @Param category body NewPrice true "body"
 // @Success 200 {object} PriceView
 // @Failure 404 {object} HTTPError
@@ -2997,7 +3000,7 @@ func putPropertyHandler(c *fiber.Ctx) error {
 // @Summary Delete price
 // @Accept json
 // @Produce json
-// @Param id query int true "Property id"
+// @Param id query int true "Option id"
 // @Success 200 {object} HTTPMessage
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
@@ -3044,7 +3047,7 @@ type PricesListItem struct {
 // @Summary Search product variation property prices
 // @Accept json
 // @Produce json
-// @Param property_id path int false "Property ID"
+// @Param property_id path int false "Option ID"
 // @Param request body ListRequest true "body"
 // @Success 200 {object} PricesListResponse
 // @Failure 404 {object} HTTPError
@@ -3198,7 +3201,7 @@ type PriceView struct {
 // @Summary Create categories
 // @Accept json
 // @Produce json
-// @Param property_id query int true "Property id"
+// @Param property_id query int true "Option id"
 // @Param category body NewPrice true "body"
 // @Success 200 {object} PriceView
 // @Failure 404 {object} HTTPError
@@ -3266,7 +3269,7 @@ type PricesView []*PriceView
 // @Summary Get prices
 // @Accept json
 // @Produce json
-// @Param property_id path int true "Property ID"
+// @Param property_id path int true "Option ID"
 // @Success 200 {object} PriceView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
@@ -4178,7 +4181,7 @@ func postValueHandler(c *fiber.Ctx) error {
 			value := &models.Value{Title: title, Value: val, OptionId: option.ID}
 			if id, err := models.CreateValue(common.Database, value); err == nil {
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
-					p := path.Join(dir, "hugo", "static", "values")
+					p := path.Join(dir, "storage", "values")
 					if _, err := os.Stat(p); err != nil {
 						if err = os.MkdirAll(p, 0755); err != nil {
 							logger.Errorf("%v", err)
@@ -4197,7 +4200,7 @@ func postValueHandler(c *fiber.Ctx) error {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
 							}
-							value.Thumbnail = "/" + path.Join("static", "values", filename)
+							value.Thumbnail = "/" + path.Join("storage", "values", filename)
 							if err = models.UpdateValue(common.Database, value); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
@@ -4321,7 +4324,7 @@ func putValueHandler(c *fiber.Ctx) error {
 					value.Thumbnail = ""
 				}
 			}else if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
-				p := path.Join(dir, "hugo", "static", "values")
+				p := path.Join(dir, "storage", "values")
 				if _, err := os.Stat(p); err != nil {
 					if err = os.MkdirAll(p, 0755); err != nil {
 						logger.Errorf("%v", err)
@@ -4340,7 +4343,7 @@ func putValueHandler(c *fiber.Ctx) error {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
 						}
-						value.Thumbnail = "/" + path.Join("static", "values", filename)
+						value.Thumbnail = "/" + path.Join("storage", "values", filename)
 						if err = models.UpdateValue(common.Database, value); err != nil {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
@@ -4473,7 +4476,7 @@ func postImageHandler(c *fiber.Ctx) error {
 					}
 					img := &models.Image{Name: name, Size: vv.Size}
 					if id, err := models.CreateImage(common.Database, img); err == nil {
-						p := path.Join(dir, "hugo", "static", "images")
+						p := path.Join(dir, "storage", "images")
 						if _, err := os.Stat(p); err != nil {
 							if err = os.MkdirAll(p, 0755); err != nil {
 								logger.Errorf("%v", err)
@@ -4492,8 +4495,8 @@ func postImageHandler(c *fiber.Ctx) error {
 									c.Status(http.StatusInternalServerError)
 									return c.JSON(HTTPError{err.Error()})
 								}
-								img.Url = common.Config.Base + "/" + path.Join("static", "images", filename)
-								img.Path = "/" + path.Join("hugo", "static", "images", filename)
+								img.Url = common.Config.Base + "/" + path.Join("storage", "images", filename)
+								img.Path = "/" + path.Join("storage", "images", filename)
 								if reader, err := os.Open(p); err != nil {
 									defer reader.Close()
 									if config, _, err := image.DecodeConfig(reader); err == nil {
@@ -5972,6 +5975,128 @@ func LoadCart(store *session.Store) (*Cart, error) {
 		}
 	}
 	return &cart, nil
+}
+
+type FilterRequest ListRequest
+
+type ProductsFilterResponse struct {
+	Data []ProductsFilterItem
+	Filtered int64
+	Total int64
+}
+
+type ProductsFilterItem struct {
+	ID uint
+	Path string
+	Name string
+	Title string
+	Thumbnail string
+	Description string
+	Images string
+	BasePrice float64
+	CategoryId uint
+}
+
+// @security BasicAuth
+// SearchCategories godoc
+// @Summary Filter products
+// @Accept json
+// @Produce json
+// @Param relPath query int true "Category RelPath"
+// @Param category body FilterRequest true "body"
+// @Success 200 {object} ProductsFilterResponse
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/filter [post]
+func postFilterHandler(c *fiber.Ctx) error {
+	var relPath string
+	if v := c.Query("relPath"); v != "" {
+		relPath = v
+	}else{
+		return c.JSON(HTTPError{"relPath required"})
+	}
+	var response ProductsFilterResponse
+	var request ListRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	if len(request.Sort) == 0 {
+		request.Sort = map[string]string{"ID": "desc"}
+	}
+	if request.Length == 0 {
+		request.Length = 10
+	}
+	// Filter
+	var keys1 []string
+	var values1 []interface{}
+	if len(request.Filter) > 0 {
+		for key, value := range request.Filter {
+			if key != "" && len(strings.TrimSpace(value)) > 0 {
+				switch key {
+				case "BasePrice":
+					parts := strings.Split(value, "-")
+					if len(parts) == 1 {
+						if v, err := strconv.Atoi(parts[0]); err == nil {
+							keys1 = append(keys1, "Base_Price == ?")
+							values1 = append(values1, v)
+						}
+					} else {
+						if v, err := strconv.Atoi(parts[0]); err == nil {
+							keys1 = append(keys1, "Base_Price >= ?")
+							values1 = append(values1, v)
+						}
+						if v, err := strconv.Atoi(parts[1]); err == nil {
+							keys1 = append(keys1, "Base_Price <= ?")
+							values1 = append(values1, v)
+						}
+					}
+				default:
+					keys1 = append(keys1, fmt.Sprintf("products.%v like ?", key))
+					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
+				}
+			}
+		}
+	}
+	keys1 = append(keys1, "Path LIKE ?")
+	values1 = append(values1, relPath + "%")
+	logger.Infof("keys1: %+v, values1: %+v", keys1, values1)
+	//
+	// Sort
+	var order string
+	if len(request.Sort) > 0 {
+		var orders []string
+		for key, value := range request.Sort {
+			if key != "" && value != "" {
+				switch key {
+				case "BasePrice":
+					orders = append(orders, fmt.Sprintf("%v %v", "Base_Price", value))
+				default:
+					orders = append(orders, fmt.Sprintf("%v %v", key, value))
+				}
+			}
+		}
+		order = strings.Join(orders, ", ")
+	}
+	logger.Infof("order: %+v", order)
+	//
+	rows, err := common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Base_Price as BasePrice, Category_Id as CategoryId").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	if err == nil {
+		for rows.Next() {
+			var item ProductsFilterItem
+			if err = common.Database.ScanRows(rows, &item); err == nil {
+				response.Data = append(response.Data, item)
+			} else {
+				logger.Errorf("%v", err)
+			}
+		}
+		rows.Close()
+	}
+	//
+	common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Base_Price as BasePrice, Category_Id as CategoryId").Where(strings.Join(keys1, " and "), values1...).Count(&response.Filtered)
+	common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Base_Price as BasePrice, Category_Id as CategoryId").Where("Path LIKE ?", relPath + "%").Count(&response.Total)
+	//
+	c.Status(http.StatusOK)
+	return c.JSON(response)
 }
 
 type SearchRequest struct {
