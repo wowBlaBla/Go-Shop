@@ -4,18 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/logger"
+	"github.com/nfnt/resize"
 	"github.com/spf13/cobra"
 	"github.com/yonnic/goshop/common"
 	"github.com/yonnic/goshop/models"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"image/jpeg"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -228,13 +231,13 @@ var renderCmd = &cobra.Command{
 							//
 							var arr = []string{}
 							for _, category := range *breadcrumbs {
-								logger.Infof("TEST001 ID: %v, Name: %v", category.ID, category.Name)
+								//logger.Infof("TEST001 ID: %v, Name: %v", category.ID, category.Name)
 								arr = append(arr, category.Name)
 								if p2 := path.Join(append(append([]string{output}, arr...), "_index.md")...); len(p2) > 0 {
-									logger.Infof("TEST001 p2: %v", p2)
+									//logger.Infof("TEST001 p2: %v", p2)
 									// Update category file
 									if categoryFile, err := common.ReadCategoryFile(p2); err == nil {
-										logger.Infof("TEST001 categoryFile.Options: %+v", categoryFile.Options)
+										//logger.Infof("TEST001 categoryFile.Options: %+v", categoryFile.Options)
 										min := categoryFile.BasePriceMin
 										max := categoryFile.BasePriceMax
 										for _, variation := range product.Variations {
@@ -247,49 +250,51 @@ var renderCmd = &cobra.Command{
 											}
 											//
 											for _, property := range variation.Properties {
-												var found bool
-												for i, opt := range categoryFile.Options {
-													if opt.ID == property.Option.ID {
-														logger.Infof("TEST001 property ID: %v, Name: %v FOUND", property.ID, property.Name)
-														for _, price := range property.Prices {
-															var found bool
-															for _, value := range opt.Values {
-																if value.ID == price.Value.ID {
-																	found = true
-																	break
+												if property.Filtering {
+													var found bool
+													for i, opt := range categoryFile.Options {
+														if opt.ID == property.Option.ID {
+															//logger.Infof("TEST001 property ID: %v, Name: %v FOUND", property.ID, property.Name)
+															for _, price := range property.Prices {
+																var found bool
+																for _, value := range opt.Values {
+																	if value.ID == price.Value.ID {
+																		found = true
+																		break
+																	}
+																}
+																if !found {
+																	categoryFile.Options[i].Values = append(categoryFile.Options[i].Values, &common.Value{
+																		ID:        price.Value.ID,
+																		Thumbnail: price.Value.Thumbnail,
+																		Title:     price.Value.Title,
+																		Value:     price.Value.Value,
+																	})
 																}
 															}
-															if !found {
-																categoryFile.Options[i].Values = append(categoryFile.Options[i].Values, &common.Value{
-																	ID: price.Value.ID,
+															found = true
+														}
+													}
+													if !found {
+														//logger.Infof("TEST001 property ID: %v, Name: %v NOT FOUND (%v)", property.ID, property.Name, len(categoryFile.Options))
+														opt := &common.Option{
+															ID:    property.Option.ID,
+															Name:  property.Option.Name,
+															Title: property.Option.Title,
+														}
+														for _, price := range property.Prices {
+															if price.Enabled {
+																opt.Values = append(opt.Values, &common.Value{
+																	ID:        price.Value.ID,
 																	Thumbnail: price.Value.Thumbnail,
 																	Title:     price.Value.Title,
 																	Value:     price.Value.Value,
 																})
 															}
 														}
-														found = true
+														//logger.Infof("TEST001 property ID: %v, Name: %v ADD %+v", property.ID, property.Name, opt)
+														categoryFile.Options = append(categoryFile.Options, opt)
 													}
-												}
-												if !found {
-													logger.Infof("TEST001 property ID: %v, Name: %v NOT FOUND (%v)", property.ID, property.Name, len(categoryFile.Options))
-													opt := &common.Option{
-														ID: property.Option.ID,
-														Name: property.Option.Name,
-														Title: property.Option.Title,
-													}
-													for _, price := range property.Prices {
-														if price.Enabled {
-															opt.Values = append(opt.Values, &common.Value{
-																ID: price.Value.ID,
-																Thumbnail: price.Value.Thumbnail,
-																Title:     price.Value.Title,
-																Value:     price.Value.Value,
-															})
-														}
-													}
-													logger.Infof("TEST001 property ID: %v, Name: %v ADD %+v", property.ID, property.Name, opt)
-													categoryFile.Options = append(categoryFile.Options, opt)
 												}
 											}
 										}
@@ -434,6 +439,11 @@ var renderCmd = &cobra.Command{
 											logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
 											if err = cp(p1, p2); err == nil {
 												thumbnail = fmt.Sprintf("/%s/%s", strings.Join(append(names, product.Name), "/"), filename)
+												if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
+													if err = imageResize(p2, common.Config.Resize.Thumbnail.Size); err != nil {
+														logger.Warningf("%v", err)
+													}
+												}
 											} else {
 												logger.Warningf("%v", err)
 											}
@@ -441,6 +451,7 @@ var renderCmd = &cobra.Command{
 									}
 								}
 								// Copy images
+								var images []string
 								if len(product.Images) > 0 {
 									for i, image := range product.Images {
 										if image.Path != "" {
@@ -452,9 +463,29 @@ var renderCmd = &cobra.Command{
 											}
 											if p1 := path.Join(dir, image.Path); len(p1) > 0 {
 												if fi, err := os.Stat(p1); err == nil {
-													p2 := path.Join(p0, fmt.Sprintf("image-%d-%d%v", i + 1, fi.ModTime().Unix(), path.Ext(p1)))
+													filename := fmt.Sprintf("image-%d-%d%v", i + 1, fi.ModTime().Unix(), path.Ext(p1))
+													p2 := path.Join(p0, filename)
 													logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-													if err = cp(p1, p2); err != nil {
+													if err = cp(p1, p2); err == nil {
+														var resized bool
+														if common.Config.Resize.Enabled && common.Config.Resize.Image.Enabled {
+															if err = imageResize(p2, common.Config.Resize.Image.Size); err == nil {
+																var miniatures []string
+																for _, size := range strings.Split(common.Config.Resize.Image.Size, ",") {
+																	filename2 := filename[:len(filename) - len(filepath.Ext(filename))]
+																	filename2 = fmt.Sprintf("%s_%s%s", filename2, size, filepath.Ext(filename))
+																	miniatures = append(miniatures, fmt.Sprintf("/%s/%s", strings.Join(append(names, product.Name, "resize"), "/"), filename2))
+																}
+																images = append(images, strings.Join(append([]string{fmt.Sprintf("/%s/%s", strings.Join(append(names, product.Name), "/"), filename)}, miniatures...), ","))
+																resized = true
+															} else {
+																logger.Warningf("%v", err)
+															}
+														}
+														if !resized {
+															images = append(images, fmt.Sprintf("/%s/%s", strings.Join(append(names, product.Name), "/"), filename))
+														}
+													} else {
 														logger.Warningf("%v", err)
 													}
 												}
@@ -479,6 +510,7 @@ var renderCmd = &cobra.Command{
 									Title:       product.Title,
 									Description: product.Description,
 									Thumbnail:   thumbnail,
+									Images:      strings.Join(images, ";"),
 									CategoryID:  category.ID,
 									BasePrice:   basePriceMin,
 								}); err != nil {
@@ -679,4 +711,56 @@ func cp(src, dst string) error {
 		return err
 	}
 	return out.Close()
+}
+
+func imageResize(src, sizes string) error {
+
+	file, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+
+	img, err := jpeg.Decode(file)
+	if err != nil {
+		return err
+	}
+	file.Close()
+
+	if p := path.Join(path.Dir(src), "resize"); len(p) > 0 {
+		if _, err := os.Stat(p); err != nil {
+			if err = os.MkdirAll(p, 0755); err != nil {
+				logger.Warningf("%v", err)
+			}
+		}
+	}
+
+	for _, size := range strings.Split(sizes, ",") {
+		pair := strings.Split(size, "x")
+		var width int
+		if width, err = strconv.Atoi(pair[0]); err != nil {
+			return err
+		}
+
+		var height int
+		if height, err = strconv.Atoi(pair[1]); err != nil {
+			return err
+		}
+
+		m := resize.Resize(uint(width), uint(height), img, resize.Lanczos3)
+
+		filename := path.Base(src)
+		filename = filename[:len(filename) - len(filepath.Ext(filename))]
+		filename = path.Join(path.Dir(src), "resize", fmt.Sprintf("%s_%dx%d%s", filename, width, height, filepath.Ext(src)))
+
+		out, err := os.Create(filename)
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+
+		if err = jpeg.Encode(out, m, nil); err != nil {
+			return err
+		}
+	}
+	return nil
 }

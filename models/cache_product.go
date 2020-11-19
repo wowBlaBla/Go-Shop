@@ -10,6 +10,7 @@ type CacheProduct struct {
 	Title       string
 	Description string
 	Thumbnail   string
+	Images string
 	CategoryID  uint
 	BasePrice   float64 // min value
 }

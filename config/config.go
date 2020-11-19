@@ -62,6 +62,18 @@ type Config struct {
 		Uri string // "root:password@/db_name?charset=utf8&parseTime=True&loc=Local" or ""
 	}
 	//
+	Resize struct {
+		Enabled bool
+		Thumbnail struct {
+			Enabled bool
+			Size string //64x0,128x0
+		}
+		Image struct {
+			Enabled bool
+			Size string // 128x0,256x0
+		}
+	}
+	//
 	Hugo struct {
 		Home string
 		Theme string

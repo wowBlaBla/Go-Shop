@@ -2666,6 +2666,7 @@ type NewProperty struct {
 	Name string
 	Title string
 	OptionId uint
+	Filtering bool
 }
 
 // @security BasicAuth
@@ -2711,6 +2712,7 @@ func postPropertyHandler(c *fiber.Ctx) error {
 				Title:       request.Title,
 				OptionId:    request.OptionId,
 				VariationId: variation.ID,
+				Filtering: request.Filtering,
 			}
 			logger.Infof("property: %+v", request)
 			//
@@ -2906,6 +2908,7 @@ type PropertyView struct {
 	Name string
 	Title string
 	OptionId uint
+	Filtering bool
 }
 
 // @security BasicAuth
@@ -2976,6 +2979,7 @@ func putPropertyHandler(c *fiber.Ctx) error {
 			}
 			property.Type = request.Type
 			property.Title = request.Title
+			property.Filtering = request.Filtering
 			if err = models.UpdateProperty(common.Database, property); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
@@ -6016,10 +6020,11 @@ func postFilterHandler(c *fiber.Ctx) error {
 		return c.JSON(HTTPError{"relPath required"})
 	}
 	var response ProductsFilterResponse
-	var request ListRequest
+	var request FilterRequest
 	if err := c.BodyParser(&request); err != nil {
 		return err
 	}
+	logger.Infof("request: %+v", request)
 	if len(request.Sort) == 0 {
 		request.Sort = map[string]string{"ID": "desc"}
 	}
@@ -6037,22 +6042,45 @@ func postFilterHandler(c *fiber.Ctx) error {
 					parts := strings.Split(value, "-")
 					if len(parts) == 1 {
 						if v, err := strconv.Atoi(parts[0]); err == nil {
-							keys1 = append(keys1, "Base_Price == ?")
+							keys1 = append(keys1, "cache_products.Base_Price == ?")
 							values1 = append(values1, v)
 						}
 					} else {
 						if v, err := strconv.Atoi(parts[0]); err == nil {
-							keys1 = append(keys1, "Base_Price >= ?")
+							keys1 = append(keys1, "cache_products.Base_Price >= ?")
 							values1 = append(values1, v)
 						}
 						if v, err := strconv.Atoi(parts[1]); err == nil {
-							keys1 = append(keys1, "Base_Price <= ?")
+							keys1 = append(keys1, "cache_products.Base_Price <= ?")
 							values1 = append(values1, v)
 						}
 					}
 				default:
-					keys1 = append(keys1, fmt.Sprintf("products.%v like ?", key))
-					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
+					if strings.Index(key, "Option-") >= -1 {
+						if res := regexp.MustCompile(`Option-(\d+)`).FindAllStringSubmatch(key, 1); len(res) > 0 && len(res[0]) > 1 {
+							if id, err := strconv.Atoi(res[0][1]); err == nil {
+								values := strings.Split(value, ",")
+								//logger.Infof("Search for list #%d with values %+v", id, values)
+								//
+								//keys2 = append(keys2, fmt.Sprintf("options.List_Id = ?"))
+								//values2 = append(values2, id)
+								//
+								var keys3 []string
+								var values3 []interface{}
+								for _, value := range values {
+									if v, err := strconv.Atoi(value); err == nil {
+										keys3 = append(keys3, fmt.Sprintf("prices.Value_Id = ?"))
+										values3 = append(values3, v)
+									}
+								}
+								keys1 = append(keys1, fmt.Sprintf("(options.Id = ? and (%v))", strings.Join(keys3, " or ")))
+								values1 = append(values1, append([]interface{}{id}, values3...)...)
+							}
+						}
+					}else{
+						keys1 = append(keys1, fmt.Sprintf("products.%v like ?", key))
+						values1 = append(values1, "%"+strings.TrimSpace(value)+"%")
+					}
 				}
 			}
 		}
@@ -6069,9 +6097,9 @@ func postFilterHandler(c *fiber.Ctx) error {
 			if key != "" && value != "" {
 				switch key {
 				case "BasePrice":
-					orders = append(orders, fmt.Sprintf("%v %v", "Base_Price", value))
+					orders = append(orders, fmt.Sprintf("cache_products.%v %v", "Base_Price", value))
 				default:
-					orders = append(orders, fmt.Sprintf("%v %v", key, value))
+					orders = append(orders, fmt.Sprintf("cache_products.%v %v", key, value))
 				}
 			}
 		}
@@ -6079,7 +6107,8 @@ func postFilterHandler(c *fiber.Ctx) error {
 	}
 	logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Base_Price as BasePrice, Category_Id as CategoryId").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.CacheProduct{}).Select("cache_products.ID, cache_products.Name, cache_products.Title, cache_products.Path, cache_products.Description, cache_products.Thumbnail, cache_products.Images, cache_products.Base_Price as BasePrice, cache_products.Category_Id as CategoryId").Joins("inner join variations on variations.Product_ID = cache_products.Product_ID").Joins("inner join properties on properties.Variation_Id = variations.Id").Joins("inner join options on options.Id = properties.Option_Id").Joins("inner join prices on prices.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...)/*.Having(strings.Join(keys2, " and "), values2...)*/.Group("cache_products.id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	//rows, err := common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Base_Price as BasePrice, Category_Id as CategoryId").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		for rows.Next() {
 			var item ProductsFilterItem

@@ -12,6 +12,7 @@ type Property struct {
 	VariationId uint
 	Option      *Option `gorm:"foreignKey:OptionId"`
 	OptionId    uint
+	Filtering   bool
 	//
 	Prices []*Price `gorm:"foreignKey:PropertyId"`
 }
