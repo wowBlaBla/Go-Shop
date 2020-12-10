@@ -172,6 +172,7 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 			})
 		})
 	}
+	app.Post("/api/v1/login", postLoginHandler)
 	app.Post("/login", postLoginHandler)
 	// Register
 	if config.UseForm {
@@ -185,7 +186,7 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 			})
 		})
 	}
-	app.Post("/register", func (c *fiber.Ctx) error {
+	postRegisterHandler := func (c *fiber.Ctx) error {
 		var request struct {
 			Email string
 			Password string
@@ -288,7 +289,9 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 			c.JSON(fiber.Map{"ERROR": err.Error()})
 		}
 		return nil
-	})
+	}
+	app.Post("/api/v1/register", postRegisterHandler)
+	app.Post("/register", postRegisterHandler)
 	// Refresh
 	app.Get("/refresh", func (c *fiber.Ctx) error {
 		if req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(c.Request().Header.Header()))); err == nil {
@@ -362,6 +365,7 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 		}
 		return nil
 	})
+	app.Get("/api/v1/logout", getLogoutHandler)
 	app.Get("/logout", getLogoutHandler)
 	return app, func (c *fiber.Ctx) error {
 		var auth bool

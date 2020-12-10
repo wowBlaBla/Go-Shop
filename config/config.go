@@ -61,6 +61,10 @@ type Config struct {
 		Dialer string // "mysql" or "sqlite"
 		Uri string // "root:password@/db_name?charset=utf8&parseTime=True&loc=Local" or ""
 	}
+	I18n struct {
+		Enabled bool
+		Languages []Language
+	}
 	//
 	Resize struct {
 		Enabled bool
@@ -72,11 +76,25 @@ type Config struct {
 			Enabled bool
 			Size string // 128x0,256x0
 		}
+		Quality int
 	}
 	//
 	Hugo struct {
 		Home string
 		Theme string
+		Minify bool
+	}
+	//
+	Currency string // usd, eur
+	//
+	Payment struct {
+		Enabled bool
+		Default string
+		Stripe struct {
+			Enabled bool
+			PublishedKey string
+			SecretKey string
+		}
 	}
 	Modified time.Time
 }
@@ -99,6 +117,13 @@ func (c *Config) Save() error {
 		}
 	}
 	return errors.New("unknown file type")
+}
+
+type Language struct {
+	Enabled bool
+	Name string
+	Code string
+	Suffix string `toml:",omitempty"`
 }
 
 func GenerateSSL(crtPath string, keyPath string, host string) error {

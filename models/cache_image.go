@@ -16,7 +16,7 @@ func (CacheImage) TableName() string {
 
 func CreateCacheImage(connector *gorm.DB, image *CacheImage) (uint, error) {
 	db := connector
-	db.Debug().Create(&image)
+	db.Create(&image)
 	if err := db.Error; err != nil {
 		return 0, err
 	}

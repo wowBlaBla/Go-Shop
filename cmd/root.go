@@ -60,8 +60,20 @@ func initConfig() {
 		common.Config.Https.Port = config.DEFAULT_HTTPS_PORT
 		common.Config.Database.Dialer = "sqlite"
 		common.Config.Database.Uri = path.Join(dir, "database.sqlite")
+		common.Config.I18n.Enabled = true
+		common.Config.I18n.Languages = []config.Language{
+			{
+				Enabled: true,
+				Name: "Deutsche",
+				Code: "de",
+			},
+		}
 		common.Config.Hugo.Home = config.DEFAULT_HUGO
 		common.Config.Hugo.Theme = "default"
+		common.Config.Hugo.Minify = true
+		common.Config.Resize.Quality = 75
+		common.Config.Currency = "usd"
+		common.Config.Payment.Default = "stripe"
 		if err = common.Config.Save(); err != nil {
 			logger.Errorf(" %v", err.Error())
 		}
@@ -167,7 +179,10 @@ var RootCmd = &cobra.Command{
 		//
 		common.Database.AutoMigrate(&models.CacheProduct{})
 		common.Database.AutoMigrate(&models.CacheImage{})
+		common.Database.AutoMigrate(&models.CacheVariation{})
+		common.Database.AutoMigrate(&models.CacheValue{})
 		//
+		common.Database.AutoMigrate(&models.Profile{})
 		// Project structure
 		if admin := path.Join(dir, "admin"); len(admin) > 0 {
 			if _, err := os.Stat(admin); err != nil {
@@ -202,6 +217,52 @@ var RootCmd = &cobra.Command{
 						logger.Errorf("%v", err)
 					}
 				}
+			}
+		}
+		// Payment
+		if common.Config.Payment.Enabled {
+			if common.Config.Payment.Stripe.Enabled {
+				common.STRIPE = common.NewStripe(common.Config.Payment.Stripe.SecretKey)
+				//
+				/*if balance, err := common.STRIPE.GetBalance(); err == nil {
+					if bts, err := json.Marshal(balance); err == nil {
+						logger.Infof("bts: %+v", string(bts))
+					}
+				}*/
+				//
+				/*if customers, err := common.STRIPE.GetCustomers(); err == nil {
+					for i, customer := range customers {
+						logger.Infof("%d %+v", i, customer)
+					}
+				}*/
+				//
+				/*if intents, err := common.STRIPE.GetPaymentIntents(); err == nil {
+					for i, intent := range intents {
+						if bts, err := json.Marshal(intent); err == nil {
+							logger.Infof("%d %+v", i, string(bts))
+						}
+					}
+				}*/
+				/*if intent, err := common.STRIPE.GetPaymentIntent("pi_1HuDdsLxvolFmsmRDXUNRZdj"); err == nil {
+					if bts, err := json.Marshal(intent); err == nil {
+						logger.Infof("%+v", string(bts))
+					}
+				}else{
+					logger.Errorf("%+v", err)
+				}*/
+				/*customerId := "cus_IVhwqYhrKfOzZ9"
+				if customer, err := common.STRIPE.GetCustomer(customerId); err == nil {
+					if bts, err := json.Marshal(customer); err == nil {
+						logger.Infof("Customer: %+v", string(bts))
+						if cards, err := common.STRIPE.GetCards(customerId); err == nil {
+							for i, card := range cards {
+								if bts, err := json.Marshal(card); err == nil {
+									logger.Infof("%d: card: %+v", i, string(bts))
+								}
+							}
+						}
+					}
+				}*/
 			}
 		}
 		//

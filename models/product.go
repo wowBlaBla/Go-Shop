@@ -10,6 +10,7 @@ type Product struct {
 	Title       string
 	Description string
 	Thumbnail   string
+	Content 	string
 	Categories  []*Category  `gorm:"many2many:categories_products;"`
 	Variations  []*Variation `gorm:"foreignKey:ProductId"`
 	Images      []*Image     `gorm:"many2many:products_images;"`
@@ -31,6 +32,16 @@ func GetProducts(connector *gorm.DB) ([]*Product, error) {
 	var products []*Product
 	db.Debug().Find(&products)
 	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return products, nil
+}
+
+func GetProductsByCategoryId(connector *gorm.DB, id uint) ([]*Product, error) {
+	db := connector
+	var products []*Product
+	db.Model(&Product{}).Joins("inner join categories_products on categories_products.product_id = products.id").Where("categories_products.category_id = ?", id).Find(&products)
+	if err :=  db.Error; err != nil {
 		return nil, err
 	}
 	return products, nil

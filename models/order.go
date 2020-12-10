@@ -7,6 +7,7 @@ import (
 const (
 	ORDER_STATUS_NEW = "new"
 	ORDER_STATUS_WAITING_FROM_PAYMENT = "waiting for payment"
+	ORDER_STATUS_PAYED = "payed"
 	ORDER_STATUS_MANUFACTURING = "manufacturing"
 	ORDER_STATUS_SHIPPING = "shipping"
 	ORDER_STATUS_COMPLETE = "complete"
@@ -17,12 +18,16 @@ type Order struct {
 	//
 	Description string
 	Items []*Item `gorm:"foreignKey:OrderId"`
+	Sum  float64 `sql:"type:decimal(8,2);"`
+	Delivery float64 `sql:"type:decimal(8,2);"`
 	Total float64 `sql:"type:decimal(8,2);"`
 	Status string
 	Comment string
 	//
 	User *User `gorm:"foreignKey:UserId"`
 	UserId uint
+	Profile *Profile `gorm:"foreignKey:ProfileId"`
+	ProfileId uint
 }
 
 func CreateOrder(connector *gorm.DB, order *Order) (uint, error) {
@@ -47,7 +52,7 @@ func GetOrdersByUserId(connector *gorm.DB, userId uint) ([]*Order, error){
 func GetOrder(connector *gorm.DB, id int) (*Order, error) {
 	db := connector
 	var order Order
-	db.Debug().Find(&order, id)
+	db.Debug().Preload("Items").Find(&order, id)
 	if err := db.Error; err != nil {
 		return nil, err
 	}

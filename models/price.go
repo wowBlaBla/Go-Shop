@@ -11,6 +11,7 @@ type Price struct {
 	//
 	Enabled bool
 	Price float64
+	Sku string
 }
 
 func GetPricesByProperty(connector *gorm.DB, propertyId uint) ([]*Price, error) {

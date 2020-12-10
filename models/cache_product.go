@@ -11,6 +11,7 @@ type CacheProduct struct {
 	Description string
 	Thumbnail   string
 	Images string
+	Variations string
 	CategoryID  uint
 	BasePrice   float64 // min value
 }
@@ -21,9 +22,16 @@ func (CacheProduct) TableName() string {
 
 func CreateCacheProduct(connector *gorm.DB, product *CacheProduct) (uint, error) {
 	db := connector
-	db.Debug().Create(&product)
+	db.Create(&product)
 	if err := db.Error; err != nil {
 		return 0, err
 	}
 	return product.ID, nil
+}
+
+func GetCacheProductByProductId(connector *gorm.DB, productId uint) (*CacheProduct, error){
+	db := connector
+	var cacheProduct CacheProduct
+	db.Where("product_id = ?", productId).First(&cacheProduct)
+	return &cacheProduct, db.Error
 }

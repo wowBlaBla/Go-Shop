@@ -10,7 +10,6 @@ type Item struct {
 	Description string
 	Path string
 	Thumbnail  string
-	Thumbnails  string
 	Price       float64          `sql:"type:decimal(8,2);"`
 	Quantity    int
 	Total       float64          `sql:"type:decimal(8,2);"`

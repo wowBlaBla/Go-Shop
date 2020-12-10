@@ -13,6 +13,7 @@ type Variation struct {
 	Thumbnail string
 	Properties []*Property `gorm:"foreignKey:VariationId"`
 	BasePrice float64          `sql:"type:decimal(8,2);"`
+	Sku string
 	//
 	ProductId uint
 }
@@ -29,7 +30,7 @@ func GetVariationsByProductAndName(connector *gorm.DB, productId uint, name stri
 func GetVariation(connector *gorm.DB, id int) (*Variation, error) {
 	db := connector
 	var variation Variation
-	db.Preload("Options").Preload("Options.Option").Preload("Options.Prices").Preload("Options.Prices.Value").Find(&variation, id)
+	db.Preload("Properties").Preload("Properties.Option").Preload("Properties.Prices").Preload("Properties.Prices.Value").Find(&variation, id)
 	if err := db.Error; err != nil {
 		return nil, err
 	}

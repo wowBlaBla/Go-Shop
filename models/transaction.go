@@ -17,8 +17,18 @@ type Transaction struct {
 	Amount float64 `sql:"type:decimal(8,2);"`
 	Status string
 	//
+	Payment string // JSON: {"Method": "stripe", "Id": "pi_1HuDdsLxvolFmsmRDXUNRZdj"}
+	//
 	Order *Order `gorm:"foreignKey:OrderId"`
 	OrderId uint
+}
+
+type TransactionPayment struct {
+	Stripe TransactionPaymentStripe
+}
+
+type TransactionPaymentStripe struct {
+	Id string
 }
 
 func CreateTransaction(connector *gorm.DB, transaction *Transaction) (uint, error) {

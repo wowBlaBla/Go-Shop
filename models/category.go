@@ -11,6 +11,7 @@ type Category struct {
 	Title string
 	Description string
 	Thumbnail string
+	Content string
 	Products []*Product `gorm:"many2many:categories_products;"`
 	//
 	Parent *Category `gorm:"foreignKey:ParentId"`
@@ -136,7 +137,7 @@ func GetChildrenOfCategoryById(connector *gorm.DB, id uint) []*Category {
 func GetProductsFromCategory(connector *gorm.DB, category *Category) ([]*Product, error) {
 	db := connector
 	var products []*Product
-	if err := db.Model(&category).Association("Products").Find(&products); err != nil {
+	if err := db.Debug().Model(&category).Association("Products").Find(&products); err != nil {
 		return nil, err
 	}
 	return products, nil

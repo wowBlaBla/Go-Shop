@@ -24,6 +24,9 @@ type User struct {
 	Email          string
 	EmailConfirmed bool
 	Role int
+	ResetCode string
+	ResetAttempt time.Time
+	Profiles  []*Profile `gorm:"foreignKey:UserId"`
 	//
 	UpdatedAt time.Time
 }
@@ -42,6 +45,15 @@ func GetUser(connector *gorm.DB, id int) (*User, error){
 		return nil, fmt.Errorf("user not found")
 	}
 	return &user, db.Error
+}
+
+func GetUserFull(connector *gorm.DB, id uint) (*User, error) {
+	db := connector
+	var user User
+	if err := db.Preload("Profiles").First(&user, id).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 func GetUserByLogin(connector *gorm.DB, login string) (*User, error){
@@ -78,6 +90,16 @@ func GetUserByEmailOrLoginAndPassword(connector *gorm.DB, emailOrLogin string, p
 	db := connector
 	var user User
 	db.Where("(login = ? or email = ?) and password = ?", emailOrLogin, emailOrLogin, password).First(&user)
+	if user.Email == "" {
+		return nil, fmt.Errorf("user not found")
+	}
+	return &user, db.Error
+}
+
+func GetUserByResetCode(connector *gorm.DB, code string) (*User, error){
+	db := connector
+	var user User
+	db.Where("code = ?", code).First(&user)
 	if user.Email == "" {
 		return nil, fmt.Errorf("user not found")
 	}
