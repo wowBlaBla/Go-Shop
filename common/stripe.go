@@ -127,3 +127,16 @@ func (s *Stripe) GetCard(customerId, id string) (*stripe.Card, error) {
 	}
 	return t, nil
 }
+
+func (s *Stripe) DeleteCard(customerId, id string) (*stripe.Card, error) {
+	stripe.Key = s.Key
+	t, err := card.Del(
+		id, &stripe.CardParams{
+			Customer: stripe.String(customerId),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return t, nil
+}

@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/BurntSushi/toml"
 	swagger "github.com/arsmn/fiber-swagger/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
@@ -14,9 +16,10 @@ import (
 	"github.com/google/logger"
 	"github.com/jinzhu/now"
 	"github.com/stripe/stripe-go/v71"
-	"github.com/stripe/stripe-go/v71/card"
 	checkout_session "github.com/stripe/stripe-go/v71/checkout/session"
 	"github.com/yonnic/goshop/common"
+	"github.com/yonnic/goshop/common/mollie"
+	"github.com/yonnic/goshop/config"
 	"github.com/yonnic/goshop/models"
 	"gorm.io/gorm"
 	"image"
@@ -25,9 +28,11 @@ import (
 	_ "image/png"
 	"io"
 	"io/ioutil"
+	"log"
 	"math"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -37,6 +42,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+)
+
+const (
+	HAS_CHANGES = ".has_changes"
 )
 
 var (
@@ -86,6 +95,23 @@ func GetFiber() *fiber.App {
 		logger.Errorf("%v", err)
 	}
 	//
+	changed := func (messages ...string) func (c *fiber.Ctx) error {
+		return func (c *fiber.Ctx) error {
+			file, err := os.OpenFile(path.Join(dir, HAS_CHANGES),
+				os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				logger.Warningf("%v", err)
+			}
+			defer file.Close()
+			for _, message := range messages {
+				if _, err := file.WriteString(message + "\n"); err != nil {
+					logger.Warningf("%v", err)
+				}
+			}
+
+			return c.Next()
+		}
+	}
 	hasRole := func (roles ...int) func (c *fiber.Ctx) error {
 		return func (c *fiber.Ctx) error {
 			if v := c.Locals("user"); v != nil {
@@ -109,74 +135,78 @@ func GetFiber() *fiber.App {
 	v1.Get("/logout", authMulti, getLogoutHandler)
 	v1.Get("/info", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getInfoHandler)
 	v1.Get("/dashboard", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getDashboardHandler)
+	v1.Get("/settings/basic", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getBasicSettingsHandler)
+	v1.Put("/settings/basic", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("basic settings updated"), putBasicSettingsHandler)
+	v1.Get("/settings/hugo", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getHugoSettingsHandler)
+	v1.Put("/settings/hugo", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("hugo settings updated"), putHugoSettingsHandler)
 	//
 	v1.Get("/categories", authMulti, getCategoriesHandler)
-	v1.Post("/categories", authMulti, postCategoriesHandler)
+	v1.Post("/categories", authMulti, changed("category created"), postCategoriesHandler)
 	v1.Post("/categories/autocomplete", authMulti, postCategoriesAutocompleteHandler)
 	v1.Post("/categories/list", authMulti, postCategoriesListHandler)
 	v1.Get("/categories/:id", authMulti, getCategoryHandler)
-	v1.Put("/categories/:id", authMulti, putCategoryHandler)
-	v1.Delete("/categories/:id", authMulti, delCategoryHandler)
+	v1.Put("/categories/:id", authMulti, changed("category updated"), putCategoryHandler)
+	v1.Delete("/categories/:id", authMulti, changed("category deleted"), delCategoryHandler)
 	//
 	v1.Get("/contents", authMulti, getContentsHandler)
 	v1.Get("/contents/*", authMulti, getContentHandler)
-	v1.Patch("/contents/*", authMulti, patchContentHandler)
-	v1.Post("/contents/*", authMulti, postContentHandler)
-	v1.Put("/contents/*", authMulti, putContentHandler)
+	v1.Patch("/contents/*", authMulti, changed("content updated"), patchContentHandler)
+	v1.Post("/contents/*", authMulti, changed("content created"), postContentHandler)
+	v1.Put("/contents/*", authMulti, changed("content updated"), putContentHandler)
 	//
 	v1.Get("/products", authMulti, getProductsHandler)
-	v1.Post("/products", authMulti, postProductsHandler)
+	v1.Post("/products", authMulti, changed("product created"), postProductsHandler)
 	v1.Post("/products/list", authMulti, postProductsListHandler)
 	v1.Get("/products/:id", authMulti, getProductHandler)
-	v1.Put("/products/:id", authMulti, putProductHandler)
-	v1.Delete("/products/:id", authMulti, delProductHandler)
+	v1.Put("/products/:id", authMulti, changed("product updated"), putProductHandler)
+	v1.Delete("/products/:id", authMulti, changed("product deleted"), delProductHandler)
 	//
 	v1.Get("/variations", authMulti, getVariationsHandler)
-	v1.Post("/variations", authMulti, postVariationHandler)
+	v1.Post("/variations", authMulti, changed("variation created"), postVariationHandler)
 	v1.Post("/variations/list", authMulti, postVariationsListHandler)
 	v1.Get("/variations/:id", authMulti, getVariationHandler)
-	v1.Put("/variations/:id", authMulti, putVariationHandler)
-	v1.Delete("/variations/:id", authMulti, delVariationHandler)
+	v1.Put("/variations/:id", authMulti, changed("variation updated"), putVariationHandler)
+	v1.Delete("/variations/:id", authMulti, changed("variation deleted"), delVariationHandler)
 	//
-	v1.Post("/properties", authMulti, postPropertyHandler)
+	v1.Post("/properties", authMulti, changed("property created"), postPropertyHandler)
 	v1.Post("/properties/list", authMulti, postPropertiesListHandler)
 	v1.Get("/properties/:id", authMulti, getPropertyHandler)
-	v1.Put("/properties/:id", authMulti, putPropertyHandler)
-	v1.Delete("/properties/:id", authMulti, deletePropertyHandler)
+	v1.Put("/properties/:id", authMulti, changed("property updated"), putPropertyHandler)
+	v1.Delete("/properties/:id", authMulti, changed("property deleted"), deletePropertyHandler)
 	//
 	v1.Get("/prices", authMulti, getPricesHandler)
 	v1.Post("/prices/list", authMulti, postPricesListHandler)
-	v1.Post("/prices", authMulti, postPriceHandler)
+	v1.Post("/prices", authMulti, changed("price created"), postPriceHandler)
 	v1.Get("/prices/:id", authMulti, getPriceHandler)
-	v1.Put("/prices/:id", authMulti, putPriceHandler)
-	v1.Delete("/prices/:id", authMulti, deletePriceHandler)
+	v1.Put("/prices/:id", authMulti, changed("price updated"), putPriceHandler)
+	v1.Delete("/prices/:id", authMulti, changed("price deleted"), deletePriceHandler)
 	//
 	v1.Get("/tags", authMulti, getTagsHandler)
-	v1.Post("/tags", authMulti, postTagHandler)
+	v1.Post("/tags", authMulti, changed("tag created"), postTagHandler)
 	v1.Post("/tags/list", authMulti, postTagsListHandler)
 	v1.Get("/tags/:id", authMulti, getTagHandler)
-	v1.Put("/tags/:id", authMulti, putTagHandler)
-	v1.Delete("/tags/:id", authMulti, delTagHandler)
+	v1.Put("/tags/:id", authMulti, changed("tag updated"), putTagHandler)
+	v1.Delete("/tags/:id", authMulti, changed("tag deleted"), delTagHandler)
 	//
 	v1.Get("/options", authMulti, getOptionsHandler)
-	v1.Post("/options", authMulti, postOptionHandler)
+	v1.Post("/options", authMulti, changed("option created"), postOptionHandler)
 	v1.Post("/options/list", authMulti, postOptionsListHandler)
 	v1.Get("/options/:id", authMulti, getOptionHandler)
-	v1.Put("/options/:id", authMulti, putOptionHandler)
-	v1.Delete("/options/:id", authMulti, delOptionHandler)
+	v1.Put("/options/:id", authMulti, changed("option updated"), putOptionHandler)
+	v1.Delete("/options/:id", authMulti, changed("option deleted"), delOptionHandler)
 	//
 	v1.Get("/values", authMulti, getValuesHandler)
-	v1.Post("/values", authMulti, postValueHandler)
+	v1.Post("/values", authMulti, changed("value created"), postValueHandler)
 	v1.Post("/values/list", authMulti, postValuesListHandler)
 	v1.Get("/values/:id", authMulti, getValueHandler)
-	v1.Put("/values/:id", authMulti, putValueHandler)
-	v1.Delete("/values/:id", authMulti, delValueHandler)
+	v1.Put("/values/:id", authMulti, changed("value updated"), putValueHandler)
+	v1.Delete("/values/:id", authMulti, changed("value deleted"), delValueHandler)
 	//
-	v1.Post("/images", authMulti, postImageHandler)
+	v1.Post("/images", authMulti, changed("value created"), postImageHandler)
 	v1.Post("/images/list", authMulti, postImagesListHandler)
 	v1.Get("/images/:id", authMulti, getImageHandler)
-	v1.Put("/images/:id", authMulti, putImageHandler)
-	v1.Delete("/images/:id", authMulti, delImageHandler)
+	v1.Put("/images/:id", authMulti, changed("value updated"), putImageHandler)
+	v1.Delete("/images/:id", authMulti, changed("value deleted"), delImageHandler)
 	//
 	v1.Post("/orders/list", authMulti, postOrdersListHandler)
 	v1.Get("/orders/:id", authMulti, getOrderHandler)
@@ -207,11 +237,16 @@ func GetFiber() *fiber.App {
 	v1.Post("/account/orders", authMulti, postAccountOrdersHandler)
 	v1.Get("/account/orders/:id", authMulti, getAccountOrderHandler)
 	v1.Post("/account/orders/:id/checkout", authMulti, postAccountOrderCheckoutHandler)
+	// Stripe
 	v1.Get("/account/orders/:id/stripe/customer", authMulti, getAccountOrderStripeCustomerHandler)
 	v1.Get("/account/orders/:id/stripe/card", authMulti, getAccountOrderStripeCardHandler)
 	v1.Post("/account/orders/:id/stripe/card", authMulti, postAccountOrderStripeCardHandler)
-	//v1.Get("/account/orders/:id/stripe/secret", authMulti, getAccountOrderStripeSecretHandler)
 	v1.Post("/account/orders/:id/stripe/submit", authMulti, postAccountOrderStripeSubmitHandler)
+	v1.Get("/account/orders/:id/stripe/success", authMulti, getAccountOrderStripeSuccessHandler)
+	// Mollie
+	v1.Post("/account/orders/:id/mollie/submit", authMulti, postAccountOrderMollieSubmitHandler)
+	v1.Get("/account/orders/:id/mollie/success", authMulti, getAccountOrderMollieSuccessHandler)
+
 	//
 	v1.Post("/profiles", postProfileHandler)
 	v1.Post("/delivery/calculate", postDeliveryCalculateHandler)
@@ -342,6 +377,10 @@ type InfoView struct {
 	Started string
 	Authorization string `json:",omitempty"`
 	ExpirationAt string `json:",omitempty"`
+	HasChanges struct {
+		Messages []string `json:",omitempty"`
+		Updated *time.Time `json:",omitempty"`
+	} `json:",omitempty"`
 	User UserView `json:",omitempty"`
 }
 
@@ -366,6 +405,23 @@ func getInfoHandler(c *fiber.Ctx) error {
 		if expiration := v.(int64); expiration > 0 {
 			view.ExpirationAt = time.Unix(expiration, 0).Format(time.RFC3339)
 		}
+	}
+	if fi, err := os.Stat(path.Join(dir, HAS_CHANGES)); err == nil {
+		file, err := os.Open(path.Join(dir, HAS_CHANGES))
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			view.HasChanges.Messages = append(view.HasChanges.Messages, scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			logger.Warningf("%v", err)
+		}
+		sort.Sort(sort.Reverse(sort.StringSlice(view.HasChanges.Messages)))
+		m := fi.ModTime()
+		view.HasChanges.Updated = &m
 	}
 	if v := c.Locals("user"); v != nil {
 		user := v.(*models.User)
@@ -462,6 +518,198 @@ func getDashboardHandler(c *fiber.Ctx) error {
 	}()
 
 	return c.JSON(view)
+}
+
+type BasicSettingsView struct {
+	Payment config.PaymentConfig
+	Resize config.ResizeConfig
+}
+
+// GetBasicSettings godoc
+// @Summary Get basic settings
+// @Accept json
+// @Produce json
+// @Success 200 {object} BasicSettingsView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/settings/basic [get]
+func getBasicSettingsHandler(c *fiber.Ctx) error {
+	var conf BasicSettingsView
+	conf.Payment = common.Config.Payment
+	conf.Resize = common.Config.Resize
+	return c.JSON(conf)
+}
+
+// @security BasicAuth
+// PutBasicSettings godoc
+// @Summary Set basic settings
+// @Accept json
+// @Produce json
+// @Param category body BasicSettingsView true "body"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/settings/basic [put]
+func putBasicSettingsHandler(c *fiber.Ctx) error {
+	var request BasicSettingsView
+	if err := c.BodyParser(&request); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	// Payment
+	common.Config.Payment = request.Payment
+	// Resize
+	common.Config.Resize = request.Resize
+	// Restart
+	go func() {
+		time.Sleep(1 * time.Second)
+		logger.Infof("Restart application because of settings change")
+		os.Exit(0)
+	}()
+	if err := common.Config.Save(); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	return c.JSON(HTTPMessage{"OK"})
+}
+
+type HugoSettingsView struct {
+	Title string `toml:"title"`
+	Theme string `toml:"theme"`
+	Paginate int `toml:"paginate"`
+	Params struct {
+		Description string `toml:"description"`
+		Keywords string `toml:"keywords"`
+		Logo string `toml:"logo"`
+	} `toml:"params"`
+	Languages map[string]struct {
+		LanguageName string `toml:"languageName"`
+		Weight int `toml:"weight"`
+	} `toml:"languages"`
+}
+
+// GetHugoSettings godoc
+// @Summary Get hugo settings
+// @Accept json
+// @Produce json
+// @Success 200 {object} HugoSettingsView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/settings/hugo [get]
+func getHugoSettingsHandler(c *fiber.Ctx) error {
+	var conf HugoSettingsView
+	if _, err := toml.DecodeFile(path.Join(dir, "hugo", "config.toml"), &conf); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	return c.JSON(conf)
+}
+
+type HugoSettingsRequest struct {
+	Title string
+	Theme string
+	Paginate int
+	Description string
+	Keywords string
+	Logo string
+}
+
+// @security BasicAuth
+// PutHugoSettings godoc
+// @Summary Set hugo settings
+// @Accept json
+// @Produce json
+// @Param category body HugoSettingsRequest true "body"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/settings/hugo [put]
+func putHugoSettingsHandler(c *fiber.Ctx) error {
+	var request HugoSettingsRequest
+
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
+			data, err := c.Request().MultipartForm()
+			if err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			//
+			var conf HugoSettingsView
+			if _, err := toml.DecodeFile(path.Join(dir, "hugo", "config.toml"), &conf); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			if v, found := data.Value["Title"]; found && len(v) > 0 {
+				conf.Title = v[0]
+			}
+			if v, found := data.Value["Description"]; found && len(v) > 0 {
+				conf.Params.Description = v[0]
+			}
+			if v, found := data.Value["Keywords"]; found && len(v) > 0 {
+				conf.Params.Keywords = v[0]
+			}
+			if v, found := data.Value["Theme"]; found && len(v) > 0 {
+				conf.Theme = v[0]
+			}
+			if v, found := data.File["Logo"]; found && len(v) > 0 {
+				p := path.Join(dir, "hugo", "themes", conf.Theme, "static", "img")
+				if _, err := os.Stat(p); err != nil {
+					if err = os.MkdirAll(p, 0755); err != nil {
+						logger.Errorf("%v", err)
+					}
+				}
+				filename := "logo.png"
+				if p := path.Join(p, filename); len(p) > 0 {
+					if in, err := v[0].Open(); err == nil {
+						out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
+						if err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+						defer out.Close()
+						if _, err := io.Copy(out, in); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+					}
+				}
+			}
+			if v, found := data.Value["Paginate"]; found && len(v) > 0 {
+				if vv, err := strconv.Atoi(v[0]); err == nil {
+					conf.Paginate = vv
+				}
+			}
+			f, err := os.Create(path.Join(dir, "hugo", "config2.toml"))
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer f.Close()
+			if err = toml.NewEncoder(f).Encode(conf); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			return c.JSON(HTTPMessage{"OK"})
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Unsupported Content-Type"})
+		}
+	}
+
+
+
+
+
+	f, err := os.Create(path.Join(dir, "hugo", "config.toml"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	if err = toml.NewEncoder(f).Encode(request); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	return c.JSON(HTTPMessage{"OK"})
 }
 
 // @security BasicAuth
@@ -759,7 +1007,7 @@ func postCategoriesListHandler(c *fiber.Ctx) error {
 		return err
 	}
 	if len(request.Sort) == 0 {
-		request.Sort["ID"] = "desc"
+		request.Sort["Title"] = "asc"
 	}
 	if request.Length == 0 {
 		request.Length = 10
@@ -1653,8 +1901,11 @@ func postProductsHandler(c *fiber.Ctx) error {
 							logger.Errorf("%v", err)
 						}
 					}
+					// Thumbnail
+					var p1 string
 					filename := fmt.Sprintf("%d-%s-thumbnail%s", id, product.Name, path.Ext(v[0].Filename))
 					if p := path.Join(p, filename); len(p) > 0 {
+						p1 = p
 						if in, err := v[0].Open(); err == nil {
 							out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
 							if err != nil {
@@ -1670,6 +1921,41 @@ func postProductsHandler(c *fiber.Ctx) error {
 							if err = models.UpdateProduct(common.Database, product); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
+							}
+						}
+					}
+					// Image
+					img := &models.Image{Name: name, Size: v[0].Size}
+					filename = fmt.Sprintf("%d-%s%s", id, img.Name, path.Ext(v[0].Filename))
+					if id, err := models.CreateImage(common.Database, img); err == nil {
+						p := path.Join(dir, "storage", "images")
+						if _, err := os.Stat(p); err != nil {
+							if err = os.MkdirAll(p, 0755); err != nil {
+								logger.Errorf("%v", err)
+							}
+						}
+						filename := fmt.Sprintf("%d-%s%s", id, img.Name, path.Ext(v[0].Filename))
+						if p := path.Join(p, filename); len(p) > 0 {
+							if err = common.Copy(p1, p); err == nil {
+								img.Url = common.Config.Base + "/" + path.Join("storage", "images", filename)
+								img.Path = "/" + path.Join("storage", "images", filename)
+								if reader, err := os.Open(p); err != nil {
+									defer reader.Close()
+									if config, _, err := image.DecodeConfig(reader); err == nil {
+										img.Height = config.Height
+										img.Width = config.Width
+									} else {
+										logger.Errorf("%v", err.Error())
+									}
+								}
+								if err = models.UpdateImage(common.Database, img); err != nil {
+									logger.Errorf("%v", err.Error())
+								}
+								if err = models.AddImageToProduct(common.Database, product, img); err != nil {
+									logger.Errorf("%v", err.Error())
+								}
+							}else{
+								logger.Errorf("%v", err.Error())
 							}
 						}
 					}
@@ -1695,7 +1981,13 @@ func postProductsHandler(c *fiber.Ctx) error {
 						}
 					}
 				}
-				if _, err = models.CreateVariation(common.Database, &models.Variation{Title: "Default", Name: "default", Description: "", ProductId: product.ID}); err != nil {
+				var basePrice float64
+				if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
+					if basePrice, err = strconv.ParseFloat(v[0], 10); err != nil {
+						logger.Errorf("%v", err)
+					}
+				}
+				if _, err = models.CreateVariation(common.Database, &models.Variation{Title: "Default", Name: "default", Description: "", BasePrice: basePrice, ProductId: product.ID}); err != nil {
 					logger.Errorf("%v", err)
 				}
 			}else{
@@ -4534,7 +4826,7 @@ type NewImage struct {
 // @Success 200 {object} HTTPMessage
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
-// @Router /api/v1/categories [post]
+// @Router /api/v1/images [post]
 func postImageHandler(c *fiber.Ctx) error {
 	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
 		if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
@@ -5494,7 +5786,7 @@ type ProfileView struct {
 	Lastname string
 	Company string
 	Address string
-	Zip int
+	Zip string
 	City string
 	Region string
 	Country string
@@ -5998,6 +6290,12 @@ func postPublishHandler(c *fiber.Ctx) error {
 			view.Output = string(buff.Bytes())
 			view.Status = "OK"
 			//
+			if _, err := os.Stat(path.Join(dir, HAS_CHANGES)); err == nil {
+				if err := os.Remove(path.Join(dir, HAS_CHANGES)); err != nil {
+					logger.Errorf("%v", err)
+				}
+			}
+			//
 			return c.JSON(view)
 		} else {
 			c.Status(http.StatusInternalServerError)
@@ -6054,7 +6352,7 @@ type NewProfile struct {
 	Lastname string
 	Company string
 	Address string
-	Zip int
+	Zip string
 	City string
 	Region string
 	Country string
@@ -6110,8 +6408,8 @@ func postAccountProfileHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Address is empty"})
 			}
-			var zip = request.Zip
-			if zip == 0 {
+			var zip = strings.TrimSpace(request.Zip)
+			if zip == "" {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Zip is empty"})
 			}
@@ -6388,7 +6686,7 @@ func postProfileHandler(c *fiber.Ctx) error {
 				return c.JSON(HTTPError{"Address is empty"})
 			}
 			var zip = request.Zip
-			if zip == 0 {
+			if zip == "" {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Zip is empty"})
 			}
@@ -6558,11 +6856,6 @@ func postFilterHandler(c *fiber.Ctx) error {
 						if res := regexp.MustCompile(`Option-(\d+)`).FindAllStringSubmatch(key, 1); len(res) > 0 && len(res[0]) > 1 {
 							if id, err := strconv.Atoi(res[0][1]); err == nil {
 								values := strings.Split(value, ",")
-								//logger.Infof("Search for list #%d with values %+v", id, values)
-								//
-								//keys2 = append(keys2, fmt.Sprintf("options.List_Id = ?"))
-								//values2 = append(values2, id)
-								//
 								var keys3 []string
 								var values3 []interface{}
 								for _, value := range values {
@@ -6585,7 +6878,7 @@ func postFilterHandler(c *fiber.Ctx) error {
 	}
 	keys1 = append(keys1, "Path LIKE ?")
 	values1 = append(values1, relPath + "%")
-	logger.Infof("keys1: %+v, values1: %+v", keys1, values1)
+	//logger.Infof("keys1: %+v, values1: %+v", keys1, values1)
 	//
 	// Sort
 	var order string
@@ -7313,7 +7606,17 @@ func postAccountOrderStripeCardHandler(c *fiber.Ctx) error {
 		Token: stripe.String(request.Token),
 	}
 
-	card, err := card.New(params)
+	if cards, err := common.STRIPE.GetCards(request.CustomerId); err == nil {
+		for i := 0; i < len(cards); i++ {
+			if _, err = common.STRIPE.DeleteCard(request.CustomerId, cards[i].ID); err != nil {
+				logger.Warningf("%+v", err.Error())
+			}
+		}
+	}else{
+		logger.Warningf("%+v", err.Error())
+	}
+
+	card, err := common.STRIPE.CreateCard(params)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
@@ -7327,50 +7630,6 @@ func postAccountOrderStripeCardHandler(c *fiber.Ctx) error {
 type StripeSecretView struct {
 	ClientSecret string
 }
-
-// GetSecret godoc
-// @Summary Get secret
-// @Accept json
-// @Produce json
-// @Param id path int true "Order ID"
-// @Success 200 {object} StripeSecretView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account/orders/{id}/stripe/secret [get]
-/*func getAccountOrderStripeSecretHandler(c *fiber.Ctx) error {
-	var id int
-	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
-	}
-	var userId uint
-	if v := c.Locals("user"); v != nil {
-		if user, ok := v.(*models.User); ok {
-			userId = user.ID
-		}
-	}
-	if order, err := models.GetOrder(common.Database, id); err == nil {
-		if order.UserId != userId {
-			c.Status(http.StatusForbidden)
-			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
-		}
-
-		pi, err := common.STRIPE.CreatePaymentIntent(order.Total, string(stripe.CurrencyUSD))
-
-		if err != nil {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-
-		data := StripeSecretView{
-			ClientSecret: pi.ClientSecret,
-		}
-		c.Status(http.StatusOK)
-		return c.JSON(data)
-	} else {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-}*/
 
 // PostStripePayment godoc
 // @Summary Post stripe payment
@@ -7400,7 +7659,6 @@ func postAccountOrderStripeSubmitHandler(c *fiber.Ctx) error {
 			c.Status(http.StatusForbidden)
 			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
 		}
-
 		var profilePayment models.ProfilePayment
 		var customerId string
 		profile, err := models.GetProfile(common.Database, order.ProfileId)
@@ -7426,6 +7684,18 @@ func postAccountOrderStripeSubmitHandler(c *fiber.Ctx) error {
 			},*/
 			Confirm: stripe.Bool(true),
 			//ReturnURL: stripe.String(fmt.Sprintf(CONFIG.Stripe.ConfirmURL, transactionId)),
+			/*PaymentMethodOptions: &stripe.PaymentIntentPaymentMethodOptionsParams{
+				Card: &stripe.PaymentIntentPaymentMethodOptionsCardParams{
+					RequestThreeDSecure: stripe.String("any"),
+				},
+			},*/
+		}
+		if v := c.Request().Header.Referer(); len(v) > 0 {
+			if u, err := url.Parse(string(v)); err == nil {
+				u.Path = fmt.Sprintf("/api/v1/account/orders/%v/stripe/success", order.ID)
+				u.RawQuery = ""
+				params.ReturnURL = stripe.String(u.String())
+			}
 		}
 		if bts, err := json.Marshal(params); err == nil {
 			logger.Infof("params: %+v", string(bts))
@@ -7441,7 +7711,7 @@ func postAccountOrderStripeSubmitHandler(c *fiber.Ctx) error {
 		}
 
 		transaction := &models.Transaction{Amount: order.Total, Status: models.TRANSACTION_STATUS_NEW, Order: order}
-		transactionPayment := models.TransactionPayment{Stripe: models.TransactionPaymentStripe{Id: pi.ID}}
+		transactionPayment := models.TransactionPayment{Stripe: &models.TransactionPaymentStripe{Id: pi.ID}}
 		if bts, err := json.Marshal(transactionPayment); err == nil {
 			transaction.Payment = string(bts)
 		}
@@ -7450,20 +7720,19 @@ func postAccountOrderStripeSubmitHandler(c *fiber.Ctx) error {
 			return c.JSON(HTTPError{err.Error()})
 		}
 
-		if pi.Status == "requires_payment_method" {
+		if pi.Status == stripe.PaymentIntentStatusRequiresPaymentMethod {
 			logger.Infof("case 1")
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{pi.LastPaymentError.Error()})
-		} else if pi.Status == "requires_action" {
+		} else if pi.Status == stripe.PaymentIntentStatusRequiresAction {
 			logger.Infof("case 2")
 			transaction.Status = models.TRANSACTION_STATUS_PENDING
 			if err = models.UpdateTransaction(common.Database, transaction); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
-		} else {
+		} else if pi.Status == stripe.PaymentIntentStatusSucceeded {
 			logger.Infof("case 3")
-			// succeeded
 			transaction.Status = models.TRANSACTION_STATUS_COMPLETE
 			if err = models.UpdateTransaction(common.Database, transaction); err != nil {
 				c.Status(http.StatusInternalServerError)
@@ -7474,6 +7743,8 @@ func postAccountOrderStripeSubmitHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
+		}else{
+			logger.Infof("case 3")
 		}
 
 		c.Status(http.StatusOK)
@@ -7484,6 +7755,335 @@ func postAccountOrderStripeSubmitHandler(c *fiber.Ctx) error {
 	}
 }
 
+// GetStripePaymentSuccess godoc
+// @Summary Get stripe payment success
+// @Accept json
+// @Produce html
+// @Param id path int true "Order ID"
+// @Success 200 {object} StripeCardsView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/orders/{id}/stripe/success [get]
+func getAccountOrderStripeSuccessHandler(c *fiber.Ctx) error {
+	// TODO: Here you can have some business logic
+	c.Response().Header.Set("Content-Type", "text/html")
+	/*
+	EXAMPLE:
+	id: 1
+	payment_intent: pi_1I0qfWLxvolFmsmRpQATpaRE
+	payment_intent_client_secret: pi_1I0qfWLxvolFmsmRpQATpaRE_secret_RkC4BWzSbdOWi31TsHtReNByc
+	source_type: card
+	*/
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	if order, err := models.GetOrder(common.Database, id); err == nil {
+		paymentIntentClientSecret := c.Query("payment_intent_client_secret")
+		if paymentIntentClientSecret != "" {
+			if res := regexp.MustCompile(`^(pi_[A-Za-z0-9]+)_secret`).FindAllStringSubmatch(paymentIntentClientSecret, 1); len(res) > 0 && len(res[0]) > 1 {
+				paymentIntentId := res[0][1]
+				logger.Infof("Success payment callback received, PaymentIntentClientSecret: %s", paymentIntentClientSecret)
+				if pi, err := common.STRIPE.GetPaymentIntent(paymentIntentId); err == nil {
+					logger.Infof("PaymentIntent ID: %s, Amount: %+v, Currency: %+v, Status: %+v, Customer: %+v", pi.ID, pi.Amount, pi.Currency, pi.Status, pi.Customer)
+						if transactions, err := models.GetTransactionsByOrderId(common.Database, id); err == nil {
+							for _, transaction := range transactions {
+								var payment models.TransactionPayment
+								if err = json.Unmarshal([]byte(transaction.Payment), &payment); err == nil {
+									if payment.Stripe != nil && payment.Stripe.Id == paymentIntentId {
+										if pi.Status == stripe.PaymentIntentStatusSucceeded {
+											transaction.Status = models.TRANSACTION_STATUS_COMPLETE
+											if err = models.UpdateTransaction(common.Database, transaction); err != nil {
+												c.Status(http.StatusInternalServerError)
+												return c.JSON(HTTPError{err.Error()})
+											}
+											order.Status = models.ORDER_STATUS_PAYED
+											if err = models.UpdateOrder(common.Database, order); err != nil {
+												c.Status(http.StatusInternalServerError)
+												return c.JSON(HTTPError{err.Error()})
+											}
+											c.Status(http.StatusOK)
+											return c.SendString("OK<script>window.top.postMessage('3DS-authentication-complete:" + c.Query("payment_intent_client_secret") + "');</script>")
+										} else {
+											payment.Stripe.Error = fmt.Sprintf("RequestID: %v, ChargeID: %v, Msg: %v", pi.LastPaymentError.RequestID, pi.LastPaymentError.ChargeID, pi.LastPaymentError.Msg)
+											if bts, err := json.Marshal(payment); err == nil {
+												transaction.Payment = string(bts)
+											}
+											transaction.Status = models.TRANSACTION_STATUS_REJECT
+											if err = models.UpdateTransaction(common.Database, transaction); err != nil {
+												c.Status(http.StatusInternalServerError)
+												return c.JSON(HTTPError{err.Error()})
+											}
+											err = fmt.Errorf("%v", pi.LastPaymentError.Msg)
+											logger.Errorf("%+v", err)
+											c.Status(http.StatusInternalServerError)
+											return c.SendString("<b>ERROR:</b> " + err.Error())
+										}
+									}
+								}else{
+									logger.Errorf("%+v", err)
+									c.Status(http.StatusInternalServerError)
+									return c.SendString("<b>ERROR:</b> " + err.Error())
+								}
+							}
+							err = fmt.Errorf("no corresponding transaction entity found")
+							logger.Errorf("%+v", err)
+							c.Status(http.StatusInternalServerError)
+							return c.SendString("<b>ERROR:</b> " + err.Error())
+						}else{
+							logger.Errorf("%+v", err)
+							c.Status(http.StatusInternalServerError)
+							return c.SendString("<b>ERROR:</b> " + err.Error())
+						}
+				} else {
+					logger.Errorf("%+v", err)
+					c.Status(http.StatusInternalServerError)
+					return c.SendString("<b>ERROR:</b> " + err.Error())
+				}
+			}else{
+				err = fmt.Errorf("incorrect payment_intent_client_secret")
+				logger.Errorf("%+v", err)
+				c.Status(http.StatusInternalServerError)
+				return c.SendString("<b>ERROR:</b> " + err.Error())
+			}
+		}else{
+			err = fmt.Errorf("missed payment_intent_client_secret")
+			logger.Errorf("%+v", err)
+			c.Status(http.StatusInternalServerError)
+			return c.SendString("<b>ERROR:</b> " + err.Error())
+		}
+	}else{
+		logger.Errorf("%+v", err)
+		c.Status(http.StatusInternalServerError)
+		return c.SendString("<b>ERROR:</b> " + err.Error())
+	}
+}
+
+// PostMollieOrder godoc
+// @Summary Post mollie order
+// @Accept json
+// @Produce json
+// @Param id path int true "Order ID"
+// @Success 200 {object} MollieOrderView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/orders/{id}/mollie/submit [get]
+func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
+	logger.Infof("postAccountOrderMollieSubmitHandler")
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	var user *models.User
+	if v := c.Locals("user"); v != nil {
+		var ok bool
+		if user, ok = v.(*models.User); !ok {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"User not found"})
+		}
+	}
+	if order, err := models.GetOrder(common.Database, id); err == nil {
+		if order.UserId != user.ID {
+			c.Status(http.StatusForbidden)
+			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
+		}
+		// PAYLOAD
+		logger.Infof("order: %+v", order)
+
+		var base string
+		var redirectUrl string
+		if v := c.Request().Header.Referer(); len(v) > 0 {
+			if u, err := url.Parse(string(v)); err == nil {
+				u.Path = ""
+				u.RawQuery = ""
+				base = u.String()
+				u.Path = fmt.Sprintf("/api/v1/account/orders/%v/mollie/success", order.ID)
+				redirectUrl = u.String()
+			}
+		}
+
+		var request struct {
+			Language string `json:"language"`
+		}
+		if err := c.BodyParser(&request); err != nil {
+			return err
+		}
+
+		o := &mollie.Order{
+			OrderNumber: fmt.Sprintf("%d", order.ID),
+		}
+		// Lines
+		var orderShortView OrderShortView
+		if err := json.Unmarshal([]byte(order.Description), &orderShortView); err == nil {
+			re := regexp.MustCompile(`^\[(.*)\]$`)
+			for _, item := range orderShortView.Items {
+				sku := strings.Replace(re.ReplaceAllString(item.Uuid, ""), ",", ".", -1)
+				meta := map[string]string{"variation": item.Variation.Title}
+				line := mollie.Line{
+					Type:           "physical",
+					Category:       "gift",
+					Sku:            sku,
+					Name:           item.Title,
+					ProductUrl:     base + item.Path,
+					Metadata:       meta,
+					Quantity:       item.Quantity,
+					VatRate:        fmt.Sprintf("%.2f", common.Config.Payment.VAT),
+					UnitPrice:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Price),
+					TotalAmount:    mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Total),
+					DiscountAmount: mollie.NewAmount(strings.ToUpper(common.Config.Currency), 0),
+					VatAmount:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Total * (common.Config.Payment.VAT / 100.0) / ((100.0 + common.Config.Payment.VAT) / 100.0)),
+				}
+				if item.Thumbnail != "" {
+					line.ImageUrl = base + strings.Split(item.Thumbnail, ",")[0]
+				}
+				o.Lines = append(o.Lines, line)
+			}
+		}
+		if order.Delivery > 0 {
+			o.Lines = append(o.Lines, mollie.Line{
+				Type: "shipping_fee",
+				Name: "Shipping Fee",
+				Quantity:       1,
+				VatRate:        fmt.Sprintf("%.2f", common.Config.Payment.VAT),
+				UnitPrice:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), order.Delivery),
+				TotalAmount:    mollie.NewAmount(strings.ToUpper(common.Config.Currency), order.Delivery),
+				DiscountAmount: mollie.NewAmount(strings.ToUpper(common.Config.Currency), 0),
+				VatAmount:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), order.Delivery * (common.Config.Payment.VAT / 100.0) / ((100.0 + common.Config.Payment.VAT) / 100.0)),
+			})
+		}
+		//
+		o.Amount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), order.Total)
+		o.RedirectUrl = redirectUrl
+		// Address
+		address := mollie.Address{
+			Email: user.Email,
+		}
+		if profile, err := models.GetProfile(common.Database, order.ProfileId); err == nil {
+			address.GivenName = profile.Name
+			address.FamilyName = profile.Lastname
+			address.OrganizationName = profile.Company
+			address.StreetAndNumber = profile.Address
+			address.City = profile.City
+			address.PostalCode = profile.Zip
+			address.Country = profile.Country
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+		o.BillingAddress = address
+		o.ShippingAddress = address
+		// Locale
+		if request.Language != "" {
+			if request.Language == "en" {
+				o.Locale = "en_US"
+			}else if request.Language == "de" {
+				o.Locale = "de_DE"
+			}
+		}
+		if bts, err := json.Marshal(o); err == nil {
+			logger.Infof("Bts: %+v", string(bts))
+		}
+
+		if o, links, err := common.MOLLIE.CreateOrder(o); err == nil {
+			logger.Infof("o: %+v", o)
+
+			transaction := &models.Transaction{Amount: order.Total, Status: models.TRANSACTION_STATUS_NEW, Order: order}
+			transactionPayment := models.TransactionPayment{Mollie: &models.TransactionPaymentMollie{Id: o.Id}}
+			if bts, err := json.Marshal(transactionPayment); err == nil {
+				transaction.Payment = string(bts)
+			}
+			if _, err = models.CreateTransaction(common.Database, transaction); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+
+			var response struct {
+				Id string
+				ProfileId string `json:",omitempty"`
+				Checkout string `json:",omitempty"`
+			}
+
+			response.Id = o.Id
+			if link, found := links["checkout"]; found {
+				response.Checkout = link.Href
+			}
+
+			c.Status(http.StatusOK)
+			return c.JSON(response)
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	} else {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+// GetMolliePaymentSuccess godoc
+// @Summary Get mollie payment success
+// @Accept json
+// @Produce html
+// @Param id path int true "Order ID"
+// @Success 200 {object} StripeCardsView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/orders/{id}/mollie/success [get]
+func getAccountOrderMollieSuccessHandler(c *fiber.Ctx) error {
+	log.Printf("getAccountOrderMollieSuccessHandler")
+	c.Response().Header.Set("Content-Type", "text/html")
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	if order, err := models.GetOrder(common.Database, id); err == nil {
+		if transactions, err := models.GetTransactionsByOrderId(common.Database, id); err == nil {
+			for _, transaction := range transactions {
+				var payment models.TransactionPayment
+				if err = json.Unmarshal([]byte(transaction.Payment), &payment); err == nil {
+					if payment.Mollie != nil && payment.Mollie.Id != "" {
+						if o, err := common.MOLLIE.GetOrder(payment.Mollie.Id); err == nil {
+							if o.Status == "paid" {
+								transaction.Status = models.TRANSACTION_STATUS_COMPLETE
+								if err = models.UpdateTransaction(common.Database, transaction); err != nil {
+									c.Status(http.StatusInternalServerError)
+									return c.JSON(HTTPError{err.Error()})
+								}
+								order.Status = models.ORDER_STATUS_PAYED
+								if err = models.UpdateOrder(common.Database, order); err != nil {
+									c.Status(http.StatusInternalServerError)
+									return c.JSON(HTTPError{err.Error()})
+								}
+								c.Status(http.StatusOK)
+								return c.SendString("OK<script>window.close()</script>")
+							}
+						}else{
+							logger.Errorf("%+v", err)
+							c.Status(http.StatusInternalServerError)
+							return c.SendString("<b>ERROR:</b> " + err.Error())
+						}
+					}
+				}else{
+					logger.Errorf("%+v", err)
+					c.Status(http.StatusInternalServerError)
+					return c.SendString("<b>ERROR:</b> " + err.Error())
+				}
+			}
+		}else{
+			logger.Errorf("%+v", err)
+			c.Status(http.StatusInternalServerError)
+			return c.SendString("<b>ERROR:</b> " + err.Error())
+		}
+	}else{
+		logger.Errorf("%+v", err)
+		c.Status(http.StatusInternalServerError)
+		return c.SendString("<b>ERROR:</b> " + err.Error())
+	}
+	err := fmt.Errorf("something wrong")
+	logger.Errorf("%+v", err)
+	c.Status(http.StatusInternalServerError)
+	return c.SendString("<b>ERROR:</b> " + err.Error())
+}
 
 /* *** */
 

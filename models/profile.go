@@ -10,7 +10,7 @@ type Profile struct {
 	Lastname string
 	Company string
 	Address string
-	Zip int
+	Zip string
 	City string
 	Region string
 	Country string

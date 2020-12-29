@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/yonnic/goshop/config"
 	"gorm.io/gorm"
+	"io"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -19,13 +20,14 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20201210145855"
+	COMPILED = "20201229154659"
 	//
 	Started          time.Time
 	Config           *config.Config
 	Database *gorm.DB
 	//
 	STRIPE *Stripe
+	MOLLIE *Mollie
 	SALT = "goshop"
 )
 
@@ -277,4 +279,24 @@ func WriteProductFile(p string, productFile *ProductFile) error {
 		return err
 	}
 	return ioutil.WriteFile(p, bts, 644)
+}
+
+func Copy(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
 }

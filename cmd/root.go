@@ -74,6 +74,7 @@ func initConfig() {
 		common.Config.Resize.Quality = 75
 		common.Config.Currency = "usd"
 		common.Config.Payment.Default = "stripe"
+		common.Config.Payment.VAT = 19
 		if err = common.Config.Save(); err != nil {
 			logger.Errorf(" %v", err.Error())
 		}
@@ -223,46 +224,9 @@ var RootCmd = &cobra.Command{
 		if common.Config.Payment.Enabled {
 			if common.Config.Payment.Stripe.Enabled {
 				common.STRIPE = common.NewStripe(common.Config.Payment.Stripe.SecretKey)
-				//
-				/*if balance, err := common.STRIPE.GetBalance(); err == nil {
-					if bts, err := json.Marshal(balance); err == nil {
-						logger.Infof("bts: %+v", string(bts))
-					}
-				}*/
-				//
-				/*if customers, err := common.STRIPE.GetCustomers(); err == nil {
-					for i, customer := range customers {
-						logger.Infof("%d %+v", i, customer)
-					}
-				}*/
-				//
-				/*if intents, err := common.STRIPE.GetPaymentIntents(); err == nil {
-					for i, intent := range intents {
-						if bts, err := json.Marshal(intent); err == nil {
-							logger.Infof("%d %+v", i, string(bts))
-						}
-					}
-				}*/
-				/*if intent, err := common.STRIPE.GetPaymentIntent("pi_1HuDdsLxvolFmsmRDXUNRZdj"); err == nil {
-					if bts, err := json.Marshal(intent); err == nil {
-						logger.Infof("%+v", string(bts))
-					}
-				}else{
-					logger.Errorf("%+v", err)
-				}*/
-				/*customerId := "cus_IVhwqYhrKfOzZ9"
-				if customer, err := common.STRIPE.GetCustomer(customerId); err == nil {
-					if bts, err := json.Marshal(customer); err == nil {
-						logger.Infof("Customer: %+v", string(bts))
-						if cards, err := common.STRIPE.GetCards(customerId); err == nil {
-							for i, card := range cards {
-								if bts, err := json.Marshal(card); err == nil {
-									logger.Infof("%d: card: %+v", i, string(bts))
-								}
-							}
-						}
-					}
-				}*/
+			}
+			if common.Config.Payment.Mollie.Enabled {
+				common.MOLLIE = common.NewMollie(common.Config.Payment.Mollie.Key)
 			}
 		}
 		//

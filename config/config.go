@@ -66,18 +66,7 @@ type Config struct {
 		Languages []Language
 	}
 	//
-	Resize struct {
-		Enabled bool
-		Thumbnail struct {
-			Enabled bool
-			Size string //64x0,128x0
-		}
-		Image struct {
-			Enabled bool
-			Size string // 128x0,256x0
-		}
-		Quality int
-	}
+	Resize ResizeConfig
 	//
 	Hugo struct {
 		Home string
@@ -87,16 +76,37 @@ type Config struct {
 	//
 	Currency string // usd, eur
 	//
-	Payment struct {
-		Enabled bool
-		Default string
-		Stripe struct {
-			Enabled bool
-			PublishedKey string
-			SecretKey string
-		}
-	}
+	Payment PaymentConfig
 	Modified time.Time
+}
+
+type PaymentConfig struct {
+	Enabled bool
+	Default string
+	Stripe struct {
+		Enabled bool
+		PublishedKey string
+		SecretKey string
+	}
+	Mollie struct {
+		Enabled bool
+		Key string
+		ProfileID string
+	}
+	VAT float64
+}
+
+type ResizeConfig struct {
+	Enabled bool
+	Thumbnail struct {
+		Enabled bool
+		Size string //64x0,128x0
+	}
+	Image struct {
+		Enabled bool
+		Size string // 128x0,256x0
+	}
+	Quality int
 }
 
 func (c *Config) Save() error {
