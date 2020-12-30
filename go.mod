@@ -42,6 +42,7 @@ require (
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/viper v1.7.1
+	github.com/streamrail/concurrent-map v0.0.0-20160823150647-8bf1e9bacbf6
 	github.com/stripe/stripe-go/v71 v71.48.0
 	github.com/swaggo/swag v1.6.7
 	github.com/ulikunitz/xz v0.5.8 // indirect

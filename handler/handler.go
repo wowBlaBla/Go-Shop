@@ -4394,6 +4394,7 @@ type ValuesView []ValueView
 type ValueView struct {
 	ID uint
 	Title string `json:",omitempty"`
+	Description string `json:",omitempty"`
 	Thumbnail string `json:",omitempty"`
 	Value string `json:",omitempty"`
 }
@@ -4571,6 +4572,10 @@ func postValueHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Invalid title"})
 			}
+			var description string
+			if v, found := data.Value["Description"]; found && len(v) > 0 {
+				description = strings.TrimSpace(v[0])
+			}
 			var val string
 			if v, found := data.Value["Value"]; found && len(v) > 0 {
 				val = strings.TrimSpace(v[0])
@@ -4579,7 +4584,7 @@ func postValueHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Invalid value"})
 			}
-			value := &models.Value{Title: title, Value: val, OptionId: option.ID}
+			value := &models.Value{Title: title, Description: description, Value: val, OptionId: option.ID}
 			if id, err := models.CreateValue(common.Database, value); err == nil {
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
 					p := path.Join(dir, "storage", "values")
@@ -4705,6 +4710,10 @@ func putValueHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Invalid title"})
 			}
+			var description string
+			if v, found := data.Value["Description"]; found && len(v) > 0 {
+				description = strings.TrimSpace(v[0])
+			}
 			var val string
 			if v, found := data.Value["Value"]; found && len(v) > 0 {
 				val = strings.TrimSpace(v[0])
@@ -4714,6 +4723,7 @@ func putValueHandler(c *fiber.Ctx) error {
 				return c.JSON(HTTPError{"Invalid value"})
 			}
 			value.Title = title
+			value.Description = description
 			value.Value = val
 			//
 			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {

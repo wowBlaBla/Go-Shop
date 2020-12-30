@@ -5,6 +5,7 @@ import (
 	"github.com/google/logger"
 	"github.com/nfnt/resize"
 	"github.com/spf13/cobra"
+	cmap "github.com/streamrail/concurrent-map"
 	"github.com/yonnic/goshop/common"
 	"github.com/yonnic/goshop/config"
 	"github.com/yonnic/goshop/models"
@@ -23,6 +24,7 @@ import (
 )
 
 var (
+	VALUES = cmap.New()
 	reLeadingDigit = regexp.MustCompile(`^[0-9]+-`)
 )
 
@@ -664,6 +666,11 @@ var renderCmd = &cobra.Command{
 															}); err != nil {
 																logger.Warningf("%v", err)
 															}
+															if key := fmt.Sprintf("%v", price.Value.ID); key != "" {
+																if !VALUES.Has(key) {
+																	VALUES.Set(key, valueView.Thumbnail)
+																}
+															}
 														}
 													}
 												}
@@ -732,6 +739,73 @@ var renderCmd = &cobra.Command{
 			return
 		}
 		//
+		// Options
+		if options, err := models.GetOptions(common.Database); err == nil {
+			if err := os.RemoveAll(path.Join(output, "options")); err != nil {
+				logger.Infof("%v", err)
+			}
+			// Payload
+			for _, option := range options {
+				if p1 := path.Join(output, "options", option.Name); len(p1) > 0 {
+					if _, err := os.Stat(p1); err != nil {
+						if err = os.MkdirAll(p1, 0755); err != nil {
+							logger.Errorf("%v", err)
+						}
+					}
+					for _, language := range languages {
+						if p2 := path.Join(p1, fmt.Sprintf("_index%s.html", language.Suffix)); len(p2) > 0 {
+							if _, err := os.Stat(p2); err != nil {
+								content := option.Description
+								optionFile := &common.OptionFile{
+									ID:    option.ID,
+									Date:  option.UpdatedAt,
+									Title: option.Title,
+									Type:    "options",
+									Content: content,
+								}
+								if err = common.WriteOptionFile(p2, optionFile); err != nil {
+									logger.Warningf("%v", err)
+								}
+							}
+						}
+					}
+					//
+					if values, err := models.GetValuesByOptionId(common.Database, int(option.ID)); err == nil {
+						for _, value := range values {
+							if p1 := path.Join(output, "options", option.Name, value.Value); len(p1) > 0 {
+								if _, err := os.Stat(p1); err != nil {
+									if err = os.MkdirAll(p1, 0755); err != nil {
+										logger.Errorf("%v", err)
+									}
+								}
+								for _, language := range languages {
+									if p2 := path.Join(p1, fmt.Sprintf("index%s.html", language.Suffix)); len(p2) > 0 {
+										if _, err := os.Stat(p2); err != nil {
+											valueFile := &common.ValueFile{
+												ID:    value.ID,
+												Date:  value.UpdatedAt,
+												Title: value.Title,
+												Description: value.Description,
+												Type:    "values",
+												Value: value.Value,
+											}
+											if key := fmt.Sprintf("%v", value.ID); key != "" {
+												if v, found := VALUES.Get(key); found {
+													valueFile.Thumbnail = v.(string)
+												}
+											}
+											if err = common.WriteValueFile(p2, valueFile); err != nil {
+												logger.Warningf("%v", err)
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 
 		/*result := struct {
 			Title string

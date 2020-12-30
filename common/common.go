@@ -20,7 +20,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20201230144618"
+	COMPILED = "20201230172028"
 	//
 	Started          time.Time
 	Config           *config.Config
@@ -280,6 +280,160 @@ func WriteProductFile(p string, productFile *ProductFile) error {
 	}
 	return ioutil.WriteFile(p, bts, 644)
 }
+
+/* Option */
+type OptionFile struct {
+	ID           uint
+	Date         time.Time
+	Title        string
+	Type         string
+	//
+	Content string
+}
+
+func (o *OptionFile) MarshalJSON() ([]byte, error) {
+	if bts, err := json.MarshalIndent(&struct {
+		ID uint
+		Type       string
+		Title      string
+		Date       time.Time
+	}{
+		ID:         o.ID,
+		Type:       o.Type,
+		Title:      o.Title,
+		Date:       o.Date,
+	}, "", "   "); err == nil {
+		bts = append(bts, "\n\n"...)
+		bts = append(bts, o.Content...)
+		return bts, nil
+	}else{
+		return []byte{}, err
+	}
+}
+
+func (o *OptionFile) UnmarshalJSON(data []byte) error {
+	type Alias OptionFile
+	v := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(o),
+	}
+	n := bytes.Index(data, []byte("\n\n"))
+	if n > -1 {
+		if err := json.Unmarshal(data[:n], &v); err != nil {
+			return err
+		}
+		v.Content = strings.TrimSpace(string(data[n:]))
+	}else{
+		return json.Unmarshal(data, &v)
+	}
+	return nil
+}
+
+func ReadOptionFile(p string) (*OptionFile, error) {
+	if _, err := os.Stat(p); err != nil {
+		return nil, err
+	}
+	bts, err := ioutil.ReadFile(p)
+	if err != nil {
+		return nil, err
+	}
+	optionFile := &OptionFile{}
+	if err = optionFile.UnmarshalJSON(bts); err != nil {
+		return nil, err
+	}
+	return optionFile, nil
+}
+
+func WriteOptionFile(p string, optionFile *OptionFile) error {
+	bts, err := optionFile.MarshalJSON()
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(p, bts, 644)
+}
+
+/* Value */
+type ValueFile struct {
+	ID           uint
+	Date         time.Time
+	Title        string
+	Description  string
+	Type         string
+	Thumbnail    string `json:",omitempty"`
+	Value        string
+	//
+	Content string
+}
+
+func (v *ValueFile) MarshalJSON() ([]byte, error) {
+	if bts, err := json.MarshalIndent(&struct {
+		ID uint
+		Type       string
+		Title      string
+		Description  string
+		Date       time.Time
+		Thumbnail    string
+		Value      string
+	}{
+		ID:    v.ID,
+		Type:  v.Type,
+		Title: v.Title,
+		Description: v.Description,
+		Date:  v.Date,
+		Thumbnail: v.Thumbnail,
+		Value: v.Value,
+	}, "", "   "); err == nil {
+		bts = append(bts, "\n\n"...)
+		bts = append(bts, v.Content...)
+		return bts, nil
+	}else{
+		return []byte{}, err
+	}
+}
+
+func (v *ValueFile) UnmarshalJSON(data []byte) error {
+	type Alias ValueFile
+	vv := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(v),
+	}
+	n := bytes.Index(data, []byte("\n\n"))
+	if n > -1 {
+		if err := json.Unmarshal(data[:n], &vv); err != nil {
+			return err
+		}
+		vv.Content = strings.TrimSpace(string(data[n:]))
+	}else{
+		return json.Unmarshal(data, &vv)
+	}
+	return nil
+}
+
+func ReadValueFile(p string) (*ValueFile, error) {
+	if _, err := os.Stat(p); err != nil {
+		return nil, err
+	}
+	bts, err := ioutil.ReadFile(p)
+	if err != nil {
+		return nil, err
+	}
+	valueFile := &ValueFile{}
+	if err = valueFile.UnmarshalJSON(bts); err != nil {
+		return nil, err
+	}
+	return valueFile, nil
+}
+
+func WriteValueFile(p string, valueFile *ValueFile) error {
+	bts, err := valueFile.MarshalJSON()
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(p, bts, 644)
+}
+/**/
 
 func Copy(src, dst string) error {
 	in, err := os.Open(src)

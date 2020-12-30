@@ -7,6 +7,7 @@ type Value struct {
 	OptionId uint
 	//
 	Title string
+	Description string `json:",omitempty"`
 	Thumbnail string
 	Value string
 }
