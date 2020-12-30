@@ -2637,11 +2637,23 @@ func postVariationHandler(c *fiber.Ctx) error {
 					return c.JSON(HTTPError{"Invalid base price"})
 				}
 			}
+			var dimensions string
+			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
+				dimensions = strings.TrimSpace(v[0])
+			}
+			var availability string
+			if v, found := data.Value["Availability"]; found && len(v) > 0 {
+				availability = strings.TrimSpace(v[0])
+			}
+			var sending string
+			if v, found := data.Value["Sending"]; found && len(v) > 0 {
+				sending = strings.TrimSpace(v[0])
+			}
 			var sku string
 			if v, found := data.Value["Sku"]; found && len(v) > 0 {
 				sku = strings.TrimSpace(v[0])
 			}
-			variation := &models.Variation{Name: name, Title: title, Description: description, BasePrice: basePrice, ProductId: product.ID, Sku: sku}
+			variation := &models.Variation{Name: name, Title: title, Description: description, BasePrice: basePrice, ProductId: product.ID, Dimensions: dimensions, Availability: availability, Sending: sending, Sku: sku}
 			if id, err := models.CreateVariation(common.Database, variation); err == nil {
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
 					p := path.Join(dir, "storage", "variations")
@@ -2742,6 +2754,18 @@ func putVariationHandler(c *fiber.Ctx) error {
 					return c.JSON(HTTPError{"Invalid base price"})
 				}
 			}
+			var dimensions string
+			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
+				dimensions = strings.TrimSpace(v[0])
+			}
+			var availability string
+			if v, found := data.Value["Availability"]; found && len(v) > 0 {
+				availability = strings.TrimSpace(v[0])
+			}
+			var sending string
+			if v, found := data.Value["Sending"]; found && len(v) > 0 {
+				sending = strings.TrimSpace(v[0])
+			}
 			var sku string
 			if v, found := data.Value["Sku"]; found && len(v) > 0 {
 				sku = strings.TrimSpace(v[0])
@@ -2749,6 +2773,9 @@ func putVariationHandler(c *fiber.Ctx) error {
 			variation.Title = title
 			variation.Description = description
 			variation.BasePrice = basePrice
+			variation.Dimensions = dimensions
+			variation.Availability = availability
+			variation.Sending = sending
 			variation.Sku = sku
 			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
 				// To delete existing
@@ -8652,6 +8679,9 @@ type VariationView struct {
 			Price float64
 		}
 	}
+	Dimensions string `json:",omitempty"`
+	Availability string `json:",omitempty"`
+	Sending string `json:",omitempty"`
 	Sku string
 	ProductId uint
 }
