@@ -13,6 +13,7 @@ type Product struct {
 	Content 	string
 	Categories  []*Category  `gorm:"many2many:categories_products;"`
 	Variations  []*Variation `gorm:"foreignKey:ProductId"`
+	Files       []*File     `gorm:"many2many:products_files;"`
 	Images      []*Image     `gorm:"many2many:products_images;"`
 	Tags        []*Tag `gorm:"many2many:products_tags;"`
 }
@@ -60,7 +61,7 @@ func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	db := connector
 	var product Product
-	if err := db.Preload("Categories").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Preload("Tags").First(&product, id).Error; err != nil {
+	if err := db.Preload("Categories").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Preload("Tags").First(&product, id).Error; err != nil {
 		return nil, err
 	}
 	return &product, nil
@@ -101,6 +102,11 @@ func GetCategoriesOfProduct(connector *gorm.DB, product *Product) ([]*Category, 
 		return nil, err
 	}
 	return categories, nil
+}
+
+func AddFileToProduct(connector *gorm.DB, product *Product, file *File) error {
+	db := connector
+	return db.Model(&product).Association("Files").Append(file)
 }
 
 func AddImageToProduct(connector *gorm.DB, product *Product, image *Image) error {

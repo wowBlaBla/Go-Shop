@@ -167,6 +167,7 @@ var RootCmd = &cobra.Command{
 		common.Database.DB()
 		common.Database.AutoMigrate(&models.Category{})
 		common.Database.AutoMigrate(&models.Product{})
+		common.Database.AutoMigrate(&models.File{})
 		common.Database.AutoMigrate(&models.Image{})
 		common.Database.AutoMigrate(&models.Variation{})
 		common.Database.AutoMigrate(&models.Property{})

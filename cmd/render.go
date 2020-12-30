@@ -117,6 +117,20 @@ var renderCmd = &cobra.Command{
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheImage{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheVariation{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheValue{})
+		// Files
+		if files, err := models.GetFiles(common.Database); err == nil {
+			logger.Infof("Files found: %v", len(files))
+			if _, err = os.Stat(path.Join(dir, "hugo", "static", "files")); err != nil {
+				if err = os.MkdirAll(path.Join(dir, "hugo", "static", "files"), 0755); err != nil {
+					logger.Warningf("%v", err)
+				}
+			}
+			for _, file := range files {
+				if err = common.Copy(path.Join(dir, file.Path), path.Join(dir, "hugo", "static", "files", path.Base(file.Path))); err != nil {
+					logger.Warningf("%v", err)
+				}
+			}
+		}
 		// Categories
 		if categories, err := models.GetCategories(common.Database); err == nil {
 			// Clear existing "products" folder
