@@ -5,6 +5,7 @@ import "gorm.io/gorm"
 type Tag struct {
 	gorm.Model
 	//
+	ID        uint `gorm:"primarykey;autoIncrement:true"`
 	Enabled bool
 	Hidden bool
 	Name string
@@ -18,6 +19,15 @@ func GetTags(connector *gorm.DB) ([]*Tag, error) {
 	db := connector
 	var tags []*Tag
 	if err := db.Debug().Find(&tags).Error; err != nil {
+		return nil, err
+	}
+	return tags, nil
+}
+
+func GetTagsByName(connector *gorm.DB, name string) ([]*Tag, error) {
+	db := connector
+	var tags []*Tag
+	if err := db.Debug().Where("name = ?", name).Find(&tags).Error; err != nil {
 		return nil, err
 	}
 	return tags, nil
@@ -50,6 +60,6 @@ func UpdateTag(connector *gorm.DB, tag *Tag) error {
 
 func DeleteTag(connector *gorm.DB, tag *Tag) error {
 	db := connector
-	db.Debug().Delete(&tag)
+	db.Debug().Unscoped().Delete(&tag)
 	return db.Error
 }

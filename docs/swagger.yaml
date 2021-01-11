@@ -1,5 +1,76 @@
 basePath: /
 definitions:
+  config.PaymentConfig:
+    properties:
+      default:
+        type: string
+      enabled:
+        type: boolean
+      mollie:
+        properties:
+          enabled:
+            type: boolean
+          key:
+            type: string
+          profileID:
+            type: string
+        type: object
+      stripe:
+        properties:
+          enabled:
+            type: boolean
+          publishedKey:
+            type: string
+          secretKey:
+            type: string
+        type: object
+      vat:
+        type: number
+    type: object
+  config.ResizeConfig:
+    properties:
+      enabled:
+        type: boolean
+      image:
+        properties:
+          enabled:
+            type: boolean
+          size:
+            description: 128x0,256x0
+            type: string
+        type: object
+      quality:
+        type: integer
+      thumbnail:
+        properties:
+          enabled:
+            type: boolean
+          size:
+            description: 64x0,128x0
+            type: string
+        type: object
+    type: object
+  handler.AccountView:
+    properties:
+      admin:
+        type: boolean
+      email:
+        type: string
+      emailConfirmed:
+        type: boolean
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      login:
+        type: string
+      profiles:
+        items:
+          $ref: '#/definitions/handler.ProfileView'
+        type: array
+      role:
+        type: integer
+    type: object
   handler.AutocompleteRequest:
     properties:
       include:
@@ -7,12 +78,14 @@ definitions:
       search:
         type: string
     type: object
-  handler.BuildView:
+  handler.BasicSettingsView:
     properties:
-      output:
-        type: string
-      status:
-        type: string
+      payment:
+        $ref: '#/definitions/config.PaymentConfig'
+        type: object
+      resize:
+        $ref: '#/definitions/config.ResizeConfig'
+        type: object
     type: object
   handler.CategoriesAutocompleteItem:
     properties:
@@ -61,6 +134,8 @@ definitions:
     type: array
   handler.CategoryFullView:
     properties:
+      content:
+        type: string
       description:
         type: string
       id:
@@ -96,6 +171,30 @@ definitions:
         type: string
       title:
         type: string
+      type:
+        description: '"category", "product"'
+        type: string
+    type: object
+  handler.CommandView:
+    properties:
+      output:
+        type: string
+      status:
+        type: string
+    type: object
+  handler.ContentAction:
+    properties:
+      action:
+        description: create
+        type: string
+      name:
+        description: new name
+        type: string
+      title:
+        type: string
+      type:
+        description: folder, file
+        type: string
     type: object
   handler.DashboardView:
     properties:
@@ -115,6 +214,8 @@ definitions:
         $ref: '#/definitions/handler.TransferView'
         type: object
     type: object
+  handler.ExistingFile:
+    type: object
   handler.ExistingImage:
     type: object
   handler.ExistingOrder:
@@ -131,9 +232,79 @@ definitions:
     type: object
   handler.ExistingUser:
     properties:
+      emailConfirmed:
+        type: boolean
       password:
         type: string
     type: object
+  handler.File2View:
+    properties:
+      created:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      path:
+        type: string
+      size:
+        type: integer
+      type:
+        type: string
+      updated:
+        type: string
+      url:
+        type: string
+    type: object
+  handler.FileView:
+    properties:
+      content:
+        type: string
+      description:
+        type: string
+      draft:
+        type: boolean
+      modified:
+        type: string
+      name:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+      url:
+        type: string
+    type: object
+  handler.FilesListItem:
+    properties:
+      created:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      size:
+        type: integer
+      type:
+        type: string
+      updated:
+        type: string
+      url:
+        type: string
+    type: object
+  handler.FilesListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.FilesListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.FilterRequest:
+    $ref: '#/definitions/handler.ListRequest'
   handler.HTTPError:
     properties:
       error:
@@ -142,6 +313,48 @@ definitions:
   handler.HTTPMessage:
     properties:
       message:
+        type: string
+    type: object
+  handler.HugoSettingsRequest:
+    properties:
+      description:
+        type: string
+      keywords:
+        type: string
+      logo:
+        type: string
+      paginate:
+        type: integer
+      theme:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.HugoSettingsView:
+    properties:
+      languages:
+        additionalProperties:
+          properties:
+            languageName:
+              type: string
+            weight:
+              type: integer
+          type: object
+        type: object
+      paginate:
+        type: integer
+      params:
+        properties:
+          description:
+            type: string
+          keywords:
+            type: string
+          logo:
+            type: string
+        type: object
+      theme:
+        type: string
+      title:
         type: string
     type: object
   handler.ImageView:
@@ -203,6 +416,15 @@ definitions:
         type: string
       expirationAt:
         type: string
+      hasChanges:
+        properties:
+          messages:
+            items:
+              type: string
+            type: array
+          updated:
+            type: string
+        type: object
       started:
         type: string
       user:
@@ -229,10 +451,16 @@ definitions:
         type: number
       uuid:
         type: string
+      variation:
+        $ref: '#/definitions/handler.VariationShortView'
+        type: object
     type: object
   handler.ItemView:
     properties:
       comment:
+        description: |-
+          Variation VariationShortView `json:",omitempty"`
+          Properties []PropertyShortView `json:",omitempty"`
         type: string
       description:
         type: string
@@ -290,7 +518,35 @@ definitions:
       remember:
         type: boolean
     type: object
-  handler.NewBuild:
+  handler.MeView:
+    properties:
+      email:
+        type: string
+      emailConfirmed:
+        type: boolean
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      isAdmin:
+        type: boolean
+      login:
+        type: string
+      profiles:
+        items:
+          $ref: '#/definitions/handler.ProfileView'
+        type: array
+      role:
+        type: integer
+    type: object
+  handler.MollieOrderView:
+    properties:
+      checkout:
+        type: string
+      id:
+        type: string
+      profileId:
+        type: string
     type: object
   handler.NewCategory:
     properties:
@@ -301,6 +557,15 @@ definitions:
       parentId:
         type: integer
       title:
+        type: string
+    type: object
+  handler.NewCommand:
+    type: object
+  handler.NewFile:
+    properties:
+      file:
+        type: string
+      name:
         type: string
     type: object
   handler.NewImage:
@@ -338,6 +603,23 @@ definitions:
         items:
           $ref: '#/definitions/handler.NewItem'
         type: array
+      profileId:
+        type: integer
+    type: object
+  handler.NewParameter:
+    properties:
+      customValue:
+        type: string
+      filtering:
+        type: boolean
+      name:
+        type: string
+      optionId:
+        type: integer
+      title:
+        type: string
+      valueId:
+        type: integer
     type: object
   handler.NewPrice:
     properties:
@@ -347,6 +629,8 @@ definitions:
         type: number
       propertyId:
         type: integer
+      sku:
+        type: string
       valueId:
         type: integer
     type: object
@@ -361,16 +645,89 @@ definitions:
       title:
         type: string
     type: object
+  handler.NewProfile:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      company:
+        type: string
+      country:
+        type: string
+      email:
+        type: string
+      lastname:
+        type: string
+      name:
+        type: string
+      region:
+        type: string
+      transportId:
+        type: integer
+      zip:
+        type: string
+    type: object
   handler.NewProperty:
     properties:
+      filtering:
+        type: boolean
       name:
         type: string
       optionId:
         type: integer
+      sku:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  handler.NewStripeCard:
+    properties:
+      customerId:
+        type: string
+      token:
+        type: string
+    type: object
+  handler.NewStripePayment:
+    properties:
+      cancelURL:
+        type: string
+      stripeToken:
+        type: string
+      successURL:
+        type: string
+    type: object
+  handler.NewTag:
+    properties:
+      description:
+        type: string
+      enabled:
+        type: boolean
+      hidden:
+        type: boolean
+      name:
+        type: string
       title:
         type: string
     type: object
-  handler.NewRender:
+  handler.NewTransport:
+    properties:
+      enabled:
+        type: boolean
+      item:
+        type: string
+      kg:
+        type: number
+      m3:
+        type: number
+      name:
+        type: string
+      order:
+        type: string
+      title:
+        type: string
     type: object
   handler.NewValue:
     properties:
@@ -385,7 +742,43 @@ definitions:
     properties:
       name:
         type: string
+      sku:
+        type: string
       title:
+        type: string
+    type: object
+  handler.NewZone:
+    properties:
+      country:
+        type: string
+      enabled:
+        type: boolean
+      zip:
+        type: string
+    type: object
+  handler.NodeView:
+    properties:
+      children:
+        items:
+          $ref: '#/definitions/handler.NodeView'
+        type: array
+      description:
+        type: string
+      draft:
+        type: boolean
+      file:
+        type: boolean
+      modified:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      size:
+        type: integer
+      title:
+        type: string
+      type:
         type: string
     type: object
   handler.OptionFullView:
@@ -413,28 +806,6 @@ definitions:
         type: string
       title:
         type: string
-    type: object
-  handler.OptionValuesListItem:
-    properties:
-      id:
-        type: integer
-      thumbnail:
-        type: string
-      title:
-        type: string
-      value:
-        type: string
-    type: object
-  handler.OptionValuesListResponse:
-    properties:
-      data:
-        items:
-          $ref: '#/definitions/handler.OptionValuesListItem'
-        type: array
-      filtered:
-        type: integer
-      total:
-        type: integer
     type: object
   handler.OptionView:
     properties:
@@ -481,14 +852,26 @@ definitions:
     type: object
   handler.OrderShortView:
     properties:
+      comment:
+        type: string
+      delivery:
+        type: number
       items:
         items:
           $ref: '#/definitions/handler.ItemShortView'
         type: array
+      sum:
+        type: number
+      total:
+        type: number
     type: object
   handler.OrderView:
     properties:
       comment:
+        type: string
+      delivery:
+        type: number
+      description:
         type: string
       id:
         type: integer
@@ -498,6 +881,8 @@ definitions:
         type: array
       status:
         type: string
+      sum:
+        type: number
       total:
         type: number
     type: object
@@ -533,6 +918,46 @@ definitions:
     items:
       $ref: '#/definitions/handler.OrderView'
     type: array
+  handler.ParameterView:
+    properties:
+      customValue:
+        type: string
+      filtering:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      option:
+        properties:
+          description:
+            type: string
+          id:
+            type: integer
+          name:
+            type: string
+          title:
+            type: string
+        type: object
+      optionId:
+        type: integer
+      title:
+        type: string
+      type:
+        description: select / radio
+        type: string
+      value:
+        properties:
+          id:
+            type: integer
+          thumbnail:
+            type: string
+          title:
+            type: string
+        type: object
+      valueId:
+        type: integer
+    type: object
   handler.PriceView:
     properties:
       enabled:
@@ -543,13 +968,45 @@ definitions:
         type: number
       propertyId:
         type: integer
+      sku:
+        type: string
       valueId:
         type: integer
     type: object
-  handler.PricesView:
-    items:
-      $ref: '#/definitions/handler.PriceView'
-    type: array
+  handler.PricesListItem:
+    properties:
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      optionId:
+        type: integer
+      price:
+        type: number
+      productTitle:
+        type: string
+      propertyId:
+        type: integer
+      propertyTitle:
+        type: string
+      valueId:
+        type: integer
+      valueTitle:
+        type: string
+      variationTitle:
+        type: string
+    type: object
+  handler.PricesListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.PricesListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
   handler.ProductShortView:
     properties:
       description:
@@ -563,38 +1020,20 @@ definitions:
       title:
         type: string
     type: object
-  handler.ProductVariationPropertyPricesListItem:
-    properties:
-      enabled:
-        type: boolean
-      id:
-        type: integer
-      price:
-        type: number
-      valueId:
-        type: integer
-      valueTitle:
-        type: string
-    type: object
-  handler.ProductVariationPropertyPricesListResponse:
-    properties:
-      data:
-        items:
-          $ref: '#/definitions/handler.ProductVariationPropertyPricesListItem'
-        type: array
-      filtered:
-        type: integer
-      total:
-        type: integer
-    type: object
   handler.ProductView:
     properties:
       categories:
         items:
           $ref: '#/definitions/handler.CategoryView'
         type: array
+      content:
+        type: string
       description:
         type: string
+      files:
+        items:
+          $ref: '#/definitions/handler.File2View'
+        type: array
       id:
         type: integer
       images:
@@ -603,17 +1042,63 @@ definitions:
         type: array
       name:
         type: string
+      parameters:
+        items:
+          $ref: '#/definitions/handler.ParameterView'
+        type: array
+      tags:
+        items:
+          $ref: '#/definitions/handler.TagView'
+        type: array
       thumbnail:
         type: string
       title:
+        type: string
+      upsale:
         type: string
       variations:
         items:
           $ref: '#/definitions/handler.VariationView'
         type: array
     type: object
+  handler.ProductsFilterItem:
+    properties:
+      basePrice:
+        type: number
+      categoryId:
+        type: integer
+      description:
+        type: string
+      id:
+        type: integer
+      images:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      thumbnail:
+        type: string
+      title:
+        type: string
+      variations:
+        type: string
+    type: object
+  handler.ProductsFilterResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.ProductsFilterItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
   handler.ProductsListItem:
     properties:
+      categoryId:
+        type: integer
       description:
         type: string
       id:
@@ -646,25 +1131,33 @@ definitions:
     type: array
   handler.ProfileView:
     properties:
-      admin:
-        type: boolean
-      email:
+      address:
         type: string
-      emailConfirmed:
-        type: boolean
-      enabled:
-        type: boolean
+      city:
+        type: string
+      company:
+        type: string
+      country:
+        type: string
       id:
         type: integer
-      login:
+      lastname:
         type: string
-      role:
+      name:
+        type: string
+      region:
+        type: string
+      transportId:
         type: integer
+      zip:
+        type: string
     type: object
   handler.PropertyShortView:
     properties:
       price:
         type: number
+      thumbnail:
+        type: string
       title:
         type: string
       value:
@@ -672,20 +1165,19 @@ definitions:
     type: object
   handler.PropertyView:
     properties:
+      filtering:
+        type: boolean
       id:
         type: integer
       name:
         type: string
       optionId:
         type: integer
+      sku:
+        type: string
       title:
         type: string
-    type: object
-  handler.RenderView:
-    properties:
-      output:
-        type: string
-      status:
+      type:
         type: string
     type: object
   handler.SearchRequest:
@@ -712,8 +1204,14 @@ definitions:
         items:
           $ref: '#/definitions/handler.CategoryView'
         type: array
+      content:
+        type: string
       description:
         type: string
+      files:
+        items:
+          $ref: '#/definitions/handler.File2View'
+        type: array
       id:
         type: integer
       images:
@@ -722,17 +1220,104 @@ definitions:
         type: array
       name:
         type: string
+      parameters:
+        items:
+          $ref: '#/definitions/handler.ParameterView'
+        type: array
       path:
         type: string
+      tags:
+        items:
+          $ref: '#/definitions/handler.TagView'
+        type: array
       thumbnail:
         type: string
       title:
+        type: string
+      upsale:
         type: string
       variations:
         items:
           $ref: '#/definitions/handler.VariationView'
         type: array
     type: object
+  handler.StripeCardView:
+    type: object
+  handler.StripeCardsView:
+    type: object
+  handler.StripeCheckoutSessionView:
+    properties:
+      id:
+        type: string
+    type: object
+  handler.StripeCustomerView:
+    type: object
+  handler.TagView:
+    properties:
+      description:
+        type: string
+      enabled:
+        type: boolean
+      hidden:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.TagsListItem:
+    properties:
+      description:
+        type: string
+      enabled:
+        type: boolean
+      hidden:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.TagsListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.TagsListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.TagsView:
+    items:
+      $ref: '#/definitions/handler.TagView'
+    type: array
+  handler.TariffView:
+    properties:
+      id:
+        type: integer
+      item:
+        type: string
+      kg:
+        type: number
+      m3:
+        type: number
+      order:
+        type: string
+      transportId:
+        type: integer
+      zoneId:
+        type: integer
+    type: object
+  handler.TariffsView:
+    items:
+      $ref: '#/definitions/handler.TariffView'
+    type: array
   handler.TransactionView:
     properties:
       amount:
@@ -793,6 +1378,59 @@ definitions:
           type: array
         type: array
     type: object
+  handler.TransportView:
+    properties:
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      item:
+        type: string
+      kg:
+        type: number
+      m3:
+        type: number
+      name:
+        type: string
+      order:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.TransportsListItem:
+    properties:
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      item:
+        type: string
+      kg:
+        type: number
+      m3:
+        type: number
+      name:
+        type: string
+      order:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.TransportsListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.TransportsListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.TransportsView:
+    items:
+      $ref: '#/definitions/handler.TransportView'
+    type: array
   handler.UserView:
     properties:
       email:
@@ -814,6 +1452,8 @@ definitions:
         type: string
       email:
         type: string
+      emailConfirmed:
+        type: boolean
       id:
         type: integer
       login:
@@ -840,6 +1480,8 @@ definitions:
     type: array
   handler.ValueView:
     properties:
+      description:
+        type: string
       id:
         type: integer
       thumbnail:
@@ -849,15 +1491,50 @@ definitions:
       value:
         type: string
     type: object
+  handler.ValuesListItem:
+    properties:
+      id:
+        type: integer
+      optionTitle:
+        type: string
+      thumbnail:
+        type: string
+      title:
+        type: string
+      value:
+        type: string
+    type: object
+  handler.ValuesListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.ValuesListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
   handler.ValuesView:
     items:
       $ref: '#/definitions/handler.ValueView'
     type: array
+  handler.VariationShortView:
+    properties:
+      thumbnail:
+        type: string
+      title:
+        type: string
+    type: object
   handler.VariationView:
     properties:
+      availability:
+        type: string
       basePrice:
         type: number
       description:
+        type: string
+      dimensions:
         type: string
       id:
         type: integer
@@ -868,6 +1545,8 @@ definitions:
       properties:
         items:
           properties:
+            filtering:
+              type: boolean
             id:
               type: integer
             name:
@@ -907,10 +1586,16 @@ definitions:
               type: string
           type: object
         type: array
+      sending:
+        type: string
+      sku:
+        type: string
       thumbnail:
         type: string
       title:
         type: string
+      weight:
+        type: number
     type: object
   handler.VariationsListItem:
     properties:
@@ -950,6 +1635,43 @@ definitions:
     items:
       $ref: '#/definitions/handler.VariationView'
     type: array
+  handler.ZoneView:
+    properties:
+      country:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      zip:
+        type: string
+    type: object
+  handler.ZonesListItem:
+    properties:
+      ZIP:
+        type: string
+      country:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+    type: object
+  handler.ZonesListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.ZonesListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.ZonesView:
+    items:
+      $ref: '#/definitions/handler.ZoneView'
+    type: array
 host: localhost:18092
 info:
   contact:
@@ -963,6 +1685,418 @@ info:
   title: GoShop API
   version: "1.0"
 paths:
+  /api/v/render:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewCommand'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CommandView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Make render
+  /api/v1/account:
+    get:
+      consumes:
+      - application/json
+      description: get account
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.AccountView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get account
+      tags:
+      - account
+  /api/v1/account/orders:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.OrdersView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get account orders
+      tags:
+      - account
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: cart
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewOrder'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.OrderView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Post account order
+      tags:
+      - account
+  /api/v1/account/orders/{id}:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.OrderView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get order
+      tags:
+      - account
+  /api/v1/account/orders/{id}/mollie/submit:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.MollieOrderView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Post mollie order
+      tags:
+      - account
+  /api/v1/account/orders/{id}/mollie/success:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.StripeCardsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get mollie payment success
+      tags:
+      - account
+  /api/v1/account/orders/{id}/stripe/card:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.StripeCardsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get stripe cards
+      tags:
+      - account
+  /api/v1/account/orders/{id}/stripe/customer:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.StripeCustomerView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get stripe customer
+      tags:
+      - account
+  /api/v1/account/orders/{id}/stripe/submit:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.StripeCardsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Post stripe payment
+      tags:
+      - account
+  /api/v1/account/orders/{id}/stripe/success:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.StripeCardsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get stripe payment success
+      tags:
+      - account
+  /api/v1/account/orders/checkout/{id}/stripe:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: cart
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewStripePayment'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.StripeCheckoutSessionView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Post order
+      tags:
+      - account
+  /api/v1/account/orders/checkout/{id}/stripe/card:
+    post:
+      consumes:
+      - application/json
+      description: See https://stripe.com/docs/api/cards/create
+      parameters:
+      - description: body
+        in: body
+        name: cart
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewStripeCard'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.StripeCardView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Post order
+      tags:
+      - account
+  /api/v1/account/profiles:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: profile
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewProfile'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ProfileView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create profile in existing account
+      tags:
+      - profile
+  /api/v1/calculate:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TariffsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Calculate shipping cost
   /api/v1/categories:
     get:
       consumes:
@@ -995,27 +2129,29 @@ paths:
       security:
       - BasicAuth: []
       summary: Get categories
+      tags:
+      - category
     post:
       consumes:
-      - multipart/form-data
+      - application/json
       parameters:
-      - description: Product id
+      - description: Parent id
         in: query
-        name: pid
+        name: parent_id
         type: integer
       - description: body
         in: body
         name: category
         required: true
         schema:
-          $ref: '#/definitions/handler.NewImage'
+          $ref: '#/definitions/handler.NewCategory'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.HTTPMessage'
+            $ref: '#/definitions/handler.CategoriesView'
         "404":
           description: Not Found
           schema:
@@ -1026,8 +2162,39 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Create image
+      summary: Create categories
+      tags:
+      - category
   /api/v1/categories/{id}:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CategoryFullView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get category
+      tags:
+      - category
     put:
       consumes:
       - application/json
@@ -1056,6 +2223,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Update category
+      tags:
+      - category
   /api/v1/categories/autocomplete:
     post:
       consumes:
@@ -1085,14 +2254,20 @@ paths:
       security:
       - BasicAuth: []
       summary: Search categories autocomplete
+      tags:
+      - category
   /api/v1/categories/list:
     post:
       consumes:
       - application/json
       parameters:
+      - description: Parent id
+        in: query
+        name: parent_id
+        type: integer
       - description: body
         in: body
-        name: category
+        name: request
         required: true
         schema:
           $ref: '#/definitions/handler.ListRequest'
@@ -1102,7 +2277,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.ProductsListResponse'
+            $ref: '#/definitions/handler.CategoriesListResponse'
         "404":
           description: Not Found
           schema:
@@ -1113,7 +2288,149 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Search products
+      summary: Search categories
+      tags:
+      - category
+  /api/v1/category/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete category
+      tags:
+      - category
+  /api/v1/contents:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: home
+        in: query
+        name: home
+        type: integer
+      - description: depth
+        in: query
+        name: depth
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.NodeView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get contents
+      tags:
+      - content
+  /api/v1/contents/{any}:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.FileView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get content
+      tags:
+      - content
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewProduct'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Post content
+      tags:
+      - content
+    put:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.FileView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Put content
+      tags:
+      - content
   /api/v1/dashboard:
     get:
       consumes:
@@ -1134,6 +2451,231 @@ paths:
           schema:
             $ref: '#/definitions/handler.HTTPError'
       summary: Get dashboard
+  /api/v1/files:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewFile'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create file
+      tags:
+      - file
+  /api/v1/files/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete file
+      tags:
+      - file
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.File2View'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get file
+      tags:
+      - file
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: file
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ExistingFile'
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update file
+      tags:
+      - file
+  /api/v1/files/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.FilesListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search files
+      tags:
+      - file
+  /api/v1/filter:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Category RelPath
+        in: query
+        name: relPath
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.FilterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ProductsFilterResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Filter products
+  /api/v1/images:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Product id
+        in: query
+        name: pid
+        type: integer
+      - description: body
+        in: body
+        name: image
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewImage'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create image
+      tags:
+      - image
   /api/v1/images/{id}:
     delete:
       consumes:
@@ -1162,6 +2704,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Delete image
+      tags:
+      - image
     get:
       consumes:
       - application/json
@@ -1189,13 +2733,15 @@ paths:
       security:
       - BasicAuth: []
       summary: Get image
+      tags:
+      - image
     put:
       consumes:
       - application/json
       parameters:
       - description: body
         in: body
-        name: option
+        name: image
         required: true
         schema:
           $ref: '#/definitions/handler.ExistingImage'
@@ -1222,6 +2768,8 @@ paths:
       security:
       - BasicAuth: []
       summary: update image
+      tags:
+      - image
   /api/v1/images/list:
     post:
       consumes:
@@ -1229,7 +2777,7 @@ paths:
       parameters:
       - description: body
         in: body
-        name: category
+        name: request
         required: true
         schema:
           $ref: '#/definitions/handler.ListRequest'
@@ -1251,6 +2799,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Search images
+      tags:
+      - image
   /api/v1/info:
     get:
       consumes:
@@ -1301,6 +2851,8 @@ paths:
           schema:
             $ref: '#/definitions/handler.HTTPError'
       summary: login
+      tags:
+      - auth
   /api/v1/logout:
     get:
       consumes:
@@ -1324,6 +2876,30 @@ paths:
       security:
       - BasicAuth: []
       summary: logout
+      tags:
+      - auth
+  /api/v1/me:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.MeView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get me
   /api/v1/options:
     get:
       consumes:
@@ -1346,6 +2922,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Get options
+      tags:
+      - option
     post:
       consumes:
       - application/json
@@ -1374,6 +2952,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Create option
+      tags:
+      - option
   /api/v1/options/{id}:
     delete:
       consumes:
@@ -1402,6 +2982,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Delete option
+      tags:
+      - option
     get:
       consumes:
       - application/json
@@ -1429,6 +3011,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Get option
+      tags:
+      - option
     put:
       consumes:
       - application/json
@@ -1462,204 +3046,8 @@ paths:
       security:
       - BasicAuth: []
       summary: update option
-  /api/v1/options/{id}/values:
-    get:
-      consumes:
-      - application/json
-      parameters:
-      - description: Option ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.ValuesView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: get option values
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Option ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: body
-        in: body
-        name: option
-        required: true
-        schema:
-          $ref: '#/definitions/handler.NewValue'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.ValueView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Create option value
-  /api/v1/options/{id}/values/list:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Option ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: body
-        in: body
-        name: category
-        required: true
-        schema:
-          $ref: '#/definitions/handler.ListRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.OptionValuesListResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Search option values
-  /api/v1/options/{oid}/values/{id}:
-    delete:
-      consumes:
-      - application/json
-      parameters:
-      - description: Option ID
-        in: path
-        name: oid
-        required: true
-        type: integer
-      - description: Value ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.HTTPMessage'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Delete option
-    get:
-      consumes:
-      - application/json
-      parameters:
-      - description: Option ID
-        in: path
-        name: oid
-        required: true
-        type: integer
-      - description: Value ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.ValueView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Get option value
-    put:
-      consumes:
-      - application/json
-      parameters:
-      - description: body
-        in: body
-        name: option
-        required: true
-        schema:
-          $ref: '#/definitions/handler.ValueView'
-      - description: Option ID
-        in: path
-        name: oid
-        required: true
-        type: integer
-      - description: Value ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.ValueView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: update option value
+      tags:
+      - option
   /api/v1/options/list:
     post:
       consumes:
@@ -1667,7 +3055,7 @@ paths:
       parameters:
       - description: body
         in: body
-        name: category
+        name: request
         required: true
         schema:
           $ref: '#/definitions/handler.ListRequest'
@@ -1689,6 +3077,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Search options
+      tags:
+      - option
   /api/v1/orders/{id}:
     delete:
       consumes:
@@ -1717,6 +3107,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Delete order
+      tags:
+      - order
     get:
       consumes:
       - application/json
@@ -1742,13 +3134,15 @@ paths:
           schema:
             $ref: '#/definitions/handler.HTTPError'
       summary: Get order
+      tags:
+      - order
     put:
       consumes:
       - application/json
       parameters:
       - description: body
         in: body
-        name: option
+        name: order
         required: true
         schema:
           $ref: '#/definitions/handler.ExistingOrder'
@@ -1775,6 +3169,8 @@ paths:
       security:
       - BasicAuth: []
       summary: update order
+      tags:
+      - order
   /api/v1/orders/list:
     post:
       consumes:
@@ -1804,6 +3200,168 @@ paths:
       security:
       - BasicAuth: []
       summary: Search orders
+      tags:
+      - order
+  /api/v1/parameter/{id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Parameter ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewParameter'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ParameterView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Update parameter
+      tags:
+      - parameter
+  /api/v1/parameters:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Product id
+        in: query
+        name: product_id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: property
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewParameter'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ParameterView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create parameter
+      tags:
+      - parameter
+  /api/v1/parameters/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Parameter id
+        in: query
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete parameter
+      tags:
+      - parameter
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Parameter ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ParameterView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get parameter
+      tags:
+      - parameter
+  /api/v1/prepare:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewCommand'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CommandView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Make prepare
   /api/v1/prices:
     get:
       consumes:
@@ -1832,6 +3390,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Get prices
+      tags:
+      - price
     post:
       consumes:
       - application/json
@@ -1843,7 +3403,7 @@ paths:
         type: integer
       - description: body
         in: body
-        name: category
+        name: price
         required: true
         schema:
           $ref: '#/definitions/handler.NewPrice'
@@ -1864,7 +3424,9 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Create categories
+      summary: Create prices
+      tags:
+      - price
   /api/v1/prices/{id}:
     delete:
       consumes:
@@ -1893,6 +3455,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Delete price
+      tags:
+      - price
     get:
       consumes:
       - application/json
@@ -1908,7 +3472,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.PricesView'
+            $ref: '#/definitions/handler.PriceView'
         "404":
           description: Not Found
           schema:
@@ -1920,6 +3484,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Get price
+      tags:
+      - price
     put:
       consumes:
       - application/json
@@ -1953,15 +3519,13 @@ paths:
       security:
       - BasicAuth: []
       summary: Update price
+      tags:
+      - price
   /api/v1/prices/list:
     post:
       consumes:
       - application/json
       parameters:
-      - description: Property ID
-        in: path
-        name: property_id
-        type: integer
       - description: body
         in: body
         name: request
@@ -1974,7 +3538,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.ProductVariationPropertyPricesListResponse'
+            $ref: '#/definitions/handler.PricesListResponse'
         "404":
           description: Not Found
           schema:
@@ -1985,7 +3549,9 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Search product variation property prices
+      summary: Search prices
+      tags:
+      - price
   /api/v1/products:
     get:
       consumes:
@@ -2008,6 +3574,38 @@ paths:
       security:
       - BasicAuth: []
       summary: Get products
+      tags:
+      - product
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewProduct'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ProductView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create product
+      tags:
+      - product
   /api/v1/products/{id}:
     delete:
       consumes:
@@ -2036,6 +3634,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Delete product
+      tags:
+      - product
     get:
       consumes:
       - application/json
@@ -2063,6 +3663,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Get product
+      tags:
+      - product
     put:
       consumes:
       - multipart/form-data
@@ -2095,6 +3697,74 @@ paths:
       security:
       - BasicAuth: []
       summary: Update product
+      tags:
+      - product
+  /api/v1/products/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Category id
+        in: query
+        name: id
+        type: integer
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ProductsListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search products
+      tags:
+      - product
+  /api/v1/profiles:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: profile
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewProfile'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ProfileView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create profile without having account
+      tags:
+      - profile
   /api/v1/properties/{id}:
     delete:
       consumes:
@@ -2122,21 +3792,13 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Delete price
+      summary: Delete property
+      tags:
+      - property
     get:
       consumes:
       - application/json
       parameters:
-      - description: Product ID
-        in: path
-        name: pid
-        required: true
-        type: integer
-      - description: Variation ID
-        in: path
-        name: oid
-        required: true
-        type: integer
       - description: Property ID
         in: path
         name: id
@@ -2160,6 +3822,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Get property
+      tags:
+      - property
     put:
       consumes:
       - application/json
@@ -2174,14 +3838,14 @@ paths:
         name: category
         required: true
         schema:
-          $ref: '#/definitions/handler.NewPrice'
+          $ref: '#/definitions/handler.NewProperty'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.PriceView'
+            $ref: '#/definitions/handler.PropertyView'
         "404":
           description: Not Found
           schema:
@@ -2192,7 +3856,9 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Update price
+      summary: Update property
+      tags:
+      - property
   /api/v1/properties/list:
     post:
       consumes:
@@ -2225,7 +3891,370 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Search product variations
+      summary: Search properties
+      tags:
+      - property
+  /api/v1/publish:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewCommand'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CommandView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Make publish
+  /api/v1/reset:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: form
+        required: true
+        schema:
+          $ref: '#/definitions/handler.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: reset password
+  /api/v1/settings/basic:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.BasicSettingsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get basic settings
+      tags:
+      - settings
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.BasicSettingsView'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Set basic settings
+      tags:
+      - settings
+  /api/v1/settings/hugo:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HugoSettingsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get hugo settings
+      tags:
+      - settings
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.HugoSettingsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Set hugo settings
+      tags:
+      - settings
+  /api/v1/tags:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TagsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get tags
+      tags:
+      - tag
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewTag'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TagView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create tag
+      tags:
+      - tag
+  /api/v1/tags/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Tag ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete tag
+      tags:
+      - tag
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Tag ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TagView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get tag
+      tags:
+      - tag
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: tag
+        required: true
+        schema:
+          $ref: '#/definitions/handler.TagView'
+      - description: Tag ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TagView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update tag
+      tags:
+      - tag
+  /api/v1/tags/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TagsListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search tags
+      tags:
+      - tag
+  /api/v1/tariffs:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TariffsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get tariffs
   /api/v1/transactions/{id}:
     delete:
       consumes:
@@ -2254,6 +4283,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Delete transaction
+      tags:
+      - transaction
     get:
       consumes:
       - application/json
@@ -2279,13 +4310,15 @@ paths:
           schema:
             $ref: '#/definitions/handler.HTTPError'
       summary: Get transaction
+      tags:
+      - transaction
     put:
       consumes:
       - application/json
       parameters:
       - description: body
         in: body
-        name: option
+        name: transaction
         required: true
         schema:
           $ref: '#/definitions/handler.ExistingTransaction'
@@ -2312,6 +4345,8 @@ paths:
       security:
       - BasicAuth: []
       summary: update transaction
+      tags:
+      - transaction
   /api/v1/transactions/list:
     post:
       consumes:
@@ -2319,7 +4354,7 @@ paths:
       parameters:
       - description: body
         in: body
-        name: category
+        name: request
         required: true
         schema:
           $ref: '#/definitions/handler.ListRequest'
@@ -2341,6 +4376,187 @@ paths:
       security:
       - BasicAuth: []
       summary: Search transactions
+      tags:
+      - transaction
+  /api/v1/transports:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TransportsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get transports
+      tags:
+      - transport
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: transport
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewTransport'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TransportView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create transport
+      tags:
+      - transport
+  /api/v1/transports/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transport ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete transport
+      tags:
+      - transport
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transport ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TransportView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get transport
+      tags:
+      - transport
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: transport
+        required: true
+        schema:
+          $ref: '#/definitions/handler.TransportView'
+      - description: Transport ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TagView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update transport
+      tags:
+      - transport
+  /api/v1/transports/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TransportsListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search transports
+      tags:
+      - transport
   /api/v1/users:
     get:
       consumes:
@@ -2364,6 +4580,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Get users
+      tags:
+      - user
   /api/v1/users/{id}:
     delete:
       consumes:
@@ -2392,12 +4610,14 @@ paths:
       security:
       - BasicAuth: []
       summary: Delete user
+      tags:
+      - user
     get:
       consumes:
       - application/json
       description: get string
       parameters:
-      - description: Order ID
+      - description: User ID
         in: path
         name: id
         required: true
@@ -2420,13 +4640,15 @@ paths:
       security:
       - BasicAuth: []
       summary: Get user
+      tags:
+      - user
     put:
       consumes:
       - application/json
       parameters:
       - description: body
         in: body
-        name: option
+        name: user
         required: true
         schema:
           $ref: '#/definitions/handler.ExistingUser'
@@ -2453,6 +4675,8 @@ paths:
       security:
       - BasicAuth: []
       summary: update user
+      tags:
+      - user
   /api/v1/users/list:
     post:
       consumes:
@@ -2460,7 +4684,7 @@ paths:
       parameters:
       - description: body
         in: body
-        name: category
+        name: request
         required: true
         schema:
           $ref: '#/definitions/handler.ListRequest'
@@ -2482,6 +4706,203 @@ paths:
       security:
       - BasicAuth: []
       summary: Search users
+      tags:
+      - user
+  /api/v1/values:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Option ID
+        in: query
+        name: option_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ValuesView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: get option values
+      tags:
+      - value
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Option ID
+        in: query
+        name: option_id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: value
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewValue'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ValueView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create value
+      tags:
+      - value
+  /api/v1/values/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Value ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete value
+      tags:
+      - value
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Value ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ValueView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get value
+      tags:
+      - value
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: value
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ValueView'
+      - description: Value ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ValueView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update option value
+      tags:
+      - value
+  /api/v1/values/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Option ID
+        in: query
+        name: option_id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ValuesListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search option values
+      tags:
+      - value
   /api/v1/variations:
     get:
       consumes:
@@ -2508,7 +4929,9 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Get product variations
+      summary: Get variations
+      tags:
+      - variation
     post:
       consumes:
       - multipart/form-data
@@ -2537,6 +4960,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Create variation
+      tags:
+      - variation
   /api/v1/variations/{id}:
     delete:
       consumes:
@@ -2565,6 +4990,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Delete variation
+      tags:
+      - variation
     get:
       consumes:
       - application/json
@@ -2592,6 +5019,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Get variation
+      tags:
+      - variation
     put:
       consumes:
       - multipart/form-data
@@ -2624,6 +5053,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Update variation
+      tags:
+      - variation
   /api/v1/variations/list:
     post:
       consumes:
@@ -2635,7 +5066,7 @@ paths:
         type: integer
       - description: body
         in: body
-        name: category
+        name: request
         required: true
         schema:
           $ref: '#/definitions/handler.ListRequest'
@@ -2657,34 +5088,9 @@ paths:
       security:
       - BasicAuth: []
       summary: Search variations
-  /order:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: body
-        in: body
-        name: cart
-        required: true
-        schema:
-          $ref: '#/definitions/handler.NewOrder'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.OrderView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      summary: Post cart
-  /orders:
+      tags:
+      - variation
+  /api/v1/zones:
     get:
       consumes:
       - application/json
@@ -2694,54 +5100,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.OrdersView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      summary: Get orders
-  /orders/{id}:
-    get:
-      consumes:
-      - application/json
-      parameters:
-      - description: Order ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.OrderView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      summary: Get order
-  /profile:
-    get:
-      consumes:
-      - application/json
-      description: get string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.ProfileView'
+            $ref: '#/definitions/handler.ZonesView'
         "404":
           description: Not Found
           schema:
@@ -2752,7 +5111,164 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Get profile
+      summary: Get zones
+      tags:
+      - zone
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: zone
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewZone'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ZoneView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create zone
+      tags:
+      - zone
+  /api/v1/zones/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Zone ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete zone
+      tags:
+      - zone
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Zone ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ZoneView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get zone
+      tags:
+      - zone
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: zone
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ZoneView'
+      - description: Zone ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TagView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update zone
+      tags:
+      - zone
+  /api/v1/zones/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ZonesListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search zones
+      tags:
+      - zone
   /properties:
     post:
       consumes:
@@ -2787,35 +5303,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Create property
-  /render:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: body
-        in: body
-        name: category
-        required: true
-        schema:
-          $ref: '#/definitions/handler.NewBuild'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.BuildView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Make build
+      tags:
+      - property
   /search:
     post:
       consumes:

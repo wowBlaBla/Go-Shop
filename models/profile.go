@@ -15,6 +15,7 @@ type Profile struct {
 	Region string
 	Country string
 	Payment string
+	TransportId uint
 	//
 	UserId uint
 }

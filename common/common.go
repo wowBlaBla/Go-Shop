@@ -20,7 +20,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20201230172028"
+	COMPILED = "20210111150013"
 	//
 	Started          time.Time
 	Config           *config.Config
@@ -56,6 +56,7 @@ type PropertyCF struct {
 
 type OptionCF struct {
 	ID uint
+	Type string
 	Name string
 	Title string
 	Values []*ValueCF
@@ -166,8 +167,25 @@ type ProductPF struct {
 	Title      string
 	Thumbnail  string `json:",omitempty"`
 	Images     []string
+	Parameters []ParameterPF
 	Path       string
 	Variations []VariationPF
+}
+
+
+type ParameterPF struct {
+	Id uint
+	Name string
+	Title string
+	Value ValuePPF
+	CustomValue string
+}
+
+type ValuePPF struct {
+	Id uint
+	Title string
+	Thumbnail string `json:",omitempty"`
+	Value string
 }
 
 type VariationPF struct {

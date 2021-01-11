@@ -13,7 +13,8 @@ type Variation struct {
 	Thumbnail string
 	Properties []*Property `gorm:"foreignKey:VariationId"`
 	BasePrice float64          `sql:"type:decimal(8,2);"`
-	Dimensions string
+	Dimensions string // width x height x depth in cm
+	Weight float64 `sql:"type:decimal(8,2);"`
 	Availability string
 	Sending string
 	Sku string

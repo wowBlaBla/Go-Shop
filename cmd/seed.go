@@ -346,8 +346,8 @@ var seedCmd = &cobra.Command{
 					},
 				},
 				/*{
-					Name: "door-handles",
-					Title: "Door Handles",
+					Country: "door-handles",
+					ZIP: "Door Handles",
 					Option: color,
 					Prices: []*models.Price{
 						{

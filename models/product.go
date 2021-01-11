@@ -10,6 +10,7 @@ type Product struct {
 	Title       string
 	Description string
 	Thumbnail   string
+	Parameters  []*Parameter `gorm:"foreignKey:ProductId"`
 	Content 	string
 	Categories  []*Category  `gorm:"many2many:categories_products;"`
 	Variations  []*Variation `gorm:"foreignKey:ProductId"`
@@ -61,7 +62,7 @@ func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	db := connector
 	var product Product
-	if err := db.Preload("Categories").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Preload("Tags").First(&product, id).Error; err != nil {
+	if err := db.Preload("Categories").Preload("Parameters").Preload("Parameters.Option").Preload("Parameters.Value").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Preload("Tags").First(&product, id).Error; err != nil {
 		return nil, err
 	}
 	return &product, nil

@@ -18,6 +18,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -61,6 +62,7 @@ var renderCmd = &cobra.Command{
 		logger.Infof("Configure Hugo Theme index")
 		if p := path.Join(dir, "hugo", "themes", common.Config.Hugo.Theme, "layouts", "partials", "scripts.html"); len(p) > 0 {
 			if _, err = os.Stat(p); err == nil {
+				logger.Infof("p: %+v", p)
 				if bts, err := ioutil.ReadFile(p); err == nil {
 					content := string(bts)
 					content = strings.ReplaceAll(content, "%API_URL%", common.Config.Base)
@@ -147,7 +149,7 @@ var renderCmd = &cobra.Command{
 				f3 = func(connector *gorm.DB, id uint) {
 					if id != 0 {
 						if category, err := models.GetCategory(common.Database, int(id)); err == nil {
-							//*names = append([]string{category.Name}, *names...)
+							//*names = append([]string{category.Country}, *names...)
 							if category.Thumbnail == "" {
 								if len(*breadcrumbs) > 0 {
 									category.Thumbnail = (*breadcrumbs)[0].Thumbnail
@@ -214,7 +216,7 @@ var renderCmd = &cobra.Command{
 									}*/
 									//
 									if category.Thumbnail != "" {
-										//p0 := path.Join(p1, product.Name)
+										//p0 := path.Join(p1, product.Country)
 										if p1 := path.Join(dir, category.Thumbnail); len(p1) > 0 {
 											if fi, err := os.Stat(p1); err == nil {
 												filename := fmt.Sprintf("thumbnail-%d%v", fi.ModTime().Unix(), path.Ext(p1))
@@ -226,7 +228,7 @@ var renderCmd = &cobra.Command{
 													}
 												}
 												if err = common.Copy(p1, p2); err == nil {
-													//thumbnails = append(thumbnails, fmt.Sprintf("/%s/%s", strings.Join(append(names, product.Name), "/"), filename))
+													//thumbnails = append(thumbnails, fmt.Sprintf("/%s/%s", strings.Join(append(names, product.Country), "/"), filename))
 													thumbnails := []string{fmt.Sprintf("/%s/%s", strings.Join(names, "/"), filename)}
 													if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
 														if images, err := imageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
@@ -260,7 +262,7 @@ var renderCmd = &cobra.Command{
 			//
 			logger.Infof("Products found: %v", len(products))
 			for i, product := range products {
-				logger.Infof("[%d] Product ID: %+v Name: %v Title: %v", i, product.ID, product.Name, product.Title)
+				logger.Infof("[%d] Product ID: %+v Country: %v ZIP: %v", i, product.ID, product.Name, product.Title)
 				product, _ = models.GetProductFull(common.Database, int(product.ID))
 				if categories, err := models.GetCategoriesOfProduct(common.Database, product); err == nil {
 					var canonical string
@@ -270,7 +272,7 @@ var renderCmd = &cobra.Command{
 						f3 = func(connector *gorm.DB, id uint) {
 							if id != 0 {
 								if category, err := models.GetCategory(common.Database, int(id)); err == nil {
-									//*names = append([]string{category.Name}, *names...)
+									//*names = append([]string{category.Country}, *names...)
 									if category.Thumbnail == "" {
 										if len(*breadcrumbs) > 0 {
 											category.Thumbnail = (*breadcrumbs)[0].Thumbnail
@@ -306,14 +308,13 @@ var renderCmd = &cobra.Command{
 								ID: product.ID,
 								Date: time.Now(),
 								Title: product.Title,
-								//Tags: []string{"Floor Light"},
-								//BasePrice: "₹ 87,341.00",
 								Type: "products",
 								CategoryId: category.ID,
 							}
 							if i > 0 {
 								view.Canonical = canonical
 							}
+							//
 							//
 							var arr = []string{}
 							for _, category := range *breadcrumbs {
@@ -332,13 +333,133 @@ var renderCmd = &cobra.Command{
 												if max < variation.BasePrice {
 													max = variation.BasePrice
 												}
-												//
+												// Product parameters
+												for _, parameter := range product.Parameters {
+													if parameter.ID > 0 && parameter.Filtering {
+														var found bool
+														for _, opt := range categoryFile.Options {
+															if opt.ID == parameter.Option.ID {
+																var found2 bool
+																for _, value := range opt.Values {
+																	if value.ID == parameter.Value.ID {
+																		found2 = true
+																		break
+																	}
+																}
+																if !found2 {
+																	//
+																	var thumbnail string
+																	if parameter.Value.Thumbnail != "" {
+																		if p1 := path.Join(dir, parameter.Value.Thumbnail); len(p1) > 0 {
+																			if fi, err := os.Stat(p1); err == nil {
+																				filename := filepath.Base(p1)
+																				filename = fmt.Sprintf("%v-%d%v", filename[:len(filename) - len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+																				p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
+																				thumbnail = "/" + path.Join("images", "values", filename)
+																				if _, err = os.Stat(p2); err != nil {
+																					logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+																					if err = common.Copy(p1, p2); err != nil {
+																						logger.Warningf("%v", err)
+																					}
+																				}
+																				if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
+																					p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
+																					if _, err = os.Stat(p2); err != nil {
+																						logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+																						if err = common.Copy(p1, p2); err != nil {
+																							logger.Warningf("%v", err)
+																						}
+																					}
+																					if images, err := imageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
+																						thumbnails := []string{fmt.Sprintf("/images/values/resize/%s", filename)}
+																						for _, image := range images {
+																							thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
+																						}
+																						thumbnail = strings.Join(thumbnails, ",")
+																					} else {
+																						logger.Warningf("%v", err)
+																					}
+																				}
+																			}
+																		}
+																	}
+																	//
+																	categoryFile.Options[i].Values = append(categoryFile.Options[i].Values, &common.ValueCF{
+																		ID:        parameter.Value.ID,
+																		Thumbnail: thumbnail,
+																		Title:     parameter.Value.Title,
+																		Value:     parameter.Value.Value,
+																	})
+																	//
+																}
+																found = true
+																break
+															}
+														}
+														if !found {
+															opt := &common.OptionCF{
+																ID:    parameter.Option.ID,
+																Type:  "Product",
+																Name:  parameter.Option.Name,
+																Title: parameter.Option.Title,
+															}
+															var thumbnail string
+															if parameter.Value.Thumbnail != "" {
+																if p1 := path.Join(dir, parameter.Value.Thumbnail); len(p1) > 0 {
+																	if fi, err := os.Stat(p1); err == nil {
+																		filename := filepath.Base(p1)
+																		filename = fmt.Sprintf("%v-%d%v", filename[:len(filename) - len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+																		p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
+																		thumbnail = "/" + path.Join("images", "values", filename)
+																		if _, err = os.Stat(p2); err != nil {
+																			logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+																			if err = common.Copy(p1, p2); err != nil {
+																				logger.Warningf("%v", err)
+																			}
+																		}
+																		if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
+																			p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
+																			if _, err = os.Stat(p2); err != nil {
+																				logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+																				if err = common.Copy(p1, p2); err != nil {
+																					logger.Warningf("%v", err)
+																				}
+																			}
+																			if images, err := imageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
+																				thumbnails := []string{fmt.Sprintf("/images/values/resize/%s", filename)}
+																				for _, image := range images {
+																					//thumbnail = "/" + path.Join("images", "values", "resize", filename)
+																					//thumbnail = fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size)
+																					thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
+																					//break
+																				}
+																				thumbnail = strings.Join(thumbnails, ",")
+																			} else {
+																				logger.Warningf("%v", err)
+																			}
+																		}
+																	}
+																}
+															}
+															//
+															opt.Values = append(opt.Values, &common.ValueCF{
+																ID:        parameter.Value.ID,
+																Thumbnail: thumbnail,
+																Title:     parameter.Value.Title,
+																Value:     parameter.Value.Value,
+															})
+															//
+															categoryFile.Options = append(categoryFile.Options, opt)
+														}
+													}
+												}
+												// Variation properties
 												for _, property := range variation.Properties {
 													if property.Filtering {
 														var found bool
 														for i, opt := range categoryFile.Options {
 															if opt.ID == property.Option.ID {
-																//logger.Infof("TEST001 property ID: %v, Name: %v FOUND", property.ID, property.Name)
+																//logger.Infof("TEST001 property ID: %v, Country: %v FOUND", property.ID, property.Country)
 																for _, price := range property.Prices {
 																	var found bool
 																	for _, value := range opt.Values {
@@ -394,15 +515,17 @@ var renderCmd = &cobra.Command{
 																			Title:     price.Value.Title,
 																			Value:     price.Value.Value,
 																		})
+																		//
 																	}
 																}
 																found = true
 															}
 														}
 														if !found {
-															//logger.Infof("TEST001 property ID: %v, Name: %v NOT FOUND (%v)", property.ID, property.Name, len(categoryFile.Options))
+															//logger.Infof("TEST001 property ID: %v, Country: %v NOT FOUND (%v)", property.ID, property.Country, len(categoryFile.Options))
 															opt := &common.OptionCF{
 																ID:    property.Option.ID,
+																Type:      "Variation",
 																Name:  property.Option.Name,
 																Title: property.Option.Title,
 															}
@@ -456,7 +579,7 @@ var renderCmd = &cobra.Command{
 																	})
 																}
 															}
-															//logger.Infof("TEST001 property ID: %v, Name: %v ADD %+v", property.ID, property.Name, opt)
+															//logger.Infof("TEST001 property ID: %v, Country: %v ADD %+v", property.ID, property.Country, opt)
 															categoryFile.Options = append(categoryFile.Options, opt)
 														}
 													}
@@ -464,7 +587,14 @@ var renderCmd = &cobra.Command{
 											}
 											categoryFile.BasePriceMin = min
 											categoryFile.BasePriceMax = max
-											//
+											// Sort to put Product options above Variation options
+											sort.Slice(categoryFile.Options, func(i, j int) bool {
+												if categoryFile.Options[i].Type == categoryFile.Options[j].Type {
+													return categoryFile.Options[i].Title < categoryFile.Options[j].Title
+												}else{
+													return categoryFile.Options[i].Type < categoryFile.Options[j].Type
+												}
+											})
 											if err = common.WriteCategoryFile(p2, categoryFile); err != nil {
 												logger.Warningf("%v", err)
 											}
@@ -554,6 +684,27 @@ var renderCmd = &cobra.Command{
 									}
 								}
 								productView.Images = images
+							}
+
+							if len(product.Parameters) > 0 {
+								for _, parameter := range product.Parameters {
+									parameterView := common.ParameterPF{
+										Id:        parameter.ID,
+										Name:      parameter.Name,
+										Title:     parameter.Title,
+									}
+									if parameter.Value != nil {
+										parameterView.Value = common.ValuePPF{
+											Id:        parameter.Value.ID,
+											Title:     parameter.Value.Title,
+											//Thumbnail: "",
+											Value:     parameter.Value.Value,
+										}
+									}else{
+										parameterView.CustomValue = parameter.CustomValue
+									}
+									productView.Parameters = append(productView.Parameters, parameterView)
+								}
 							}
 							if p := path.Join(p1, product.Name); p != "" {
 								if _, err := os.Stat(p); err != nil {
@@ -808,7 +959,7 @@ var renderCmd = &cobra.Command{
 		}
 
 		/*result := struct {
-			Title string
+			ZIP string
 			Date time.Time
 			Tags []string
 			Categories []string
@@ -818,7 +969,7 @@ var renderCmd = &cobra.Command{
 			ComparePrice *models.Price
 			InStock bool
 		}{
-			Title: "Duke2",
+			ZIP: "Duke2",
 			Date: time.Now(),
 			Tags: []string{"Floor Light"},
 			Categories: []string{"Floor Light"},
@@ -892,7 +1043,7 @@ type CategoryView struct {
 /*type PageView struct {
 	ID uint
 	Type       string
-	Title      string
+	ZIP      string
 	Date       time.Time
 	Tags       []string
 	Canonical  string
@@ -907,8 +1058,8 @@ type CategoryView struct {
 type ProductView struct {
 	Id         uint `json:"Id"`
 	CategoryId uint
-	Name       string
-	Title      string
+	Country       string
+	ZIP      string
 	Thumbnail  string
 	Path       string
 	Variations []VariationView
@@ -916,8 +1067,8 @@ type ProductView struct {
 
 type VariationView struct {
 	Id uint
-	Name string
-	Title string
+	Country string
+	ZIP string
 	Thumbnail string
 	Description string
 	BasePrice float64
@@ -928,8 +1079,8 @@ type VariationView struct {
 type PropertyView struct {
 	Id uint
 	Type string
-	Name string
-	Title string
+	Country string
+	ZIP string
 	Description string
 	Values []ValueView
 }
@@ -937,7 +1088,7 @@ type PropertyView struct {
 type ValueView struct {
 	Id uint
 	Enabled bool
-	Title string
+	ZIP string
 	Thumbnail string
 	Value string
 	Price PriceView

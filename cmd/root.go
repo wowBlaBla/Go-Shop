@@ -60,14 +60,14 @@ func initConfig() {
 		common.Config.Https.Port = config.DEFAULT_HTTPS_PORT
 		common.Config.Database.Dialer = "sqlite"
 		common.Config.Database.Uri = path.Join(dir, "database.sqlite")
-		common.Config.I18n.Enabled = true
+		/*common.Config.I18n.Enabled = true
 		common.Config.I18n.Languages = []config.Language{
 			{
 				Enabled: true,
 				Name: "Deutsche",
 				Code: "de",
 			},
-		}
+		}*/
 		common.Config.Hugo.Home = config.DEFAULT_HUGO
 		common.Config.Hugo.Theme = "default"
 		common.Config.Hugo.Minify = true
@@ -75,6 +75,8 @@ func initConfig() {
 		common.Config.Currency = "usd"
 		common.Config.Payment.Default = "stripe"
 		common.Config.Payment.VAT = 19
+		common.Config.Swagger.Enabled = false
+		common.Config.Swagger.Url = fmt.Sprintf("http://localhost:%d/swagger.json", config.DEFAULT_PORT)
 		if err = common.Config.Save(); err != nil {
 			logger.Errorf(" %v", err.Error())
 		}
@@ -149,7 +151,7 @@ var RootCmd = &cobra.Command{
 		var dialer gorm.Dialector
 		if common.Config.Database.Dialer == "mysql" {
 			dialer = mysql.Open(common.Config.Database.Uri)
-		}else {
+		} else {
 			var uri = path.Join(dir, os.Getenv("DATABASE_FOLDER"), "database.sqlite")
 			if common.Config.Database.Uri != "" {
 				uri = common.Config.Database.Uri
@@ -167,6 +169,7 @@ var RootCmd = &cobra.Command{
 		common.Database.DB()
 		common.Database.AutoMigrate(&models.Category{})
 		common.Database.AutoMigrate(&models.Product{})
+		common.Database.AutoMigrate(&models.Parameter{})
 		common.Database.AutoMigrate(&models.File{})
 		common.Database.AutoMigrate(&models.Image{})
 		common.Database.AutoMigrate(&models.Variation{})
@@ -178,6 +181,9 @@ var RootCmd = &cobra.Command{
 		common.Database.AutoMigrate(&models.Item{})
 		common.Database.AutoMigrate(&models.Transaction{})
 		common.Database.AutoMigrate(&models.Tag{})
+		common.Database.AutoMigrate(&models.Tariff{})
+		common.Database.AutoMigrate(&models.Transport{})
+		common.Database.AutoMigrate(&models.Zone{})
 		//
 		common.Database.AutoMigrate(&models.CacheProduct{})
 		common.Database.AutoMigrate(&models.CacheImage{})

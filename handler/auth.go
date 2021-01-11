@@ -509,6 +509,7 @@ type LoginRequest struct {
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/login [post]
+// @Tags auth
 func postLoginHandler(c *fiber.Ctx) error {
 	var request LoginRequest
 	if err := c.BodyParser(&request); err != nil {
@@ -614,6 +615,7 @@ func postLoginHandler(c *fiber.Ctx) error {
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/logout [get]
+// @Tags auth
 func getLogoutHandler (c *fiber.Ctx) error {
 	//c.ClearCookie(COOKIE_NAME)
 	cookie := &fiber.Cookie{

@@ -77,6 +77,10 @@ type Config struct {
 	Currency string // usd, eur
 	//
 	Payment PaymentConfig
+	Swagger struct {
+		Enabled bool
+		Url string
+	}
 	Modified time.Time
 }
 
