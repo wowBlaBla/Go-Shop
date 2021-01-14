@@ -23,10 +23,11 @@ type User struct {
 	Password       string
 	Email          string
 	EmailConfirmed bool
-	Role int
-	ResetCode string
-	ResetAttempt time.Time
-	Profiles  []*Profile `gorm:"foreignKey:UserId"`
+	Role           int
+	Notification   bool
+	ResetCode      string
+	ResetAttempt   time.Time
+	Profiles       []*Profile `gorm:"foreignKey:UserId"`
 	//
 	UpdatedAt time.Time
 }
@@ -35,6 +36,15 @@ func GetUsers(connector *gorm.DB) (users []*User, err error){
 	db := connector
 	db.Find(&users)
 	return users, db.Error
+}
+
+func GetUsersByRoleLessOrEqualsAndNotification(connector *gorm.DB, role int, notification bool) ([]*User, error) {
+	db := connector
+	var users []*User
+	if err := db.Debug().Where("role <= ? and notification = ?", role, notification).Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 func GetUser(connector *gorm.DB, id int) (*User, error){

@@ -20,7 +20,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210111150013"
+	COMPILED = "20210114121700"
 	//
 	Started          time.Time
 	Config           *config.Config
@@ -28,6 +28,8 @@ var (
 	//
 	STRIPE *Stripe
 	MOLLIE *Mollie
+	//
+	NOTIFICATION *Notification
 	SALT = "goshop"
 )
 

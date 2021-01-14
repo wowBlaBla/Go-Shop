@@ -40,6 +40,8 @@ require (
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/ryanuber/go-glob v1.0.0 // indirect
+	github.com/sendgrid/rest v2.6.2+incompatible // indirect
+	github.com/sendgrid/sendgrid-go v3.7.2+incompatible
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/viper v1.7.1
 	github.com/streamrail/concurrent-map v0.0.0-20160823150647-8bf1e9bacbf6

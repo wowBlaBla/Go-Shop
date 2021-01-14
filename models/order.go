@@ -11,6 +11,7 @@ const (
 	ORDER_STATUS_MANUFACTURING = "manufacturing"
 	ORDER_STATUS_SHIPPING = "shipping"
 	ORDER_STATUS_COMPLETE = "complete"
+	ORDER_STATUS_CANCELED = "canceled"
 )
 
 type Order struct {
@@ -53,6 +54,16 @@ func GetOrder(connector *gorm.DB, id int) (*Order, error) {
 	db := connector
 	var order Order
 	db.Debug().Preload("Items").Find(&order, id)
+	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return &order, nil
+}
+
+func GetOrderFull(connector *gorm.DB, id int) (*Order, error) {
+	db := connector
+	var order Order
+	db.Debug().Preload("Items").Preload("Profile").Preload("Profile.Transport").Preload("User").Find(&order, id)
 	if err := db.Error; err != nil {
 		return nil, err
 	}

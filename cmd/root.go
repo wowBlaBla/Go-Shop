@@ -184,6 +184,7 @@ var RootCmd = &cobra.Command{
 		common.Database.AutoMigrate(&models.Tariff{})
 		common.Database.AutoMigrate(&models.Transport{})
 		common.Database.AutoMigrate(&models.Zone{})
+		common.Database.AutoMigrate(&models.EmailTemplate{})
 		//
 		common.Database.AutoMigrate(&models.CacheProduct{})
 		common.Database.AutoMigrate(&models.CacheImage{})
@@ -234,6 +235,13 @@ var RootCmd = &cobra.Command{
 			}
 			if common.Config.Payment.Mollie.Enabled {
 				common.MOLLIE = common.NewMollie(common.Config.Payment.Mollie.Key)
+			}
+		}
+		// Notification
+		if common.Config.Notification.Enabled {
+			common.NOTIFICATION = common.NewNotification()
+			if common.Config.Notification.Email.Enabled && common.Config.Notification.Email.Key != "" {
+				common.NOTIFICATION.SendGrid = common.NewSendGrid(common.Config.Notification.Email.Key)
 			}
 		}
 		//

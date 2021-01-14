@@ -113,6 +113,7 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 			EmailConfirmed: true,
 			Password:       models.MakeUserPassword(DEFAULT_PASSWORD),
 			Role: models.ROLE_ROOT,
+			Notification: true,
 		}
 		models.CreateUser(common.Database, &user)
 	}
@@ -247,8 +248,10 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 			Enabled:  true,
 			Login:    login,
 			Email:    request.Email,
+			EmailConfirmed: true,
 			Password: models.MakeUserPassword(request.Password),
 			Role: models.ROLE_USER,
+			Notification: true,
 		}
 		if !config.EmailConfirmationRequired {
 			user.EmailConfirmed = true

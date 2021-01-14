@@ -77,6 +77,7 @@ type Config struct {
 	Currency string // usd, eur
 	//
 	Payment PaymentConfig
+	Notification NotificationConfig
 	Swagger struct {
 		Enabled bool
 		Url string
@@ -111,6 +112,18 @@ type ResizeConfig struct {
 		Size string // 128x0,256x0
 	}
 	Quality int
+}
+
+type NotificationConfig struct {
+	Enabled bool
+	Email EmailConfig
+}
+
+type EmailConfig struct {
+	Enabled bool
+	Name string
+	Email string
+	Key string // SendGrid key
 }
 
 func (c *Config) Save() error {

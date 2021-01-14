@@ -15,6 +15,7 @@ import (
 	"github.com/gofiber/session/v2/provider/redis"
 	"github.com/google/logger"
 	"github.com/jinzhu/now"
+	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"github.com/stripe/stripe-go/v71"
 	checkout_session "github.com/stripe/stripe-go/v71/checkout/session"
 	"github.com/yonnic/goshop/common"
@@ -249,6 +250,12 @@ func GetFiber() *fiber.App {
 	v1.Put("/zones/:id", authMulti, changed("zone updated"), putZoneHandler)
 	v1.Delete("/zones/:id", authMulti, changed("zone deleted"), delZoneHandler)
 	//
+	v1.Post("/notification/email", authMulti, postEmailTemplateHandler)
+	v1.Post("/notification/email/list", authMulti, changed("email template created"), postEmailTemplatesListHandler)
+	v1.Get("/notification/email/:id", authMulti, getEmailTemplateHandler)
+	v1.Put("/notification/email/:id", authMulti, changed("email template updated"), putEmailTemplateHandler)
+	v1.Delete("/notification/email/:id", authMulti, changed("email template deleted"), delEmailTemplateHandler)
+	//
 	v1.Get("/users", authMulti, getUsersHandler)
 	v1.Post("/users/list", authMulti, postUsersListHandler)
 	v1.Get("/users/:id", authMulti, getUserHandler)
@@ -265,6 +272,7 @@ func GetFiber() *fiber.App {
 	v1.Get("/account/orders", authMulti, getAccountOrdersHandler)
 	v1.Post("/account/orders", authMulti, postAccountOrdersHandler)
 	v1.Get("/account/orders/:id", authMulti, getAccountOrderHandler)
+	v1.Put("/account/orders/:id", authMulti, putAccountOrderHandler)
 	v1.Post("/account/orders/:id/checkout", authMulti, postAccountOrderCheckoutHandler)
 	// Stripe
 	v1.Get("/account/orders/:id/stripe/customer", authMulti, getAccountOrderStripeCustomerHandler) // +
@@ -552,6 +560,7 @@ func getDashboardHandler(c *fiber.Ctx) error {
 type BasicSettingsView struct {
 	Payment config.PaymentConfig
 	Resize config.ResizeConfig
+	Notification config.NotificationConfig
 }
 
 // GetBasicSettings godoc
@@ -567,6 +576,7 @@ func getBasicSettingsHandler(c *fiber.Ctx) error {
 	var conf BasicSettingsView
 	conf.Payment = common.Config.Payment
 	conf.Resize = common.Config.Resize
+	conf.Notification = common.Config.Notification
 	return c.JSON(conf)
 }
 
@@ -591,6 +601,8 @@ func putBasicSettingsHandler(c *fiber.Ctx) error {
 	common.Config.Payment = request.Payment
 	// Resize
 	common.Config.Resize = request.Resize
+	// Notification
+	common.Config.Notification = request.Notification
 	// Restart
 	go func() {
 		time.Sleep(1 * time.Second)
@@ -960,7 +972,7 @@ func postCategoriesAutocompleteHandler(c *fiber.Ctx) error {
 		keys = append(keys, "title like ?")
 		values = append(values, "%" + request.Search + "%")
 	}
-	logger.Infof("request: %+v", request)
+	//logger.Infof("request: %+v", request)
 	//
 	var categories []*models.Category
 	if err := common.Database.Debug().Where(strings.Join(keys, " or "), values...).Limit(10).Find(&categories).Error; err != nil {
@@ -1049,7 +1061,7 @@ func postCategoriesListHandler(c *fiber.Ctx) error {
 	if request.Length == 0 {
 		request.Length = 10
 	}
-	logger.Infof("request: %+v", request)
+	//logger.Infof("request: %+v", request)
 	// Filter
 	var keys1 []string
 	var values1 []interface{}
@@ -3335,7 +3347,7 @@ func postPropertiesListHandler(c *fiber.Ctx) error {
 	if err := c.BodyParser(&request); err != nil {
 		return err
 	}
-	logger.Infof("request: %+v", request)
+	//logger.Infof("request: %+v", request)
 	if len(request.Sort) == 0 {
 		request.Sort = make(map[string]string)
 		request.Sort["ID"] = "desc"
@@ -7393,7 +7405,7 @@ func getZoneHandler(c *fiber.Ctx) error {
 // @Produce json
 // @Param zone body ZoneView true "body"
 // @Param id path int true "Zone ID"
-// @Success 200 {object} TagView
+// @Success 200 {object} ZoneView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/zones/{id} [put]
@@ -7501,6 +7513,349 @@ func delZoneHandler(c *fiber.Ctx) error {
 	}
 }
 
+// Notification Email
+type EmailTemplatesView []EmailTemplateView
+
+type EmailTemplateView struct{
+	ID      uint
+	Enabled bool
+	Type string
+	From string
+	Topic string
+	Message string
+}
+
+type NewEmailTemplate struct {
+	Enabled bool
+	Type string
+	Topic string
+	Message string
+}
+
+// @security BasicAuth
+// CreateEmailTemplate godoc
+// @Summary Create email template
+// @Accept json
+// @Produce json
+// @Param zone body NewEmailTemplate true "body"
+// @Success 200 {object} EmailTemplateView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/notification/email [post]
+// @Tags notification
+func postEmailTemplateHandler(c *fiber.Ctx) error {
+	var view EmailTemplateView
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
+			var request NewEmailTemplate
+			if err := c.BodyParser(&request); err != nil {
+				return err
+			}
+			//logger.Infof("request: %+v", request)
+			request.Type = strings.TrimSpace(request.Type)
+			if request.Type == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(fiber.Map{"ERROR": "Type is not defined"})
+			}
+			request.Topic = strings.TrimSpace(request.Topic)
+			if request.Topic == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(fiber.Map{"ERROR": "Topic is not defined"})
+			}
+			request.Message = strings.TrimSpace(request.Message)
+			if request.Message == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(fiber.Map{"ERROR": "Message is not defined"})
+			}
+			if template, err := models.GetEmailTemplateByType(common.Database, request.Type); err == nil && template != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Template exists"})
+			}
+			template := &models.EmailTemplate {
+				Enabled: request.Enabled,
+				Type: request.Type,
+				Topic: request.Topic,
+				Message: request.Message,
+			}
+			var err error
+			if _, err = models.CreateEmailTemplate(common.Database, template); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			if bts, err := json.Marshal(template); err == nil {
+				if err = json.Unmarshal(bts, &view); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+			return c.JSON(view)
+		} else {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Unsupported Content-Type"})
+		}
+	}
+	return c.JSON(view)
+}
+
+type EmailsListResponse struct {
+	Data []EmailsListItem
+	Filtered int64
+	Total int64
+}
+
+type EmailsListItem struct {
+	ID uint
+	Enabled bool
+	Type string
+	Topic string
+}
+
+// @security BasicAuth
+// SearchEmails godoc
+// @Summary Search email templates
+// @Accept json
+// @Produce json
+// @Param request body ListRequest true "body"
+// @Success 200 {object} EmailsListResponse
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/notification/email/list [post]
+// @Tags notification
+func postEmailTemplatesListHandler(c *fiber.Ctx) error {
+	var response EmailsListResponse
+	var request ListRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	if len(request.Sort) == 0 {
+		request.Sort["ID"] = "desc"
+	}
+	if request.Length == 0 {
+		request.Length = 10
+	}
+	// Filter
+	var keys1 []string
+	var values1 []interface{}
+	if len(request.Filter) > 0 {
+		for key, value := range request.Filter {
+			if key != "" && len(strings.TrimSpace(value)) > 0 {
+				switch key {
+				default:
+					keys1 = append(keys1, fmt.Sprintf("email_templates.%v like ?", key))
+					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
+				}
+			}
+		}
+	}
+	//logger.Infof("keys1: %+v, values1: %+v", keys1, values1)
+	//
+	// Sort
+	var order string
+	if len(request.Sort) > 0 {
+		var orders []string
+		for key, value := range request.Sort {
+			if key != "" && value != "" {
+				switch key {
+				default:
+					orders = append(orders, fmt.Sprintf("email_templates.%v %v", key, value))
+				}
+			}
+		}
+		order = strings.Join(orders, ", ")
+	}
+	//logger.Infof("order: %+v", order)
+	//
+	rows, err := common.Database.Debug().Model(&models.EmailTemplate{}).Select("email_templates.ID, email_templates.Enabled, email_templates.Type, email_templates.`From`, email_templates.Topic, email_templates.Message").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	if err == nil {
+		if err == nil {
+			for rows.Next() {
+				var item EmailsListItem
+				if err = common.Database.ScanRows(rows, &item); err == nil {
+					response.Data = append(response.Data, item)
+				} else {
+					logger.Errorf("%v", err)
+				}
+			}
+		}else{
+			logger.Errorf("%v", err)
+		}
+		rows.Close()
+	}
+	rows, err = common.Database.Debug().Model(&models.EmailTemplate{}).Select("email_templates.ID, email_templates.Enabled, email_templates.Type, email_templates.`From`, email_templates.Topic, email_templates.Message").Where(strings.Join(keys1, " and "), values1...).Rows()
+	if err == nil {
+		for rows.Next() {
+			response.Filtered ++
+		}
+		rows.Close()
+	}
+	if len(keys1) > 0 {
+		common.Database.Debug().Model(&models.EmailTemplate{}).Count(&response.Total)
+	}else{
+		response.Total = response.Filtered
+	}
+	c.Status(http.StatusOK)
+	return c.JSON(response)
+}
+
+// @security BasicAuth
+// GetEmailTemplate godoc
+// @Summary Get email template
+// @Accept json
+// @Produce json
+// @Param id path int true "EmailTemplate ID"
+// @Success 200 {object} EmailTemplateView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/notification/email/{id} [get]
+// @Tags notification
+func getEmailTemplateHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	if template, err := models.GetEmailTemplate(common.Database, id); err == nil {
+		var view EmailTemplateView
+		if bts, err := json.MarshalIndent(template, "", "   "); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+// @security BasicAuth
+// UpdateEmailTemplate godoc
+// @Summary update email template
+// @Accept json
+// @Produce json
+// @Param transport body EmailTemplateView true "body"
+// @Param id path int true "Email Template ID"
+// @Success 200 {object} EmailTemplateView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/notification/email/{id} [put]
+// @Tags notification
+func putEmailTemplateHandler(c *fiber.Ctx) error {
+	var request struct {
+		EmailTemplateView
+		Name string
+		Email string
+	}
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
+	}
+	var emailTemplate *models.EmailTemplate
+	var err error
+	if emailTemplate, err = models.GetEmailTemplate(common.Database, int(id)); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	emailTemplate.Enabled = request.Enabled
+	emailTemplate.Type = strings.TrimSpace(request.Type)
+	if emailTemplate.Type == "" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "Type is not defined"})
+	}
+	emailTemplate.Topic = strings.TrimSpace(request.Topic)
+	if emailTemplate.Topic == "" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "Topic is not defined"})
+	}
+	emailTemplate.Message = strings.TrimSpace(request.Message)
+	if emailTemplate.Message == "" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "Message is not defined"})
+	}
+	if common.NOTIFICATION != nil && common.NOTIFICATION.SendGrid != nil && request.Email != "" {
+		//
+		/*vars := make(map[string]interface{})
+		vars["OrderId"] = 123
+		vars["OrderTotal"] = 1234.56
+		vars["UserEmail"] = "test@mail.com"*/
+		vars := &common.NotificationTemplateVariables{ }
+		if order, err := models.GetOrderFull(common.Database, 30); err == nil {
+			var orderView struct {
+				models.Order
+				Items []struct {
+					ItemShortView
+					Description string
+				}
+			}
+			if bts, err := json.Marshal(order); err == nil {
+				if err = json.Unmarshal(bts, &orderView); err == nil {
+					for i := 0; i < len(orderView.Items); i++ {
+						var itemView ItemShortView
+						if err = json.Unmarshal([]byte(orderView.Items[i].Description), &itemView); err == nil {
+							orderView.Items[i].Variation = itemView.Variation
+							orderView.Items[i].Properties = itemView.Properties
+						}
+					}
+					vars.Order = orderView
+				} else {
+					logger.Infof("%+v", err)
+				}
+			}
+		}
+		//
+		if err = common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), mail.NewEmail(request.Name, request.Email), emailTemplate.Topic, emailTemplate.Message, vars); err != nil {
+			logger.Warningf("%+v", err)
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}
+	if err := models.UpdateEmailTemplate(common.Database, emailTemplate); err == nil {
+		return c.JSON(EmailTemplateView{ID: emailTemplate.ID, Enabled: emailTemplate.Enabled, Type: emailTemplate.Type, Topic: emailTemplate.Topic, Message: emailTemplate.Message})
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+// @security BasicAuth
+// DelEmailTemplate godoc
+// @Summary Delete email template
+// @Accept json
+// @Produce json
+// @Param id path int true "Email template ID"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/notification/email/{id} [delete]
+// @Tags notification
+func delEmailTemplateHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	if template, err := models.GetEmailTemplate(common.Database, id); err == nil {
+		if err = models.DeleteEmailTemplate(common.Database, template); err == nil {
+			return c.JSON(HTTPMessage{MESSAGE: "OK"})
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
 // Users
 
 type UsersView []UserView
@@ -7512,6 +7867,7 @@ type UserView struct {
 	Email string
 	EmailConfirmed bool
 	Role int `json:",omitempty"`
+	Notification bool
 }
 
 // @security BasicAuth
@@ -7556,6 +7912,7 @@ type UsersListItem struct {
 	Login string
 	Email string
 	EmailConfirmed bool
+	Role int
 	Orders int
 	UpdatedAt time.Time
 }
@@ -7663,7 +8020,7 @@ func postUsersListHandler(c *fiber.Ctx) error {
 	//logger.Infof("order: %+v", order)
 	//
 	func() {
-		rows, err := common.Database.Debug().Model(&models.User{}).Select("users.ID, users.Created_At as CreatedAt, users.Login, users.Email, count(orders.Id) as Orders, users.Updated_At as UpdatedAt").Joins("left join orders on orders.User_Id = users.id").Group("users.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+		rows, err := common.Database.Debug().Model(&models.User{}).Select("users.ID, users.Created_At as CreatedAt, users.Login, users.Email, users.Role, users.Email_Confirmed as EmailConfirmed, count(orders.Id) as Orders, users.Updated_At as UpdatedAt").Joins("left join orders on orders.User_Id = users.id").Group("users.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 		if err == nil {
 			if err == nil {
 				for rows.Next() {
@@ -7681,7 +8038,7 @@ func postUsersListHandler(c *fiber.Ctx) error {
 		}
 	}()
 	func() {
-		rows, err := common.Database.Debug().Model(&models.User{}).Select("users.ID, users.Created_At as CreatedAt, users.Login, users.Email, users.Updated_At as UpdatedAt").Joins("left join orders on orders.User_Id = users.id").Group("users.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Rows()
+		rows, err := common.Database.Debug().Model(&models.User{}).Select("users.ID, users.Created_At as CreatedAt, users.Login, users.Email, users.Role, users.Email_Confirmed as EmailConfirmed, users.Updated_At as UpdatedAt").Joins("left join orders on orders.User_Id = users.id").Group("users.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Rows()
 		if err == nil {
 			for rows.Next() {
 				response.Filtered++
@@ -7738,8 +8095,11 @@ func getUserHandler(c *fiber.Ctx) error {
 
 
 type ExistingUser struct {
-	Password string
+	Password       string
+	Email          string
 	EmailConfirmed bool
+	Role           int
+	Notification   bool
 }
 
 // @security BasicAuth
@@ -7780,7 +8140,15 @@ func putUserHandler(c *fiber.Ctx) error {
 		}
 		user.Password = models.MakeUserPassword(request.Password)
 	}
+	request.Email = strings.TrimSpace(request.Email)
+	if len(request.Email) > 0 {
+		user.Email = request.Email
+	}
 	user.EmailConfirmed = request.EmailConfirmed
+	if request.Role > 0 {
+		user.Role = request.Role
+	}
+	user.Notification = request.Notification
 	if err := models.UpdateUser(common.Database, user); err == nil {
 		return c.JSON(HTTPMessage{"OK"})
 	}else{
@@ -8299,7 +8667,7 @@ func postProfileHandler(c *fiber.Ctx) error {
 			if err := c.BodyParser(&request); err != nil {
 				return err
 			}
-			logger.Infof("request: %+v", request)
+			//logger.Infof("request: %+v", request)
 			//
 			var userId uint
 			var email = strings.TrimSpace(request.Email)
@@ -8322,9 +8690,11 @@ func postProfileHandler(c *fiber.Ctx) error {
 			user = &models.User{
 				Enabled: true,
 				Email: email,
+				EmailConfirmed: true,
 				Login: login,
 				Password: models.MakeUserPassword(password),
 				Role: models.ROLE_USER,
+				Notification: true,
 			}
 			var err error
 			userId, err = models.CreateUser(common.Database, user)
@@ -8338,9 +8708,9 @@ func postProfileHandler(c *fiber.Ctx) error {
 				"login": login,
 				"password": password,
 			}
-			logger.Infof("credentials: %+v", credentials)
+			//logger.Infof("credentials: %+v", credentials)
 			if encoded, err := cookieHandler.Encode(COOKIE_NAME, credentials); err == nil {
-				logger.Infof("encoded: %+v", encoded)
+				//logger.Infof("encoded: %+v", encoded)
 				cookie := &fiber.Cookie{
 					Name:  COOKIE_NAME,
 					Value: encoded,
@@ -8397,6 +8767,7 @@ func postProfileHandler(c *fiber.Ctx) error {
 				Region:   region,
 				Country:  country,
 				UserId:   userId,
+				TransportId: request.TransportId,
 			}
 			//
 			if _, err := models.CreateProfile(common.Database, profile); err != nil {
@@ -8464,7 +8835,7 @@ func postFilterHandler(c *fiber.Ctx) error {
 	if err := c.BodyParser(&request); err != nil {
 		return err
 	}
-	logger.Infof("request: %+v", request)
+	//logger.Infof("request: %+v", request)
 	if len(request.Sort) == 0 {
 		request.Sort = map[string]string{"ID": "desc"}
 	}
@@ -8801,6 +9172,15 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 	if v := c.Locals("user"); v != nil {
 		if user, ok := v.(*models.User); ok {
 			order.User = user
+			//
+			if orders, err := models.GetOrdersByUserId(common.Database, user.ID); err == nil {
+				for _, order := range orders {
+					if order.Status == models.ORDER_STATUS_NEW || order.Status == models.ORDER_STATUS_WAITING_FROM_PAYMENT {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{"Some orders wait for your payment, please finish it before continuing"})
+					}
+				}
+			}
 		}
 	}
 	var orderShortView OrderShortView
@@ -8986,6 +9366,47 @@ func getAccountOrderHandler(c *fiber.Ctx) error {
 	}
 }
 
+// @security BasicAuth
+// UpdateOrder godoc
+// @Summary update order by user
+// @Accept json
+// @Produce json
+// @Param user body ExistingOrder true "body"
+// @Param id path int true "Order ID"
+// @Success 200 {object} UserView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/orders/{id} [put]
+// @Tags order
+func putAccountOrderHandler(c *fiber.Ctx) error {
+	var request ExistingOrder
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
+	}
+	var order *models.Order
+	var err error
+	if order, err = models.GetOrder(common.Database, int(id)); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	if (order.Status == models.ORDER_STATUS_NEW || order.Status == models.ORDER_STATUS_WAITING_FROM_PAYMENT) && request.Status == models.ORDER_STATUS_CANCELED {
+		order.Status = models.ORDER_STATUS_CANCELED
+	}
+	if err := models.UpdateOrder(common.Database, order); err == nil {
+		return c.JSON(HTTPMessage{"OK"})
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
 type NewStripePayment struct {
 	StripeToken string
 	SuccessURL string
@@ -9032,7 +9453,7 @@ func postAccountOrderCheckoutHandler(c *fiber.Ctx) error {
 	if err := c.BodyParser(&request); err != nil {
 		return err
 	}
-	logger.Infof("request: %+v", request)
+	//logger.Infof("request: %+v", request)
 
 	params := &stripe.CheckoutSessionParams{
 		PaymentMethodTypes: stripe.StringSlice([]string{
@@ -9271,7 +9692,7 @@ func postAccountOrderStripeCardHandler(c *fiber.Ctx) error {
 	if err := c.BodyParser(&request); err != nil {
 		return err
 	}
-	logger.Infof("request: %+v", request)
+	//logger.Infof("request: %+v", request)
 
 	params := &stripe.CardParams{
 		Customer: stripe.String(request.CustomerId),
@@ -9346,7 +9767,7 @@ func postAccountOrderStripeSubmitHandler(c *fiber.Ctx) error {
 			return c.JSON(HTTPError{"Profile not found"})
 		}
 
-		logger.Infof("Start")
+		//logger.Infof("Start")
 		params := &stripe.PaymentIntentParams{
 			Amount: stripe.Int64(int64(math.Round(order.Total * 100))),
 			Currency: stripe.String(common.Config.Currency),
@@ -9369,9 +9790,9 @@ func postAccountOrderStripeSubmitHandler(c *fiber.Ctx) error {
 				params.ReturnURL = stripe.String(u.String())
 			}
 		}
-		if bts, err := json.Marshal(params); err == nil {
+		/*if bts, err := json.Marshal(params); err == nil {
 			logger.Infof("params: %+v", string(bts))
-		}
+		}*/
 		pi, err := common.STRIPE.CreatePaymentIntent(params)
 		if err != nil {
 			c.Status(http.StatusInternalServerError)
@@ -9393,18 +9814,18 @@ func postAccountOrderStripeSubmitHandler(c *fiber.Ctx) error {
 		}
 
 		if pi.Status == stripe.PaymentIntentStatusRequiresPaymentMethod {
-			logger.Infof("case 1")
+			logger.Infof("PaymentIntentStatusRequiresPaymentMethod")
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{pi.LastPaymentError.Error()})
 		} else if pi.Status == stripe.PaymentIntentStatusRequiresAction {
-			logger.Infof("case 2")
+			logger.Infof("PaymentIntentStatusRequiresAction")
 			transaction.Status = models.TRANSACTION_STATUS_PENDING
 			if err = models.UpdateTransaction(common.Database, transaction); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
 		} else if pi.Status == stripe.PaymentIntentStatusSucceeded {
-			logger.Infof("case 3")
+			logger.Infof("PaymentIntentStatusSucceeded")
 			transaction.Status = models.TRANSACTION_STATUS_COMPLETE
 			if err = models.UpdateTransaction(common.Database, transaction); err != nil {
 				c.Status(http.StatusInternalServerError)
@@ -9415,8 +9836,51 @@ func postAccountOrderStripeSubmitHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
+			// Notifications
+			if common.Config.Notification.Enabled {
+				if common.Config.Notification.Email.Enabled {
+					// to admin
+					//logger.Infof("Time to send admin email")
+					if users, err := models.GetUsersByRoleLessOrEqualsAndNotification(common.Database, models.ROLE_ADMIN, true); err == nil {
+						//logger.Infof("users found: %v", len(users))
+						template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_ADMIN_ORDER_PAID)
+						if err == nil {
+							//logger.Infof("Template: %+v", template)
+							for _, user := range users {
+								logger.Infof("Send email admin user: %+v", user.Email)
+								if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
+									logger.Errorf("%+v", err)
+								}
+							}
+						}else{
+							logger.Warningf("%+v", err)
+						}
+					}else{
+						logger.Warningf("%+v", err)
+					}
+					// to user
+					//logger.Infof("Time to send user email")
+					template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_USER_ORDER_PAID)
+					if err == nil {
+						//logger.Infof("Template: %+v", template)
+						if user, err := models.GetUser(common.Database, int(order.UserId)); err == nil {
+							if user.EmailConfirmed {
+								logger.Infof("Send email to user: %+v", user.Email)
+								if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
+									logger.Errorf("%+v", err)
+								}
+							}else{
+								logger.Warningf("User's %v email %v is not confirmed", user.Login, user.Email)
+							}
+						} else {
+							logger.Warningf("%+v", err)
+						}
+					}
+				}
+			}
+			//
 		}else{
-			logger.Infof("case 3")
+			logger.Warningf("Unexpected PaymentIntentStatus: %+v", pi.Status)
 		}
 
 		c.Status(http.StatusOK)
@@ -9474,6 +9938,48 @@ func getAccountOrderStripeSuccessHandler(c *fiber.Ctx) error {
 											if err = models.UpdateOrder(common.Database, order); err != nil {
 												c.Status(http.StatusInternalServerError)
 												return c.JSON(HTTPError{err.Error()})
+											}
+											// Notifications
+											if common.Config.Notification.Enabled {
+												if common.Config.Notification.Email.Enabled {
+													// to admin
+													//logger.Infof("Time to send admin email")
+													if users, err := models.GetUsersByRoleLessOrEqualsAndNotification(common.Database, models.ROLE_ADMIN, true); err == nil {
+														//logger.Infof("users found: %v", len(users))
+														template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_ADMIN_ORDER_PAID)
+														if err == nil {
+															//logger.Infof("Template: %+v", template)
+															for _, user := range users {
+																logger.Infof("Send email admin user: %+v", user.Email)
+																if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
+																	logger.Errorf("%+v", err)
+																}
+															}
+														}else{
+															logger.Warningf("%+v", err)
+														}
+													}else{
+														logger.Warningf("%+v", err)
+													}
+													// to user
+													//logger.Infof("Time to send user email")
+													template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_USER_ORDER_PAID)
+													if err == nil {
+														//logger.Infof("Template: %+v", template)
+														if user, err := models.GetUser(common.Database, int(order.UserId)); err == nil {
+															if user.EmailConfirmed {
+																logger.Infof("Send email to user: %+v", user.Email)
+																if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
+																	logger.Errorf("%+v", err)
+																}
+															}else{
+																logger.Warningf("User's %v email %v is not confirmed", user.Login, user.Email)
+															}
+														} else {
+															logger.Warningf("%+v", err)
+														}
+													}
+												}
 											}
 											c.Status(http.StatusOK)
 											return c.SendString("OK<script>window.top.postMessage('3DS-authentication-complete:" + c.Query("payment_intent_client_secret") + "');</script>")
@@ -9730,6 +10236,48 @@ func getAccountOrderMollieSuccessHandler(c *fiber.Ctx) error {
 								if err = models.UpdateOrder(common.Database, order); err != nil {
 									c.Status(http.StatusInternalServerError)
 									return c.JSON(HTTPError{err.Error()})
+								}
+								// Notifications
+								if common.Config.Notification.Enabled {
+									if common.Config.Notification.Email.Enabled {
+										// to admin
+										//logger.Infof("Time to send admin email")
+										if users, err := models.GetUsersByRoleLessOrEqualsAndNotification(common.Database, models.ROLE_ADMIN, true); err == nil {
+											//logger.Infof("users found: %v", len(users))
+											template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_ADMIN_ORDER_PAID)
+											if err == nil {
+												//logger.Infof("Template: %+v", template)
+												for _, user := range users {
+													logger.Infof("Send email admin user: %+v", user.Email)
+													if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
+														logger.Errorf("%+v", err)
+													}
+												}
+											}else{
+												logger.Warningf("%+v", err)
+											}
+										}else{
+											logger.Warningf("%+v", err)
+										}
+										// to user
+										//logger.Infof("Time to send user email")
+										template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_USER_ORDER_PAID)
+										if err == nil {
+											//logger.Infof("Template: %+v", template)
+											if user, err := models.GetUser(common.Database, int(order.UserId)); err == nil {
+												if user.EmailConfirmed {
+													logger.Infof("Send email to user: %+v", user.Email)
+													if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
+														logger.Errorf("%+v", err)
+													}
+												}else{
+													logger.Warningf("User's %v email %v is not confirmed", user.Login, user.Email)
+												}
+											} else {
+												logger.Warningf("%+v", err)
+											}
+										}
+									}
 								}
 								c.Status(http.StatusOK)
 								return c.SendString("OK<script>window.close()</script>")
@@ -10025,7 +10573,6 @@ func Calculate(transport *models.Transport, tariff *models.Tariff, items []NewIt
 			}else{
 				fee = itemFixed
 			}
-			logger.Infof("item fee: %+v", fee)
 			// Volume
 			if res := reVolume.FindAllStringSubmatch(variation.Dimensions, 1); len(res) > 0 && len(res[0]) > 1 {
 				var width float64
@@ -10051,10 +10598,6 @@ func Calculate(transport *models.Transport, tariff *models.Tariff, items []NewIt
 			// Calculate
 		}
 	}
-	logger.Infof("kg: %+v", kg)
-	logger.Infof("result.ByVolume: %+v", result.ByVolume)
-	logger.Infof("result.ByWeight: %+v", result.ByWeight)
-	logger.Infof("orderFixed: %+v, orderPercent: %+v, orderIsPercent: %+v", orderFixed, orderPercent, orderIsPercent)
 	// Order fee
 	if orderIsPercent {
 		//result.ByVolume += result.ByVolume * orderPercent / 100.0
@@ -10079,3 +10622,31 @@ func Calculate(transport *models.Transport, tariff *models.Tariff, items []NewIt
 	return result, nil
 }
 
+func SendOrderPaidEmail(to *mail.Email, orderId int, template *models.EmailTemplate) error {
+	vars := &common.NotificationTemplateVariables{ }
+	if order, err := models.GetOrderFull(common.Database, orderId); err == nil {
+		var orderView struct {
+			models.Order
+			Items []struct {
+				ItemShortView
+				Description string
+			}
+		}
+		if bts, err := json.Marshal(order); err == nil {
+			if err = json.Unmarshal(bts, &orderView); err == nil {
+				for i := 0; i < len(orderView.Items); i++ {
+					var itemView ItemShortView
+					if err = json.Unmarshal([]byte(orderView.Items[i].Description), &itemView); err == nil {
+						orderView.Items[i].Variation = itemView.Variation
+						orderView.Items[i].Properties = itemView.Properties
+					}
+				}
+				vars.Order = orderView
+			} else {
+				logger.Infof("%+v", err)
+			}
+		}
+	}
+	//
+	return common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), to, template.Topic, template.Message, vars)
+}

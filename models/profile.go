@@ -15,6 +15,7 @@ type Profile struct {
 	Region string
 	Country string
 	Payment string
+	Transport *Transport `gorm:"foreignKey:TransportId"`
 	TransportId uint
 	//
 	UserId uint
