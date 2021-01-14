@@ -1921,6 +1921,10 @@ func postProductsHandler(c *fiber.Ctx) error {
 			if err != nil {
 				return err
 			}
+			var enabled bool
+			if v, found := data.Value["Enabled"]; found && len(v) > 0 {
+				enabled, _ = strconv.ParseBool(v[0])
+			}
 			var name string
 			if v, found := data.Value["Name"]; found && len(v) > 0 {
 				name = strings.TrimSpace(v[0])
@@ -1948,7 +1952,7 @@ func postProductsHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Content"]; found && len(v) > 0 {
 				content = strings.TrimSpace(v[0])
 			}
-			product := &models.Product{Name: name, Title: title, Description: description, Content: content}
+			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Content: content}
 			if id, err := models.CreateProduct(common.Database, product); err == nil {
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
 					p := path.Join(dir, "storage", "products")
@@ -2066,6 +2070,7 @@ type ProductsListResponse struct {
 
 type ProductsListItem struct {
 	ID uint
+	Enabled bool
 	Name string
 	Title string
 	Thumbnail string
@@ -2176,7 +2181,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Name, products.Title, products.Thumbnail, products.Description, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles, category_id as CategoryId").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, products.Thumbnail, products.Description, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles, category_id as CategoryId").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -2193,7 +2198,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Name, products.Title, products.Thumbnail, products.Description, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles, category_id as CategoryId").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, products.Thumbnail, products.Description, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles, category_id as CategoryId").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -2281,6 +2286,18 @@ func putProductHandler(c *fiber.Ctx) error {
 			if err != nil {
 				return err
 			}
+			var enabled bool
+			if v, found := data.Value["Enabled"]; found && len(v) > 0 {
+				enabled, _ = strconv.ParseBool(v[0])
+			}
+			var name string
+			if v, found := data.Value["Name"]; found && len(v) > 0 {
+				name = strings.TrimSpace(v[0])
+			}
+			if name == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Invalid name"})
+			}
 			var title string
 			if v, found := data.Value["Title"]; found && len(v) > 0 {
 				title = strings.TrimSpace(v[0])
@@ -2297,6 +2314,8 @@ func putProductHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Content"]; found && len(v) > 0 {
 				content = strings.TrimSpace(v[0])
 			}
+			product.Enabled = enabled
+			product.Name = name
 			product.Title = title
 			product.Description = description
 			product.Content = content
@@ -5459,7 +5478,7 @@ func postFilesListHandler(c *fiber.Ctx) error {
 
 type File2View struct {
 	ID uint
-	Created time.Time `json:",omitempty"`
+	CreatedAt time.Time `json:",omitempty"`
 	Type string `json:",omitempty"`
 	Name string `json:",omitempty"`
 	Path string `json:",omitempty"`
@@ -5920,7 +5939,7 @@ func postImagesListHandler(c *fiber.Ctx) error {
 
 type ImageView struct {
 	ID uint
-	Created time.Time `json:",omitempty"`
+	CreatedAt time.Time `json:",omitempty"`
 	Name string `json:",omitempty"`
 	Path string `json:",omitempty"`
 	Url string `json:",omitempty"`
@@ -10375,6 +10394,7 @@ func getParentCategoriesView(connector *gorm.DB, node *CategoryView, pid uint) e
 
 type ProductView struct {
 	ID uint
+	Enabled bool
 	Name string
 	Title string
 	Thumbnail string `json:",omitempty"`

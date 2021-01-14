@@ -6,6 +6,7 @@ import (
 
 type Product struct {
 	gorm.Model
+	Enabled bool
 	Name        string `gorm:"size:255;index:idx_name,unique"`
 	Title       string
 	Description string

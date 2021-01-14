@@ -262,220 +262,283 @@ var renderCmd = &cobra.Command{
 			//
 			logger.Infof("Products found: %v", len(products))
 			for i, product := range products {
-				logger.Infof("[%d] Product ID: %+v Country: %v ZIP: %v", i, product.ID, product.Name, product.Title)
-				product, _ = models.GetProductFull(common.Database, int(product.ID))
-				if categories, err := models.GetCategoriesOfProduct(common.Database, product); err == nil {
-					var canonical string
-					for i, category := range categories {
-						breadcrumbs := &[]*models.Category{}
-						var f3 func(connector *gorm.DB, id uint)
-						f3 = func(connector *gorm.DB, id uint) {
-							if id != 0 {
-								if category, err := models.GetCategory(common.Database, int(id)); err == nil {
-									//*names = append([]string{category.Country}, *names...)
-									if category.Thumbnail == "" {
-										if len(*breadcrumbs) > 0 {
-											category.Thumbnail = (*breadcrumbs)[0].Thumbnail
-										} else if product.Thumbnail != "" {
-											category.Thumbnail = product.Thumbnail
+				if product.Enabled {
+					logger.Infof("[%d] Product ID: %+v Name: %v Title: %v", i, product.ID, product.Name, product.Title)
+					product, _ = models.GetProductFull(common.Database, int(product.ID))
+					if categories, err := models.GetCategoriesOfProduct(common.Database, product); err == nil {
+						var canonical string
+						for i, category := range categories {
+							breadcrumbs := &[]*models.Category{}
+							var f3 func(connector *gorm.DB, id uint)
+							f3 = func(connector *gorm.DB, id uint) {
+								if id != 0 {
+									if category, err := models.GetCategory(common.Database, int(id)); err == nil {
+										//*names = append([]string{category.Country}, *names...)
+										if category.Thumbnail == "" {
+											if len(*breadcrumbs) > 0 {
+												category.Thumbnail = (*breadcrumbs)[0].Thumbnail
+											} else if product.Thumbnail != "" {
+												category.Thumbnail = product.Thumbnail
+											}
 										}
+										*breadcrumbs = append([]*models.Category{category}, *breadcrumbs...)
+										f3(connector, category.ParentId)
 									}
-									*breadcrumbs = append([]*models.Category{category}, *breadcrumbs...)
-									f3(connector, category.ParentId)
 								}
 							}
-						}
-						f3(common.Database, category.ID)
-						*breadcrumbs = append([]*models.Category{{Name: "products", Title: "Products", Model: gorm.Model{UpdatedAt: time.Now()}}}, *breadcrumbs...)
-						var names []string
-						for _, crumb := range *breadcrumbs {
-							names = append(names, crumb.Name)
-						}
-						if i == 0 {
-							canonical = fmt.Sprintf("/%s/", path.Join(strings.Join(names, "/"), product.Name))
-						}
-						if p1 := path.Join(append([]string{output}, names...)...); len(p1) > 0 {
-							if _, err := os.Stat(p1); err != nil {
-								if err = os.MkdirAll(p1, 0755); err == nil {
-									logger.Infof("Create directory %v", p1)
-								} else {
-									logger.Errorf("%v", err)
-									os.Exit(2)
+							f3(common.Database, category.ID)
+							*breadcrumbs = append([]*models.Category{{Name: "products", Title: "Products", Model: gorm.Model{UpdatedAt: time.Now()}}}, *breadcrumbs...)
+							var names []string
+							for _, crumb := range *breadcrumbs {
+								names = append(names, crumb.Name)
+							}
+							if i == 0 {
+								canonical = fmt.Sprintf("/%s/", path.Join(strings.Join(names, "/"), product.Name))
+							}
+							if p1 := path.Join(append([]string{output}, names...)...); len(p1) > 0 {
+								if _, err := os.Stat(p1); err != nil {
+									if err = os.MkdirAll(p1, 0755); err == nil {
+										logger.Infof("Create directory %v", p1)
+									} else {
+										logger.Errorf("%v", err)
+										os.Exit(2)
+									}
 								}
-							}
-							//
-							view := &common.ProductFile{
-								ID: product.ID,
-								Date: time.Now(),
-								Title: product.Title,
-								Type: "products",
-								CategoryId: category.ID,
-							}
-							if i > 0 {
-								view.Canonical = canonical
-							}
-							//
-							//
-							var arr = []string{}
-							for _, category := range *breadcrumbs {
-								arr = append(arr, category.Name)
-								for _, language := range languages {
-									if p2 := path.Join(append(append([]string{output}, arr...), fmt.Sprintf("_index%s.html", language.Suffix))...); len(p2) > 0 {
-										// Update category file
-										if categoryFile, err := common.ReadCategoryFile(p2); err == nil {
-											min := categoryFile.BasePriceMin
-											max := categoryFile.BasePriceMax
-											for _, variation := range product.Variations {
-												// Min Max
-												if min > variation.BasePrice || min == 0 {
-													min = variation.BasePrice
-												}
-												if max < variation.BasePrice {
-													max = variation.BasePrice
-												}
-												// Product parameters
-												for _, parameter := range product.Parameters {
-													if parameter.ID > 0 && parameter.Filtering {
-														var found bool
-														for _, opt := range categoryFile.Options {
-															if opt.ID == parameter.Option.ID {
-																var found2 bool
-																for _, value := range opt.Values {
-																	if value.ID == parameter.Value.ID {
-																		found2 = true
-																		break
+								//
+								view := &common.ProductFile{
+									ID:         product.ID,
+									Date:       time.Now(),
+									Title:      product.Title,
+									Type:       "products",
+									CategoryId: category.ID,
+								}
+								if i > 0 {
+									view.Canonical = canonical
+								}
+								//
+								//
+								var arr = []string{}
+								for _, category := range *breadcrumbs {
+									arr = append(arr, category.Name)
+									for _, language := range languages {
+										if p2 := path.Join(append(append([]string{output}, arr...), fmt.Sprintf("_index%s.html", language.Suffix))...); len(p2) > 0 {
+											// Update category file
+											if categoryFile, err := common.ReadCategoryFile(p2); err == nil {
+												min := categoryFile.BasePriceMin
+												max := categoryFile.BasePriceMax
+												for _, variation := range product.Variations {
+													// Min Max
+													if min > variation.BasePrice || min == 0 {
+														min = variation.BasePrice
+													}
+													if max < variation.BasePrice {
+														max = variation.BasePrice
+													}
+													// Product parameters
+													for _, parameter := range product.Parameters {
+														if parameter.ID > 0 && parameter.Filtering {
+															var found bool
+															for _, opt := range categoryFile.Options {
+																if opt.ID == parameter.Option.ID {
+																	var found2 bool
+																	for _, value := range opt.Values {
+																		if value.ID == parameter.Value.ID {
+																			found2 = true
+																			break
+																		}
 																	}
-																}
-																if !found2 {
-																	//
-																	var thumbnail string
-																	if parameter.Value.Thumbnail != "" {
-																		if p1 := path.Join(dir, parameter.Value.Thumbnail); len(p1) > 0 {
-																			if fi, err := os.Stat(p1); err == nil {
-																				filename := filepath.Base(p1)
-																				filename = fmt.Sprintf("%v-%d%v", filename[:len(filename) - len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																				p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
-																				thumbnail = "/" + path.Join("images", "values", filename)
-																				if _, err = os.Stat(p2); err != nil {
-																					logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																					if err = common.Copy(p1, p2); err != nil {
-																						logger.Warningf("%v", err)
-																					}
-																				}
-																				if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
-																					p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
+																	if !found2 {
+																		//
+																		var thumbnail string
+																		if parameter.Value.Thumbnail != "" {
+																			if p1 := path.Join(dir, parameter.Value.Thumbnail); len(p1) > 0 {
+																				if fi, err := os.Stat(p1); err == nil {
+																					filename := filepath.Base(p1)
+																					filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+																					p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
+																					thumbnail = "/" + path.Join("images", "values", filename)
 																					if _, err = os.Stat(p2); err != nil {
 																						logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
 																						if err = common.Copy(p1, p2); err != nil {
 																							logger.Warningf("%v", err)
 																						}
 																					}
-																					if images, err := imageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
-																						thumbnails := []string{fmt.Sprintf("/images/values/resize/%s", filename)}
-																						for _, image := range images {
-																							thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
+																					if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
+																						p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
+																						if _, err = os.Stat(p2); err != nil {
+																							logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+																							if err = common.Copy(p1, p2); err != nil {
+																								logger.Warningf("%v", err)
+																							}
 																						}
-																						thumbnail = strings.Join(thumbnails, ",")
-																					} else {
-																						logger.Warningf("%v", err)
+																						if images, err := imageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
+																							thumbnails := []string{fmt.Sprintf("/images/values/resize/%s", filename)}
+																							for _, image := range images {
+																								thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
+																							}
+																							thumbnail = strings.Join(thumbnails, ",")
+																						} else {
+																							logger.Warningf("%v", err)
+																						}
 																					}
 																				}
 																			}
 																		}
+																		//
+																		categoryFile.Options[i].Values = append(categoryFile.Options[i].Values, &common.ValueCF{
+																			ID:        parameter.Value.ID,
+																			Thumbnail: thumbnail,
+																			Title:     parameter.Value.Title,
+																			Value:     parameter.Value.Value,
+																		})
+																		//
 																	}
-																	//
-																	categoryFile.Options[i].Values = append(categoryFile.Options[i].Values, &common.ValueCF{
-																		ID:        parameter.Value.ID,
-																		Thumbnail: thumbnail,
-																		Title:     parameter.Value.Title,
-																		Value:     parameter.Value.Value,
-																	})
-																	//
+																	found = true
+																	break
 																}
-																found = true
-																break
 															}
-														}
-														if !found {
-															opt := &common.OptionCF{
-																ID:    parameter.Option.ID,
-																Type:  "Product",
-																Name:  parameter.Option.Name,
-																Title: parameter.Option.Title,
-															}
-															var thumbnail string
-															if parameter.Value.Thumbnail != "" {
-																if p1 := path.Join(dir, parameter.Value.Thumbnail); len(p1) > 0 {
-																	if fi, err := os.Stat(p1); err == nil {
-																		filename := filepath.Base(p1)
-																		filename = fmt.Sprintf("%v-%d%v", filename[:len(filename) - len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																		p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
-																		thumbnail = "/" + path.Join("images", "values", filename)
-																		if _, err = os.Stat(p2); err != nil {
-																			logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																			if err = common.Copy(p1, p2); err != nil {
-																				logger.Warningf("%v", err)
-																			}
-																		}
-																		if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
-																			p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
+															if !found {
+																opt := &common.OptionCF{
+																	ID:    parameter.Option.ID,
+																	Type:  "Product",
+																	Name:  parameter.Option.Name,
+																	Title: parameter.Option.Title,
+																}
+																var thumbnail string
+																if parameter.Value.Thumbnail != "" {
+																	if p1 := path.Join(dir, parameter.Value.Thumbnail); len(p1) > 0 {
+																		if fi, err := os.Stat(p1); err == nil {
+																			filename := filepath.Base(p1)
+																			filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+																			p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
+																			thumbnail = "/" + path.Join("images", "values", filename)
 																			if _, err = os.Stat(p2); err != nil {
 																				logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
 																				if err = common.Copy(p1, p2); err != nil {
 																					logger.Warningf("%v", err)
 																				}
 																			}
-																			if images, err := imageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
-																				thumbnails := []string{fmt.Sprintf("/images/values/resize/%s", filename)}
-																				for _, image := range images {
-																					//thumbnail = "/" + path.Join("images", "values", "resize", filename)
-																					//thumbnail = fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size)
-																					thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
-																					//break
+																			if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
+																				p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
+																				if _, err = os.Stat(p2); err != nil {
+																					logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+																					if err = common.Copy(p1, p2); err != nil {
+																						logger.Warningf("%v", err)
+																					}
 																				}
-																				thumbnail = strings.Join(thumbnails, ",")
-																			} else {
-																				logger.Warningf("%v", err)
+																				if images, err := imageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
+																					thumbnails := []string{fmt.Sprintf("/images/values/resize/%s", filename)}
+																					for _, image := range images {
+																						//thumbnail = "/" + path.Join("images", "values", "resize", filename)
+																						//thumbnail = fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size)
+																						thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
+																						//break
+																					}
+																					thumbnail = strings.Join(thumbnails, ",")
+																				} else {
+																					logger.Warningf("%v", err)
+																				}
 																			}
 																		}
 																	}
 																}
+																//
+																opt.Values = append(opt.Values, &common.ValueCF{
+																	ID:        parameter.Value.ID,
+																	Thumbnail: thumbnail,
+																	Title:     parameter.Value.Title,
+																	Value:     parameter.Value.Value,
+																})
+																//
+																categoryFile.Options = append(categoryFile.Options, opt)
 															}
-															//
-															opt.Values = append(opt.Values, &common.ValueCF{
-																ID:        parameter.Value.ID,
-																Thumbnail: thumbnail,
-																Title:     parameter.Value.Title,
-																Value:     parameter.Value.Value,
-															})
-															//
-															categoryFile.Options = append(categoryFile.Options, opt)
 														}
 													}
-												}
-												// Variation properties
-												for _, property := range variation.Properties {
-													if property.Filtering {
-														var found bool
-														for i, opt := range categoryFile.Options {
-															if opt.ID == property.Option.ID {
-																//logger.Infof("TEST001 property ID: %v, Country: %v FOUND", property.ID, property.Country)
-																for _, price := range property.Prices {
-																	var found bool
-																	for _, value := range opt.Values {
-																		if value.ID == price.Value.ID {
-																			found = true
-																			break
+													// Variation properties
+													for _, property := range variation.Properties {
+														if property.Filtering {
+															var found bool
+															for i, opt := range categoryFile.Options {
+																if opt.ID == property.Option.ID {
+																	//logger.Infof("TEST001 property ID: %v, Country: %v FOUND", property.ID, property.Country)
+																	for _, price := range property.Prices {
+																		var found bool
+																		for _, value := range opt.Values {
+																			if value.ID == price.Value.ID {
+																				found = true
+																				break
+																			}
+																		}
+																		if !found {
+																			//
+																			var thumbnail string
+																			if price.Value.Thumbnail != "" {
+																				if p1 := path.Join(dir, price.Value.Thumbnail); len(p1) > 0 {
+																					if fi, err := os.Stat(p1); err == nil {
+																						filename := filepath.Base(p1)
+																						filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+																						p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
+																						thumbnail = "/" + path.Join("images", "values", filename)
+																						if _, err = os.Stat(p2); err != nil {
+																							logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+																							if err = common.Copy(p1, p2); err != nil {
+																								logger.Warningf("%v", err)
+																							}
+																						}
+																						if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
+																							p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
+																							if _, err = os.Stat(p2); err != nil {
+																								logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+																								if err = common.Copy(p1, p2); err != nil {
+																									logger.Warningf("%v", err)
+																								}
+																							}
+																							if images, err := imageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
+																								thumbnails := []string{fmt.Sprintf("/images/values/resize/%s", filename)}
+																								for _, image := range images {
+																									//thumbnail = "/" + path.Join("images", "values", "resize", filename)
+																									//thumbnail = fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size)
+																									thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
+																									//break
+																								}
+																								thumbnail = strings.Join(thumbnails, ",")
+																							} else {
+																								logger.Warningf("%v", err)
+																							}
+																						}
+																					}
+																				}
+																			}
+																			//
+																			categoryFile.Options[i].Values = append(categoryFile.Options[i].Values, &common.ValueCF{
+																				ID:        price.Value.ID,
+																				Thumbnail: thumbnail,
+																				Title:     price.Value.Title,
+																				Value:     price.Value.Value,
+																			})
+																			//
 																		}
 																	}
-																	if !found {
+																	found = true
+																}
+															}
+															if !found {
+																//logger.Infof("TEST001 property ID: %v, Country: %v NOT FOUND (%v)", property.ID, property.Country, len(categoryFile.Options))
+																opt := &common.OptionCF{
+																	ID:    property.Option.ID,
+																	Type:  "Variation",
+																	Name:  property.Option.Name,
+																	Title: property.Option.Title,
+																}
+																for _, price := range property.Prices {
+																	if price.Enabled {
 																		//
 																		var thumbnail string
 																		if price.Value.Thumbnail != "" {
 																			if p1 := path.Join(dir, price.Value.Thumbnail); len(p1) > 0 {
 																				if fi, err := os.Stat(p1); err == nil {
 																					filename := filepath.Base(p1)
-																					filename = fmt.Sprintf("%v-%d%v", filename[:len(filename) - len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+																					filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
 																					p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
 																					thumbnail = "/" + path.Join("images", "values", filename)
 																					if _, err = os.Stat(p2); err != nil {
@@ -509,377 +572,316 @@ var renderCmd = &cobra.Command{
 																			}
 																		}
 																		//
-																		categoryFile.Options[i].Values = append(categoryFile.Options[i].Values, &common.ValueCF{
+																		opt.Values = append(opt.Values, &common.ValueCF{
 																			ID:        price.Value.ID,
 																			Thumbnail: thumbnail,
 																			Title:     price.Value.Title,
 																			Value:     price.Value.Value,
 																		})
-																		//
 																	}
 																}
-																found = true
+																//logger.Infof("TEST001 property ID: %v, Country: %v ADD %+v", property.ID, property.Country, opt)
+																categoryFile.Options = append(categoryFile.Options, opt)
 															}
-														}
-														if !found {
-															//logger.Infof("TEST001 property ID: %v, Country: %v NOT FOUND (%v)", property.ID, property.Country, len(categoryFile.Options))
-															opt := &common.OptionCF{
-																ID:    property.Option.ID,
-																Type:      "Variation",
-																Name:  property.Option.Name,
-																Title: property.Option.Title,
-															}
-															for _, price := range property.Prices {
-																if price.Enabled {
-																	//
-																	var thumbnail string
-																	if price.Value.Thumbnail != "" {
-																		if p1 := path.Join(dir, price.Value.Thumbnail); len(p1) > 0 {
-																			if fi, err := os.Stat(p1); err == nil {
-																				filename := filepath.Base(p1)
-																				filename = fmt.Sprintf("%v-%d%v", filename[:len(filename) - len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																				p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
-																				thumbnail = "/" + path.Join("images", "values", filename)
-																				if _, err = os.Stat(p2); err != nil {
-																					logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																					if err = common.Copy(p1, p2); err != nil {
-																						logger.Warningf("%v", err)
-																					}
-																				}
-																				if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
-																					p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
-																					if _, err = os.Stat(p2); err != nil {
-																						logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																						if err = common.Copy(p1, p2); err != nil {
-																							logger.Warningf("%v", err)
-																						}
-																					}
-																					if images, err := imageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
-																						thumbnails := []string{fmt.Sprintf("/images/values/resize/%s", filename)}
-																						for _, image := range images {
-																							//thumbnail = "/" + path.Join("images", "values", "resize", filename)
-																							//thumbnail = fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size)
-																							thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
-																							//break
-																						}
-																						thumbnail = strings.Join(thumbnails, ",")
-																					} else {
-																						logger.Warningf("%v", err)
-																					}
-																				}
-																			}
-																		}
-																	}
-																	//
-																	opt.Values = append(opt.Values, &common.ValueCF{
-																		ID:        price.Value.ID,
-																		Thumbnail: thumbnail,
-																		Title:     price.Value.Title,
-																		Value:     price.Value.Value,
-																	})
-																}
-															}
-															//logger.Infof("TEST001 property ID: %v, Country: %v ADD %+v", property.ID, property.Country, opt)
-															categoryFile.Options = append(categoryFile.Options, opt)
 														}
 													}
 												}
-											}
-											categoryFile.BasePriceMin = min
-											categoryFile.BasePriceMax = max
-											// Sort to put Product options above Variation options
-											sort.Slice(categoryFile.Options, func(i, j int) bool {
-												if categoryFile.Options[i].Type == categoryFile.Options[j].Type {
-													return categoryFile.Options[i].Title < categoryFile.Options[j].Title
-												}else{
-													return categoryFile.Options[i].Type < categoryFile.Options[j].Type
-												}
-											})
-											if err = common.WriteCategoryFile(p2, categoryFile); err != nil {
-												logger.Warningf("%v", err)
-											}
-										}
-										//
-									}
-								}
-								view.Categories = append(view.Categories, category.Title)
-							}
-							productView := common.ProductPF{
-								Id: product.ID,
-								CategoryId: category.ID,
-								Name: product.Name,
-								Title: product.Title,
-							}
-							// Process thumbnail
-							var thumbnails []string
-							if product.Thumbnail != "" {
-								p0 := path.Join(p1, product.Name)
-								if p1 := path.Join(dir, product.Thumbnail); len(p1) > 0 {
-									if fi, err := os.Stat(p1); err == nil {
-										filename := fmt.Sprintf("thumbnail-%d%v", fi.ModTime().Unix(), path.Ext(p1))
-										p2 := path.Join(p0, filename)
-										logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-										if _, err := os.Stat(path.Dir(p2)); err != nil {
-											if err = os.MkdirAll(path.Dir(p2), 0755); err != nil {
-												logger.Warningf("%v", err)
-											}
-										}
-										if err = common.Copy(p1, p2); err == nil {
-											thumbnails = append(thumbnails, fmt.Sprintf("/%s/%s", strings.Join(append(names, product.Name), "/"), filename))
-											if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
-												if images, err := imageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
-													for _, image := range images {
-														thumbnails = append(thumbnails, fmt.Sprintf("/%s/resize/%s %s", strings.Join(append(names, product.Name), "/"), image.Filename, image.Size))
+												categoryFile.BasePriceMin = min
+												categoryFile.BasePriceMax = max
+												// Sort to put Product options above Variation options
+												sort.Slice(categoryFile.Options, func(i, j int) bool {
+													if categoryFile.Options[i].Type == categoryFile.Options[j].Type {
+														return categoryFile.Options[i].Title < categoryFile.Options[j].Title
+													} else {
+														return categoryFile.Options[i].Type < categoryFile.Options[j].Type
 													}
-												} else {
+												})
+												if err = common.WriteCategoryFile(p2, categoryFile); err != nil {
 													logger.Warningf("%v", err)
 												}
 											}
-											view.Thumbnail = strings.Join(thumbnails, ",")
-											productView.Thumbnail = strings.Join(thumbnails, ",")
-										} else {
-											logger.Warningf("%v", err)
+											//
 										}
 									}
+									view.Categories = append(view.Categories, category.Title)
 								}
-							}
-							// Copy images
-							var images []string
-							if len(product.Images) > 0 {
-								for i, image := range product.Images {
-									if image.Path != "" {
-										p0 := path.Join(p1, product.Name)
-										if _, err = os.Stat(p0); err != nil {
-											if err = os.MkdirAll(p0, 0755); err != nil {
-												logger.Warningf("%v", err)
-											}
-										}
-										if p1 := path.Join(dir, image.Path); len(p1) > 0 {
-											if fi, err := os.Stat(p1); err == nil {
-												filename := fmt.Sprintf("image-%d-%d%v", i + 1, fi.ModTime().Unix(), path.Ext(p1))
-												p2 := path.Join(p0, filename)
-												logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-												if _, err := os.Stat(path.Dir(p2)); err != nil {
-													if err = os.MkdirAll(path.Dir(p2), 0755); err != nil {
-														logger.Warningf("%v", err)
-													}
-												}
-												if err = common.Copy(p1, p2); err == nil {
-													images2 := []string{fmt.Sprintf("/%s/%s", strings.Join(append(names, product.Name), "/"), filename)}
-													if common.Config.Resize.Enabled && common.Config.Resize.Image.Enabled {
-														if images, err := imageResize(p2, common.Config.Resize.Image.Size); err == nil {
-															for _, image := range images{
-																images2 = append(images2, fmt.Sprintf("/%s/%s %s", strings.Join(append(names, product.Name, "resize"), "/"), image.Filename, image.Size))
-															}
-														} else {
-															logger.Warningf("%v", err)
-														}
-													}
-													images = append(images, strings.Join(images2, ","))
-												} else {
+								productView := common.ProductPF{
+									Id:         product.ID,
+									CategoryId: category.ID,
+									Name:       product.Name,
+									Title:      product.Title,
+								}
+								// Process thumbnail
+								var thumbnails []string
+								if product.Thumbnail != "" {
+									p0 := path.Join(p1, product.Name)
+									if p1 := path.Join(dir, product.Thumbnail); len(p1) > 0 {
+										if fi, err := os.Stat(p1); err == nil {
+											filename := fmt.Sprintf("thumbnail-%d%v", fi.ModTime().Unix(), path.Ext(p1))
+											p2 := path.Join(p0, filename)
+											logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+											if _, err := os.Stat(path.Dir(p2)); err != nil {
+												if err = os.MkdirAll(path.Dir(p2), 0755); err != nil {
 													logger.Warningf("%v", err)
 												}
 											}
-										}
-									}
-								}
-								productView.Images = images
-							}
-
-							if len(product.Parameters) > 0 {
-								for _, parameter := range product.Parameters {
-									parameterView := common.ParameterPF{
-										Id:        parameter.ID,
-										Name:      parameter.Name,
-										Title:     parameter.Title,
-									}
-									if parameter.Value != nil {
-										parameterView.Value = common.ValuePPF{
-											Id:        parameter.Value.ID,
-											Title:     parameter.Value.Title,
-											//Thumbnail: "",
-											Value:     parameter.Value.Value,
-										}
-									}else{
-										parameterView.CustomValue = parameter.CustomValue
-									}
-									productView.Parameters = append(productView.Parameters, parameterView)
-								}
-							}
-							if p := path.Join(p1, product.Name); p != "" {
-								if _, err := os.Stat(p); err != nil {
-									if err = os.MkdirAll(p, 0755); err != nil {
-										logger.Warningf("%v", err)
-									}
-								}
-							}
-							var basePriceMin float64
-							var variations []string
-							if len(product.Variations) > 0 {
-								view.BasePrice = fmt.Sprintf("%.2f", product.Variations[0].BasePrice)
-								for i, variation := range product.Variations {
-									variationView := common.VariationPF{
-										Id:          variation.ID,
-										Name:        variation.Name,
-										Title:       variation.Title,
-										//Thumbnail:   variation.Thumbnail,
-										Description: variation.Description,
-										BasePrice:   variation.BasePrice,
-										Selected:    i == 0,
-									}
-									if basePriceMin > variation.BasePrice || basePriceMin == 0 {
-										basePriceMin = variation.BasePrice
-									}
-									// Thumbnail
-									if variation.Thumbnail != "" {
-										if p1 := path.Join(dir, variation.Thumbnail); len(p1) > 0 {
-											if fi, err := os.Stat(p1); err == nil {
-												filename := filepath.Base(p1)
-												filename = fmt.Sprintf("%v-%d%v", filename[:len(filename) - len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-												p2 := path.Join(dir, "hugo", "static", "images", "variations", filename)
-												//
-												if _, err = os.Stat(path.Dir(p2)); err != nil {
-													if err = os.MkdirAll(path.Dir(p2), 0755); err != nil {
+											if err = common.Copy(p1, p2); err == nil {
+												thumbnails = append(thumbnails, fmt.Sprintf("/%s/%s", strings.Join(append(names, product.Name), "/"), filename))
+												if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
+													if images, err := imageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
+														for _, image := range images {
+															thumbnails = append(thumbnails, fmt.Sprintf("/%s/resize/%s %s", strings.Join(append(names, product.Name), "/"), image.Filename, image.Size))
+														}
+													} else {
 														logger.Warningf("%v", err)
 													}
 												}
-												//
-												logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-												if err = common.Copy(p1, p2); err == nil {
-													thumbnails := []string{fmt.Sprintf("/images/variations/%s", filename)}
-													if common.Config.Resize.Enabled && common.Config.Resize.Image.Enabled {
-														if images, err := imageResize(p2, common.Config.Resize.Image.Size); err == nil {
-															for _, image := range images{
-																thumbnails = append(thumbnails, fmt.Sprintf("/images/variations/resize/%s %s", image.Filename, image.Size))
-															}
-														} else {
-															logger.Warningf("%v", err)
-														}
-													}
-													variationView.Thumbnail = strings.Join(thumbnails, ",")
-												}
+												view.Thumbnail = strings.Join(thumbnails, ",")
+												productView.Thumbnail = strings.Join(thumbnails, ",")
+											} else {
+												logger.Warningf("%v", err)
 											}
 										}
 									}
-									variations = append(variations, strings.Join([]string{fmt.Sprintf("%d", variation.ID), variation.Title}, ","))
-									for _, property := range variation.Properties {
-										propertyView := common.PropertyPF{
-											Id: property.ID,
-											Type: property.Type,
-											Name:        property.Name,
-											Title:       property.Title,
-										}
-										for h, price := range property.Prices {
-											valueView := common.ValuePF{
-												Id:        price.Value.ID,
-												Enabled:   price.Enabled,
-												Title:     price.Value.Title,
-												//Thumbnail: price.Value.Thumbnail,
-												Value:     price.Value.Value,
-												Price: common.PricePF{
-													Id:    price.ID,
-													Price:     price.Price,
-												},
-												Selected: h == 0,
+								}
+								// Copy images
+								var images []string
+								if len(product.Images) > 0 {
+									for i, image := range product.Images {
+										if image.Path != "" {
+											p0 := path.Join(p1, product.Name)
+											if _, err = os.Stat(p0); err != nil {
+												if err = os.MkdirAll(p0, 0755); err != nil {
+													logger.Warningf("%v", err)
+												}
 											}
-											// Thumbnail
-											if price.Value.Thumbnail != "" {
-												if p1 := path.Join(dir, price.Value.Thumbnail); len(p1) > 0 {
-													if fi, err := os.Stat(p1); err == nil {
-														filename := filepath.Base(p1)
-														filename = fmt.Sprintf("%v-%d%v", filename[:len(filename) - len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-														thumbnails := []string{fmt.Sprintf("/images/values/%s", filename)}
+											if p1 := path.Join(dir, image.Path); len(p1) > 0 {
+												if fi, err := os.Stat(p1); err == nil {
+													filename := fmt.Sprintf("image-%d-%d%v", i+1, fi.ModTime().Unix(), path.Ext(p1))
+													p2 := path.Join(p0, filename)
+													logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+													if _, err := os.Stat(path.Dir(p2)); err != nil {
+														if err = os.MkdirAll(path.Dir(p2), 0755); err != nil {
+															logger.Warningf("%v", err)
+														}
+													}
+													if err = common.Copy(p1, p2); err == nil {
+														images2 := []string{fmt.Sprintf("/%s/%s", strings.Join(append(names, product.Name), "/"), filename)}
 														if common.Config.Resize.Enabled && common.Config.Resize.Image.Enabled {
-															p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
-															if _, err = os.Stat(p2); err != nil {
-																logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																if err = common.Copy(p1, p2); err != nil {
-																	logger.Warningf("%v", err)
-																}
-															}
 															if images, err := imageResize(p2, common.Config.Resize.Image.Size); err == nil {
-																for _, image := range images{
-																	thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
+																for _, image := range images {
+																	images2 = append(images2, fmt.Sprintf("/%s/%s %s", strings.Join(append(names, product.Name, "resize"), "/"), image.Filename, image.Size))
 																}
 															} else {
 																logger.Warningf("%v", err)
 															}
 														}
-														valueView.Thumbnail = strings.Join(thumbnails, ",")
-														//
-														if !models.HasCacheVariationByValueId(common.Database, price.Value.ID) {
-															// Cache
-															if _, err = models.CreateCacheValue(common.Database, &models.CacheValue{
-																ValueID:     price.Value.ID,
-																Title:       price.Value.Title,
-																Thumbnail:   valueView.Thumbnail,
-																Value:       price.Value.Value,
-															}); err != nil {
+														images = append(images, strings.Join(images2, ","))
+													} else {
+														logger.Warningf("%v", err)
+													}
+												}
+											}
+										}
+									}
+									productView.Images = images
+								}
+
+								if len(product.Parameters) > 0 {
+									for _, parameter := range product.Parameters {
+										parameterView := common.ParameterPF{
+											Id:    parameter.ID,
+											Name:  parameter.Name,
+											Title: parameter.Title,
+										}
+										if parameter.Value != nil {
+											parameterView.Value = common.ValuePPF{
+												Id:    parameter.Value.ID,
+												Title: parameter.Value.Title,
+												//Thumbnail: "",
+												Value: parameter.Value.Value,
+											}
+										} else {
+											parameterView.CustomValue = parameter.CustomValue
+										}
+										productView.Parameters = append(productView.Parameters, parameterView)
+									}
+								}
+								if p := path.Join(p1, product.Name); p != "" {
+									if _, err := os.Stat(p); err != nil {
+										if err = os.MkdirAll(p, 0755); err != nil {
+											logger.Warningf("%v", err)
+										}
+									}
+								}
+								var basePriceMin float64
+								var variations []string
+								if len(product.Variations) > 0 {
+									view.BasePrice = fmt.Sprintf("%.2f", product.Variations[0].BasePrice)
+									for i, variation := range product.Variations {
+										variationView := common.VariationPF{
+											Id:    variation.ID,
+											Name:  variation.Name,
+											Title: variation.Title,
+											//Thumbnail:   variation.Thumbnail,
+											Description: variation.Description,
+											BasePrice:   variation.BasePrice,
+											Selected:    i == 0,
+										}
+										if basePriceMin > variation.BasePrice || basePriceMin == 0 {
+											basePriceMin = variation.BasePrice
+										}
+										// Thumbnail
+										if variation.Thumbnail != "" {
+											if p1 := path.Join(dir, variation.Thumbnail); len(p1) > 0 {
+												if fi, err := os.Stat(p1); err == nil {
+													filename := filepath.Base(p1)
+													filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+													p2 := path.Join(dir, "hugo", "static", "images", "variations", filename)
+													//
+													if _, err = os.Stat(path.Dir(p2)); err != nil {
+														if err = os.MkdirAll(path.Dir(p2), 0755); err != nil {
+															logger.Warningf("%v", err)
+														}
+													}
+													//
+													logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+													if err = common.Copy(p1, p2); err == nil {
+														thumbnails := []string{fmt.Sprintf("/images/variations/%s", filename)}
+														if common.Config.Resize.Enabled && common.Config.Resize.Image.Enabled {
+															if images, err := imageResize(p2, common.Config.Resize.Image.Size); err == nil {
+																for _, image := range images {
+																	thumbnails = append(thumbnails, fmt.Sprintf("/images/variations/resize/%s %s", image.Filename, image.Size))
+																}
+															} else {
 																logger.Warningf("%v", err)
 															}
-															if key := fmt.Sprintf("%v", price.Value.ID); key != "" {
-																if !VALUES.Has(key) {
-																	VALUES.Set(key, valueView.Thumbnail)
+														}
+														variationView.Thumbnail = strings.Join(thumbnails, ",")
+													}
+												}
+											}
+										}
+										variations = append(variations, strings.Join([]string{fmt.Sprintf("%d", variation.ID), variation.Title}, ","))
+										for _, property := range variation.Properties {
+											propertyView := common.PropertyPF{
+												Id:    property.ID,
+												Type:  property.Type,
+												Name:  property.Name,
+												Title: property.Title,
+											}
+											for h, price := range property.Prices {
+												valueView := common.ValuePF{
+													Id:      price.Value.ID,
+													Enabled: price.Enabled,
+													Title:   price.Value.Title,
+													//Thumbnail: price.Value.Thumbnail,
+													Value: price.Value.Value,
+													Price: common.PricePF{
+														Id:    price.ID,
+														Price: price.Price,
+													},
+													Selected: h == 0,
+												}
+												// Thumbnail
+												if price.Value.Thumbnail != "" {
+													if p1 := path.Join(dir, price.Value.Thumbnail); len(p1) > 0 {
+														if fi, err := os.Stat(p1); err == nil {
+															filename := filepath.Base(p1)
+															filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+															thumbnails := []string{fmt.Sprintf("/images/values/%s", filename)}
+															if common.Config.Resize.Enabled && common.Config.Resize.Image.Enabled {
+																p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
+																if _, err = os.Stat(p2); err != nil {
+																	logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+																	if err = common.Copy(p1, p2); err != nil {
+																		logger.Warningf("%v", err)
+																	}
+																}
+																if images, err := imageResize(p2, common.Config.Resize.Image.Size); err == nil {
+																	for _, image := range images {
+																		thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
+																	}
+																} else {
+																	logger.Warningf("%v", err)
+																}
+															}
+															valueView.Thumbnail = strings.Join(thumbnails, ",")
+															//
+															if !models.HasCacheVariationByValueId(common.Database, price.Value.ID) {
+																// Cache
+																if _, err = models.CreateCacheValue(common.Database, &models.CacheValue{
+																	ValueID:   price.Value.ID,
+																	Title:     price.Value.Title,
+																	Thumbnail: valueView.Thumbnail,
+																	Value:     price.Value.Value,
+																}); err != nil {
+																	logger.Warningf("%v", err)
+																}
+																if key := fmt.Sprintf("%v", price.Value.ID); key != "" {
+																	if !VALUES.Has(key) {
+																		VALUES.Set(key, valueView.Thumbnail)
+																	}
 																}
 															}
 														}
 													}
 												}
+												propertyView.Values = append(propertyView.Values, valueView)
 											}
-											propertyView.Values = append(propertyView.Values, valueView)
+											variationView.Properties = append(variationView.Properties, propertyView)
 										}
-										variationView.Properties = append(variationView.Properties, propertyView)
-									}
-									productView.Variations = append(productView.Variations, variationView)
-									//variations = append(variations, strings.Join([]string{fmt.Sprintf("%d", variation.ID), variationView.Thumbnail}, ","))
-									// Cache
-									if _, err = models.CreateCacheVariation(common.Database, &models.CacheVariation{
-										VariationID:   variation.ID,
-										Name:        variation.Name,
-										Title:       variation.Title,
-										Description: variation.Description,
-										Thumbnail:   variationView.Thumbnail,
-										BasePrice:   variation.BasePrice,
-									}); err != nil {
-										logger.Warningf("%v", err)
-									}
-								}
-							}
-							productView.Path = "/" + path.Join(append(names, product.Name)...) + "/"
-							view.Product = productView
-							for _, tag := range product.Tags {
-								if tag.Enabled {
-									view.Tags = append(view.Tags, tag.Name)
-								}
-							}
-							view.Content = product.Content
-							//
-							for _, language := range languages {
-								file := path.Join(p1, product.Name, fmt.Sprintf("index%s.html", language.Suffix))
-								if _, err := os.Stat(path.Dir(file)); err != nil {
-									if err = os.MkdirAll(path.Dir(file), 0755); err != nil {
-										logger.Error("%v", err)
-										return
+										productView.Variations = append(productView.Variations, variationView)
+										//variations = append(variations, strings.Join([]string{fmt.Sprintf("%d", variation.ID), variationView.Thumbnail}, ","))
+										// Cache
+										if _, err = models.CreateCacheVariation(common.Database, &models.CacheVariation{
+											VariationID: variation.ID,
+											Name:        variation.Name,
+											Title:       variation.Title,
+											Description: variation.Description,
+											Thumbnail:   variationView.Thumbnail,
+											BasePrice:   variation.BasePrice,
+										}); err != nil {
+											logger.Warningf("%v", err)
+										}
 									}
 								}
-								if err = common.WriteProductFile(file, view); err != nil {
-									logger.Errorf("%v", err)
+								productView.Path = "/" + path.Join(append(names, product.Name)...) + "/"
+								view.Product = productView
+								for _, tag := range product.Tags {
+									if tag.Enabled {
+										view.Tags = append(view.Tags, tag.Name)
+									}
 								}
-							}
-							// Cache
-							if _, err = models.CreateCacheProduct(common.Database, &models.CacheProduct{
-								ProductID:   product.ID,
-								Path:        fmt.Sprintf("/%s/", strings.Join(names, "/")),
-								Name:        product.Name,
-								Title:       product.Title,
-								Description: product.Description,
-								Thumbnail:   strings.Join(thumbnails, ","),
-								Images:      strings.Join(images, ";"),
-								Variations:  strings.Join(variations, ";"),
-								CategoryID:  category.ID,
-								BasePrice:   basePriceMin,
-							}); err != nil {
-								logger.Warningf("%v", err)
+								view.Content = product.Content
+								//
+								for _, language := range languages {
+									file := path.Join(p1, product.Name, fmt.Sprintf("index%s.html", language.Suffix))
+									if _, err := os.Stat(path.Dir(file)); err != nil {
+										if err = os.MkdirAll(path.Dir(file), 0755); err != nil {
+											logger.Error("%v", err)
+											return
+										}
+									}
+									if err = common.WriteProductFile(file, view); err != nil {
+										logger.Errorf("%v", err)
+									}
+								}
+								// Cache
+								if _, err = models.CreateCacheProduct(common.Database, &models.CacheProduct{
+									ProductID:   product.ID,
+									Path:        fmt.Sprintf("/%s/", strings.Join(names, "/")),
+									Name:        product.Name,
+									Title:       product.Title,
+									Description: product.Description,
+									Thumbnail:   strings.Join(thumbnails, ","),
+									Images:      strings.Join(images, ";"),
+									Variations:  strings.Join(variations, ";"),
+									CategoryID:  category.ID,
+									BasePrice:   basePriceMin,
+								}); err != nil {
+									logger.Warningf("%v", err)
+								}
 							}
 						}
 					}
