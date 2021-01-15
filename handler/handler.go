@@ -1929,21 +1929,21 @@ func postProductsHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Name"]; found && len(v) > 0 {
 				name = strings.TrimSpace(v[0])
 			}
-			if name == "" {
+			/*if name == "" {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Invalid name"})
 			}
 			if _, err := models.GetProductByName(common.Database, name); err == nil {
 				return c.JSON(HTTPError{"Name is already in use"})
-			}
+			}*/
 			var title string
 			if v, found := data.Value["Title"]; found && len(v) > 0 {
 				title = strings.TrimSpace(v[0])
 			}
-			if title == "" {
+			/*if title == "" {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Invalid title"})
-			}
+			}*/
 			var description string
 			if v, found := data.Value["Description"]; found && len(v) > 0 {
 				description = strings.TrimSpace(v[0])
@@ -1954,6 +1954,15 @@ func postProductsHandler(c *fiber.Ctx) error {
 			}
 			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Content: content}
 			if id, err := models.CreateProduct(common.Database, product); err == nil {
+				// Create new product automatically
+				if name == "" {
+					product.Name = fmt.Sprintf("new-product-%d", product.ID)
+					product.Title = fmt.Sprintf("New Product %d", product.ID)
+					if err = models.UpdateProduct(common.Database, product); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+				}
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
 					p := path.Join(dir, "storage", "products")
 					if _, err := os.Stat(p); err != nil {
@@ -2352,7 +2361,7 @@ func putProductHandler(c *fiber.Ctx) error {
 					}
 				}
 			}
-
+			logger.Infof("product.Description: %+v", product.Description)
 			if err = models.UpdateProduct(common.Database, product); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
@@ -8864,6 +8873,8 @@ func postFilterHandler(c *fiber.Ctx) error {
 	// Filter
 	var keys1 []string
 	var values1 []interface{}
+	var keys2 []string
+	var values2 []interface{}
 	if len(request.Filter) > 0 {
 		for key, value := range request.Filter {
 			if key != "" && len(strings.TrimSpace(value)) > 0 {
@@ -8901,8 +8912,8 @@ func postFilterHandler(c *fiber.Ctx) error {
 										values3 = append(values3, v, v)
 									}
 								}
-								keys1 = append(keys1, fmt.Sprintf("(options.Id = ? and (%v))", strings.Join(keys3, " or ")))
-								values1 = append(values1, append([]interface{}{id}, values3...)...)
+								keys2 = append(keys2, fmt.Sprintf("(options.Id = ? and (%v))", strings.Join(keys3, " or ")))
+								values2 = append(values2, append([]interface{}{id}, values3...)...)
 							}
 						}
 					}else{
@@ -8912,6 +8923,10 @@ func postFilterHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
+	}
+	if len(keys2) > 0 {
+		keys1 = append(keys1, fmt.Sprintf("(%v)", strings.Join(keys2, " or ")))
+		values1 = append(values1, values2...)
 	}
 	keys1 = append(keys1, "Path LIKE ?")
 	values1 = append(values1, relPath + "%")
@@ -8948,8 +8963,8 @@ func postFilterHandler(c *fiber.Ctx) error {
 		rows.Close()
 	}
 	//
-	common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Base_Price as BasePrice, Category_Id as CategoryId").Where(strings.Join(keys1, " and "), values1...).Count(&response.Filtered)
-	common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Base_Price as BasePrice, Category_Id as CategoryId").Where("Path LIKE ?", relPath + "%").Count(&response.Total)
+	common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Base_Price as BasePrice, Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join prices on prices.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...).Count(&response.Filtered)
+	common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Base_Price as BasePrice, Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join prices on prices.Property_Id = properties.Id").Where("Path LIKE ?", relPath + "%").Count(&response.Total)
 	//
 	c.Status(http.StatusOK)
 	return c.JSON(response)
@@ -9103,6 +9118,7 @@ type NewItem struct {
 
 type OrderShortView struct{
 	Items []ItemShortView `json:",omitempty"`
+	Quantity int
 	Sum float64
 	Delivery float64
 	Total float64
@@ -9318,6 +9334,7 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 			itemShortView.Quantity = orderItem.Quantity
 			itemShortView.Total = orderItem.Total
 			//
+			orderShortView.Quantity += itemShortView.Quantity
 			orderShortView.Items = append(orderShortView.Items, itemShortView)
 		}
 	}

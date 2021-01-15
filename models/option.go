@@ -68,6 +68,6 @@ func UpdateOption(connector *gorm.DB, option *Option) error {
 
 func DeleteOption(connector *gorm.DB, option *Option) error {
 	db := connector
-	db.Debug().Delete(&option)
+	db.Unscoped().Debug().Delete(&option)
 	return db.Error
 }
