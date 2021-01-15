@@ -7,6 +7,8 @@ type Transport struct {
 	Enabled bool
 	Name  string
 	Title string
+	Weight float64 `sql:"type:decimal(8,2);"`
+	Volume float64 `sql:"type:decimal(8,3);"`
 	Order string
 	Item string
 	Kg float64 `sql:"type:decimal(8,2);"`

@@ -6709,37 +6709,36 @@ func postCalculateHandler(c *fiber.Ctx) error {
 				Items []NewItem
 				Country string
 				Zip string
-				TransportId uint
 			}
 			if err := c.BodyParser(&request); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
-			// 1 Get selected transport company
-			transport, err := models.GetTransport(common.Database, int(request.TransportId))
-			if err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			if !transport.Enabled {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Disabled"})
-			}
-			// 2 Get Zone by Country and Zip
-			var zoneId uint
-			zone, err := models.GetZoneByCountryAndZIP(common.Database, request.Country, request.Zip)
-			if err == nil {
-				zoneId = zone.ID
-			}
-			// 3 Get Tariff by Transport and Zone
-			tariff, err := models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
-			if cost, err := Calculate(transport, tariff, request.Items); err == nil {
+			// 1 Get all transports
+			if transports, err := models.GetTransports(common.Database); err == nil {
+				var costs []*DeliveryCost
+				for _, transport := range transports {
+					if transport.Enabled {
+						// 2 Get Zone by Country and Zip
+						var zoneId uint
+						zone, err := models.GetZoneByCountryAndZIP(common.Database, request.Country, request.Zip)
+						if err == nil {
+							zoneId = zone.ID
+						}
+						// 3 Get Tariff by Transport and Zone
+						tariff, err := models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
+						if cost, err := Calculate(transport, tariff, request.Items); err == nil {
+							costs = append(costs, cost)
+						}
+					}
+				}
 				c.Status(http.StatusOK)
-				return c.JSON(cost)
+				return c.JSON(costs)
 			}else{
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
+			//
 		}else{
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{"Unsupported Content-Type"})
@@ -6748,6 +6747,8 @@ func postCalculateHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{"Content-Type not set"})
 	}
+	c.Status(http.StatusInternalServerError)
+	return c.JSON(HTTPError{"Something wend wrong"})
 }
 
 
@@ -6813,6 +6814,8 @@ type TransportView struct{
 	Enabled bool
 	Name string
 	Title string
+	Weight float64
+	Volume float64
 	Order string
 	Item string
 	Kg float64
@@ -6853,6 +6856,8 @@ type NewTransport struct {
 	Enabled bool
 	Name string
 	Title string
+	Weight float64
+	Volume float64
 	Order string
 	Item string
 	Kg float64
@@ -6897,6 +6902,8 @@ func postTransportHandler(c *fiber.Ctx) error {
 				Enabled: request.Enabled,
 				Name: request.Name,
 				Title: request.Title,
+				Weight: request.Weight,
+				Volume: request.Volume,
 				Order: request.Order,
 				Item: request.Item,
 				Kg: request.Kg,
@@ -6932,6 +6939,8 @@ type TransportsListItem struct {
 	Enabled bool
 	Name string
 	Title string
+	Weight float64
+	Volume float64
 	Order string
 	Item string
 	Kg float64
@@ -6998,7 +7007,7 @@ func postTransportsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Transport{}).Select("transports.ID, transports.Enabled, transports.Name, transports.Title, transports.`Order`, transports.Item, transports.Kg, transports.M3").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Transport{}).Select("transports.ID, transports.Enabled, transports.Name, transports.Title, transports.Weight, transports.Volume, transports.`Order`, transports.Item, transports.Kg, transports.M3").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -7014,7 +7023,7 @@ func postTransportsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Transport{}).Select("transports.ID, transports.Enabled, transports.Name, transports.Title, transports.`Order`, transports.Item, transports.Kg, transports.M3").Where(strings.Join(keys1, " and "), values1...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Transport{}).Select("transports.ID, transports.Enabled, transports.Name, transports.Title, transports.Weight, transports.Volume, transports.`Order`, transports.Item, transports.Kg, transports.M3").Where(strings.Join(keys1, " and "), values1...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -7102,6 +7111,8 @@ func putTransportHandler(c *fiber.Ctx) error {
 	}
 	transport.Enabled = request.Enabled
 	transport.Title = request.Title
+	transport.Weight = request.Weight
+	transport.Volume = request.Volume
 	transport.Order = request.Order
 	transport.Item = request.Item
 	transport.Kg = request.Kg
@@ -8425,7 +8436,6 @@ type NewProfile struct {
 	City string
 	Region string
 	Country string
-	TransportId uint
 }
 
 // @security BasicAuth
@@ -8499,11 +8509,6 @@ func postAccountProfileHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Country is empty"})
 			}
-			transport, err := models.GetTransport(common.Database, int(request.TransportId))
-			if err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Transport not found"})
-			}
 			profile := &models.Profile{
 				Name:     name,
 				Lastname: lastname,
@@ -8513,7 +8518,6 @@ func postAccountProfileHandler(c *fiber.Ctx) error {
 				City:     city,
 				Region:   region,
 				Country:  country,
-				TransportId: transport.ID,
 				UserId:   userId,
 			}
 			//
@@ -8795,7 +8799,6 @@ func postProfileHandler(c *fiber.Ctx) error {
 				Region:   region,
 				Country:  country,
 				UserId:   userId,
-				TransportId: request.TransportId,
 			}
 			//
 			if _, err := models.CreateProfile(common.Database, profile); err != nil {
@@ -9106,6 +9109,7 @@ type NewOrder struct {
 	Items []NewItem
 	Comment string
 	ProfileId uint
+	TransportId uint
 }
 
 type NewItem struct {
@@ -9178,29 +9182,28 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 	order := &models.Order{
 		Status: models.ORDER_STATUS_NEW,
 		ProfileId: request.ProfileId,
+		TransportId: request.TransportId,
 	}
-	if profile.ID > 0 {
-		if profile.TransportId > 0 {
-			// 1 Get selected transport company
-			transport, err := models.GetTransport(common.Database, int(profile.TransportId))
-			if err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			// 2 Get Zone by Country and Zip
-			var zoneId uint
-			zone, err := models.GetZoneByCountryAndZIP(common.Database, profile.Country, profile.Zip)
-			if err == nil {
-				zoneId = zone.ID
-			}
-			// 3 Get Tariff by Transport and Zone
-			tariff, err := models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
-			if cost, err := Calculate(transport, tariff, request.Items); err == nil {
-				order.Delivery = cost.Value
-			}else{
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
+	if request.TransportId > 0 {
+		// 1 Get selected transport company
+		transport, err := models.GetTransport(common.Database, int(request.TransportId))
+		if err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+		// 2 Get Zone by Country and Zip
+		var zoneId uint
+		zone, err := models.GetZoneByCountryAndZIP(common.Database, profile.Country, profile.Zip)
+		if err == nil {
+			zoneId = zone.ID
+		}
+		// 3 Get Tariff by Transport and Zone
+		tariff, err := models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
+		if cost, err := Calculate(transport, tariff, request.Items); err == nil {
+			order.Delivery = cost.Value
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
 		}
 	}
 	// //
@@ -10486,6 +10489,8 @@ func NewPassword(length int) string {
 
 /**/
 type DeliveryCost struct {
+	ID uint
+	Title string
 	By string
 	OrderFee string `json:",omitempty"`
 	ItemFee string `json:",omitempty"`
@@ -10503,6 +10508,8 @@ type DeliveryCost struct {
 
 func Calculate(transport *models.Transport, tariff *models.Tariff, items []NewItem) (*DeliveryCost, error) {
 	result := &DeliveryCost{
+		ID: transport.ID,
+		Title: transport.Title,
 		Special: tariff != nil,
 	}
 	//
@@ -10634,6 +10641,9 @@ func Calculate(transport *models.Transport, tariff *models.Tariff, items []NewIt
 			result.ByWeight += weight * kg + fee
 			// Calculate
 		}
+	}
+	if result.Weight < transport.Weight && result.Volume < transport.Volume {
+		return nil, fmt.Errorf("transport is not avialable for such weight and volume")
 	}
 	// Order fee
 	if orderIsPercent {

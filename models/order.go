@@ -29,6 +29,8 @@ type Order struct {
 	UserId uint
 	Profile *Profile `gorm:"foreignKey:ProfileId"`
 	ProfileId uint
+	Transport *Transport `gorm:"foreignKey:TransportId"`
+	TransportId uint
 }
 
 func CreateOrder(connector *gorm.DB, order *Order) (uint, error) {
