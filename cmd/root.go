@@ -240,8 +240,125 @@ var RootCmd = &cobra.Command{
 		// Notification
 		if common.Config.Notification.Enabled {
 			common.NOTIFICATION = common.NewNotification()
-			if common.Config.Notification.Email.Enabled && common.Config.Notification.Email.Key != "" {
-				common.NOTIFICATION.SendGrid = common.NewSendGrid(common.Config.Notification.Email.Key)
+			if common.Config.Notification.Email.Enabled {
+				if common.Config.Notification.Email.Key != "" {
+					common.NOTIFICATION.SendGrid = common.NewSendGrid(common.Config.Notification.Email.Key)
+				}
+				if templates, err := models.GetEmailTemplates(common.Database); err == nil && len(templates) == 0 {
+					// Admin
+					if _, err = models.CreateEmailTemplate(common.Database, &models.EmailTemplate{
+						Enabled: false,
+						Type:    common.NOTIFICATION_TYPE_ADMIN_ORDER_PAID,
+						Topic:   "New order id {{.Order.ID}} paid",
+						Message: `<div>
+<h1><a href="http://example.com/admin/sales/orders?id={{.Order.ID}}">Order #{{.Order.ID}}</a></h1>
+<table>
+<tbody>
+<tr><th style="text-align: left">Created</th><td>{{.Order.CreatedAt.Format "2006-01-02 15:04:05"}}</td></tr>
+<tr><th style="text-align: left">Status</th><td>{{.Order.Status}}</td>
+<tr><th style="text-align: left">Sum</th><td>{{printf "%.2f" .Order.Sum}}</td>
+<tr><th style="text-align: left">Delivery</th><td>{{printf "%.2f" .Order.Delivery}}</td>
+<tr><th style="text-align: left">Total</th><td>{{printf "%.2f" .Order.Total}}</td></tr>
+</tbody>
+</table>
+</div>
+<div>
+<h2>Items</h2>
+<table>
+<thead><tr style="background-color: lightgray;"><th style="min-width: 50px;">#</th><th>UUID</th><th>Product</th><th>Variation</th><th>Properties</th><th>Price</th><th>Quantity</th><th>Total</th></tr></thead>
+<tbody>
+{{range $index, $item := .Order.Items}}
+<tr style="background-color: {{if even $index}}#fff{{else}}#f5f5f5{{end}}">
+<td style="text-align: center;">{{add $index 1}}</td>
+<td style="padding: 0 10px;">{{toUuid .Uuid}}</td>
+<td style="padding: 0 10px;"><a href="http://example.com{{$item.Path}}?uuid={{toUuid $item.Uuid}}">{{.Title}}</a></td>
+<td style="padding: 0 10px;">{{$item.Variation.Title}}</td>
+<td><ul style="padding: 0 20px;">{{range $item.Properties}}<li><span>{{.Title}}:&nbsp;</span><span>{{.Value}}</span></li>{{end}}</ul></td>
+<td style="padding: 0 10px;">{{printf "%.2f" $item.Price}}</td>
+<td style="text-align: center;">{{$item.Quantity}}</td>
+<td style="padding: 0 10px;">{{printf "%.2f" $item.Total}}</td>
+</tr>
+{{end}}
+</tbody>
+</table>
+</div>
+<div>
+<h2>Delivery</h2>
+<table>
+<tbody>
+<tr><th style="text-align: left">Name</th><td>{{.Order.Profile.Name}}</td></tr>
+<tr><th style="text-align: left">Lastname</th><td>{{.Order.Profile.Lastname}}</td></tr>
+<tr><th style="text-align: left">Address</th><td>{{.Order.Profile.Address}}</td></tr>
+<tr><th style="text-align: left">Zip</th><td>{{.Order.Profile.Zip}}</td></tr>
+<tr><th style="text-align: left">City</th><td>{{.Order.Profile.City}}</td></tr>
+<tr><th style="text-align: left">Region</th><td>{{.Order.Profile.Region}}</td></tr>
+<tr><th style="text-align: left">Country</th><td>{{.Order.Profile.Country}}</td></tr>
+<tr><th style="text-align: left">Transport</th><td>{{.Order.Profile.Transport.Title}}</td></tr>
+</tbody>
+</table>
+</div>`,
+					}); err != nil {
+						logger.Warningf("%v", err)
+					}
+					// User
+					if _, err = models.CreateEmailTemplate(common.Database, &models.EmailTemplate{
+						Enabled: false,
+						Type:    common.NOTIFICATION_TYPE_USER_ORDER_PAID,
+						Topic:   "You order #{{.Order.ID}}",
+						Message: `<div>
+<h1><a href="http://example.com/orders/">Order #{{.Order.ID}}</a></h1>
+<table>
+<tbody>
+<tr><th style="text-align: left">Created</th><td>{{.Order.CreatedAt.Format "2006-01-02 15:04:05"}}</td></tr>
+<tr><th style="text-align: left">Status</th><td>{{.Order.Status}}</td>
+<tr><th style="text-align: left">Sum</th><td>{{printf "%.2f" .Order.Sum}}</td>
+<tr><th style="text-align: left">Delivery</th><td>{{printf "%.2f" .Order.Delivery}}</td>
+<tr><th style="text-align: left">Total</th><td>{{printf "%.2f" .Order.Total}}</td></tr>
+</tbody>
+</table>
+</div>
+<div>
+<h2>Items</h2>
+<table>
+<thead><tr style="background-color: lightgray;"><th style="min-width: 50px;">#</th><th>UUID</th><th>Product</th><th>Variation</th><th>Properties</th><th>Price</th><th>Quantity</th><th>Total</th></tr></thead>
+<tbody>
+{{range $index, $item := .Order.Items}}
+<tr style="background-color: {{if even $index}}#fff{{else}}#f5f5f5{{end}}">
+<td style="text-align: center;">{{add $index 1}}</td>
+<td style="padding: 0 10px;">{{toUuid .Uuid}}</td>
+<td style="padding: 0 10px;"><a href="http://example.com{{$item.Path}}?uuid={{toUuid $item.Uuid}}">{{.Title}}</a></td>
+<td style="padding: 0 10px;">{{$item.Variation.Title}}</td>
+<td><ul style="padding: 0 20px;">{{range $item.Properties}}<li><span>{{.Title}}:&nbsp;</span><span>{{.Value}}</span></li>{{end}}</ul></td>
+<td style="padding: 0 10px;">{{printf "%.2f" $item.Price}}</td>
+<td style="text-align: center;">{{$item.Quantity}}</td>
+<td style="padding: 0 10px;">{{printf "%.2f" $item.Total}}</td>
+</tr>
+{{end}}
+</tbody>
+</table>
+</div>
+<div>
+<h2>Delivery</h2>
+<table>
+<tbody>
+<tr><th style="text-align: left">Name</th><td>{{.Order.Profile.Name}}</td></tr>
+<tr><th style="text-align: left">Lastname</th><td>{{.Order.Profile.Lastname}}</td></tr>
+<tr><th style="text-align: left">Address</th><td>{{.Order.Profile.Address}}</td></tr>
+<tr><th style="text-align: left">Zip</th><td>{{.Order.Profile.Zip}}</td></tr>
+<tr><th style="text-align: left">City</th><td>{{.Order.Profile.City}}</td></tr>
+<tr><th style="text-align: left">Region</th><td>{{.Order.Profile.Region}}</td></tr>
+<tr><th style="text-align: left">Country</th><td>{{.Order.Profile.Country}}</td></tr>
+<tr><th style="text-align: left">Transport</th><td>{{.Order.Profile.Transport.Title}}</td></tr>
+</tbody>
+</table>
+</div>
+<div>
+<h1>Thank you for your purchase!</h1>
+</div>`,
+					}); err != nil {
+						logger.Warningf("%v", err)
+					}
+				}
 			}
 		}
 		//

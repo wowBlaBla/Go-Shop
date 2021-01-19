@@ -5421,7 +5421,7 @@ func postFilesListHandler(c *fiber.Ctx) error {
 		//id, _ = strconv.Atoi(v)
 		keys1 = append(keys1, fmt.Sprintf("products_files.product_id = ?"))
 		values1 = append(values1, v)
-		rows, err := common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Country, files.Url, files.Size, files.Updated_At as Updated").Joins("left join products_files on products_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+		rows, err := common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Url, files.Size, files.Updated_At as Updated").Joins("left join products_files on products_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 		if err == nil {
 			if err == nil {
 				for rows.Next() {
@@ -5437,7 +5437,7 @@ func postFilesListHandler(c *fiber.Ctx) error {
 			}
 			rows.Close()
 		}
-		rows, err = common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Country, files.Url, files.Size, files.Updated_At as Updated").Joins("left join products_files on products_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Rows()
+		rows, err = common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Url, files.Size, files.Updated_At as Updated").Joins("left join products_files on products_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Rows()
 		if err == nil {
 			for rows.Next() {
 				response.Filtered ++
@@ -5450,7 +5450,7 @@ func postFilesListHandler(c *fiber.Ctx) error {
 			response.Total = response.Filtered
 		}
 	}else{
-		rows, err := common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Country, files.Url, files.Size, files.Updated_At as Updated").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+		rows, err := common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Url, files.Size, files.Updated_At as Updated").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 		if err == nil {
 			if err == nil {
 				for rows.Next() {
@@ -5466,7 +5466,7 @@ func postFilesListHandler(c *fiber.Ctx) error {
 			}
 			rows.Close()
 		}
-		rows, err = common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Country, files.Url, files.Size, files.Updated_At as Updated").Where(strings.Join(keys1, " and "), values1...).Rows()
+		rows, err = common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Url, files.Size, files.Updated_At as Updated").Where(strings.Join(keys1, " and "), values1...).Rows()
 		if err == nil {
 			for rows.Next() {
 				response.Filtered ++
@@ -5882,7 +5882,7 @@ func postImagesListHandler(c *fiber.Ctx) error {
 		//id, _ = strconv.Atoi(v)
 		keys1 = append(keys1, fmt.Sprintf("products_images.product_id = ?"))
 		values1 = append(values1, v)
-		rows, err := common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Country, images.Url, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join products_images on products_images.image_id = images.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+		rows, err := common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Url, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join products_images on products_images.image_id = images.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 		if err == nil {
 			if err == nil {
 				for rows.Next() {
@@ -5898,7 +5898,7 @@ func postImagesListHandler(c *fiber.Ctx) error {
 			}
 			rows.Close()
 		}
-		rows, err = common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Country, images.Url, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join products_images on products_images.image_id = images.id").Where(strings.Join(keys1, " and "), values1...).Rows()
+		rows, err = common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Url, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join products_images on products_images.image_id = images.id").Where(strings.Join(keys1, " and "), values1...).Rows()
 		if err == nil {
 			for rows.Next() {
 				response.Filtered ++
@@ -5911,7 +5911,7 @@ func postImagesListHandler(c *fiber.Ctx) error {
 			response.Total = response.Filtered
 		}
 	}else{
-		rows, err := common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Country, images.Url, images.Height, images.Width, images.Size, images.Updated_At as Updated").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+		rows, err := common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Url, images.Height, images.Width, images.Size, images.Updated_At as Updated").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 		if err == nil {
 			if err == nil {
 				for rows.Next() {
@@ -5927,7 +5927,7 @@ func postImagesListHandler(c *fiber.Ctx) error {
 			}
 			rows.Close()
 		}
-		rows, err = common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Country, images.Url, images.Height, images.Width, images.Size, images.Updated_At as Updated").Where(strings.Join(keys1, " and "), values1...).Rows()
+		rows, err = common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Url, images.Height, images.Width, images.Size, images.Updated_At as Updated").Where(strings.Join(keys1, " and "), values1...).Rows()
 		if err == nil {
 			for rows.Next() {
 				response.Filtered ++
