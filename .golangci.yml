@@ -1,0 +1,7 @@
+run:
+  tests: false
+issues:
+  exclude:
+    -  Error return value of `c.JSON` is not checked
+    -  Error return value of `c.Redirect` is not checked
+    -  Error return value of `c.SendString` is not checked

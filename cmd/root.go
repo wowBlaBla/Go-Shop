@@ -44,11 +44,10 @@ func init() {
 }
 
 func initConfig() {
-	var file string
 	// JSON
-	//file = path.Join(DIR, "config.json")
+	//file := path.Join(DIR, "config.json")
 	// OR TOML
-	file = path.Join(dir, os.Getenv("CONFIG_FOLDER"), "config.toml")
+	file := path.Join(dir, os.Getenv("CONFIG_FOLDER"), "config.toml")
 	v = viper.GetViper()
 	v.SetConfigFile(file)
 	common.Config = config.NewConfig(file)
@@ -117,7 +116,9 @@ func initConfig() {
 		if err := config.GenerateSSL(crtPath, keyPath, strings.Join([]string{"localhost"}, ",")); err == nil {
 			common.Config.Https.Crt = crtPath
 			common.Config.Https.Key = keyPath
-			common.Config.Save()
+			if err = common.Config.Save(); err != nil {
+				logger.Fatalf("%+v", err)
+			}
 		}else{
 			log.Printf("[ERR] [APP] %v", err)
 		}
@@ -166,32 +167,80 @@ var RootCmd = &cobra.Command{
 			logger.Errorf("%v", err)
 			os.Exit(1)
 		}
-		common.Database.DB()
-		common.Database.AutoMigrate(&models.Category{})
-		common.Database.AutoMigrate(&models.Product{})
-		common.Database.AutoMigrate(&models.Parameter{})
-		common.Database.AutoMigrate(&models.File{})
-		common.Database.AutoMigrate(&models.Image{})
-		common.Database.AutoMigrate(&models.Variation{})
-		common.Database.AutoMigrate(&models.Property{})
-		common.Database.AutoMigrate(&models.Option{})
-		common.Database.AutoMigrate(&models.Value{})
-		common.Database.AutoMigrate(&models.Price{})
-		common.Database.AutoMigrate(&models.Order{})
-		common.Database.AutoMigrate(&models.Item{})
-		common.Database.AutoMigrate(&models.Transaction{})
-		common.Database.AutoMigrate(&models.Tag{})
-		common.Database.AutoMigrate(&models.Tariff{})
-		common.Database.AutoMigrate(&models.Transport{})
-		common.Database.AutoMigrate(&models.Zone{})
-		common.Database.AutoMigrate(&models.EmailTemplate{})
+		if _, err := common.Database.DB(); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Category{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Product{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Parameter{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.File{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Image{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Variation{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Property{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Option{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Value{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Price{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Order{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Item{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Transaction{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Tag{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Tariff{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Transport{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Zone{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.EmailTemplate{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
 		//
-		common.Database.AutoMigrate(&models.CacheProduct{})
-		common.Database.AutoMigrate(&models.CacheImage{})
-		common.Database.AutoMigrate(&models.CacheVariation{})
-		common.Database.AutoMigrate(&models.CacheValue{})
+		if err := common.Database.AutoMigrate(&models.CacheProduct{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.CacheImage{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.CacheVariation{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.CacheValue{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
 		//
-		common.Database.AutoMigrate(&models.Profile{})
+		if err := common.Database.AutoMigrate(&models.Profile{}); err != nil {
+			logger.Fatalf("%+v", err)
+		}
 		// Project structure
 		if admin := path.Join(dir, "admin"); len(admin) > 0 {
 			if _, err := os.Stat(admin); err != nil {
@@ -373,11 +422,11 @@ var RootCmd = &cobra.Command{
 				port := common.Config.Https.Port
 				var crt []byte
 				if _, err := os.Stat(common.Config.Https.Crt); err == nil {
-					crt, err = ioutil.ReadFile(common.Config.Https.Crt)
+					crt, _ = ioutil.ReadFile(common.Config.Https.Crt)
 				}
 				var key []byte
 				if _, err := os.Stat(common.Config.Https.Key); err == nil {
-					key, err = ioutil.ReadFile(common.Config.Https.Key)
+					key, _ = ioutil.ReadFile(common.Config.Https.Key)
 				}
 				if cert, err := tls.X509KeyPair(crt, key); err == nil {
 					tlsConfig := &tls.Config{

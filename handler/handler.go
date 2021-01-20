@@ -11,8 +11,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/session/v2"
-	"github.com/gofiber/session/v2/provider/redis"
 	"github.com/google/logger"
 	"github.com/jinzhu/now"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
@@ -51,9 +49,6 @@ const (
 
 var (
 	reNotAbc = regexp.MustCompile("(?i)[^a-z0-9]+")
-	sessions = session.New(session.Config{
-		//Expiration: 24 * 30 * time.Hour,
-	})
 )
 
 
@@ -71,30 +66,6 @@ func GetFiber() *fiber.App {
 			AllowOrigins: "*",
 		},
 	))
-	/*app.Get("/", authMulti, func(c *fiber.Ctx) error {
-		m := fiber.Map{"Hello": "world"}
-		if v := c.Locals("user"); v != nil {
-			m["User"] = v.(*models.User)
-		}
-		return c.JSON(m)
-	})*/
-	// Sessions
-	if provider, err := redis.New(redis.Config{
-	  KeyPrefix:   "session",
-	  Addr:        "127.0.0.1:6379",
-	  PoolSize:    8,
-	  IdleTimeout: 30 * time.Second,
-	}); err == nil {
-		sessions = session.New(session.Config{
-			Lookup: "cookie:sid",
-			Expiration: 24 * 30 * time.Hour,
-			Provider: provider,
-			SameSite: "None",
-			/*Secure: true,*/
-		})
-	}else{
-		logger.Errorf("%v", err)
-	}
 	//
 	changed := func (messages ...string) func (c *fiber.Ctx) error {
 		return func (c *fiber.Ctx) error {
@@ -287,20 +258,6 @@ func GetFiber() *fiber.App {
 	v1.Post("/profiles", postProfileHandler)
 	//
 	v1.Post("/filter", postFilterHandler)
-	v1.Post("/search", postSearchHandler)
-
-	//app.Get("/session", func(c *fiber.Ctx) error {
-	//	store := sessions.Get(c) // get/create new session
-	//	defer store.Save()
-	//
-	//	var counter int64
-	//	if v := store.Get("counter"); v != nil {
-	//		counter = v.(int64)
-	//	}
-	//	counter++
-	//	store.Set("counter", counter)
-	//	return c.JSON(fiber.Map{"Counter": counter})
-	//})
 	//
 	v1.Get("/error/200", func(c *fiber.Ctx) error {
 		c.Status(http.StatusOK)
@@ -339,30 +296,6 @@ func GetFiber() *fiber.App {
 	app.Static("/", public)
 	app.Static("*", public)
 	//
-	/*static := path.Join(dir, "storage")
-	if _, err := os.Stat(static); err != nil {
-		if err = os.MkdirAll(static, 0755); err != nil {
-			logger.Errorf("%v", err)
-		}
-	}
-	app.Static("/static", static)
-	//
-	htdocs := path.Join(dir, "htdocs")
-	if _, err := os.Stat(htdocs); err != nil {
-		if err = os.MkdirAll(htdocs, 0755); err != nil {
-			logger.Errorf("%v", err)
-		}
-	}
-	if p := path.Join(htdocs, "index.html"); len(p) > 0 {
-		if _, err := os.Stat(p); err != nil {
-			if err = ioutil.WriteFile(p, []byte(`Hello world`), 0644); err != nil {
-				logger.Errorf("%v", err)
-			}
-		}
-	}
-	app.Static("/", htdocs)
-	app.Static("*", path.Join(htdocs, "index.html"))
-	 */
 	return app
 }
 
@@ -1748,8 +1681,6 @@ func patchContentHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{"Unknown action"})
 	}
-	c.Status(http.StatusInternalServerError)
-	return c.JSON(HTTPError{"Something wrong"})
 }
 
 // @security BasicAuth
@@ -1995,7 +1926,7 @@ func postProductsHandler(c *fiber.Ctx) error {
 					}
 					// Image
 					img := &models.Image{Name: name, Size: v[0].Size}
-					filename = fmt.Sprintf("%d-%s%s", id, img.Name, path.Ext(v[0].Filename))
+					//filename = fmt.Sprintf("%d-%s%s", id, img.Name, path.Ext(v[0].Filename))
 					if id, err := models.CreateImage(common.Database, img); err == nil {
 						p := path.Join(dir, "storage", "images")
 						if _, err := os.Stat(p); err != nil {
@@ -5419,7 +5350,7 @@ func postFilesListHandler(c *fiber.Ctx) error {
 	//logger.Infof("order: %+v", order)
 	if v := c.Query("product_id"); v != "" {
 		//id, _ = strconv.Atoi(v)
-		keys1 = append(keys1, fmt.Sprintf("products_files.product_id = ?"))
+		keys1 = append(keys1, "products_files.product_id = ?")
 		values1 = append(values1, v)
 		rows, err := common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Url, files.Size, files.Updated_At as Updated").Joins("left join products_files on products_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 		if err == nil {
@@ -5880,7 +5811,7 @@ func postImagesListHandler(c *fiber.Ctx) error {
 	//logger.Infof("order: %+v", order)
 	if v := c.Query("product_id"); v != "" {
 		//id, _ = strconv.Atoi(v)
-		keys1 = append(keys1, fmt.Sprintf("products_images.product_id = ?"))
+		keys1 = append(keys1, "products_images.product_id = ?")
 		values1 = append(values1, v)
 		rows, err := common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Url, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join products_images on products_images.image_id = images.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 		if err == nil {
@@ -6179,7 +6110,7 @@ func postOrdersListHandler(c *fiber.Ctx) error {
 			if key != "" && len(strings.TrimSpace(value)) > 0 {
 				switch key {
 				case "UserEmail":
-					keys1 = append(keys1, fmt.Sprintf("users.Email like ?"))
+					keys1 = append(keys1, "users.Email like ?")
 					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
 				default:
 					keys1 = append(keys1, fmt.Sprintf("orders.%v like ?", key))
@@ -6414,47 +6345,45 @@ func postTransactionsListHandler(c *fiber.Ctx) error {
 	// Filter
 	var keys1 []string
 	var values1 []interface{}
-	var keys2 []string
-	var values2 []interface{}
 	if len(request.Filter) > 0 {
 		for key, value := range request.Filter {
 			if key != "" && len(strings.TrimSpace(value)) > 0 {
 				switch key {
-				case "Values":
+				case "Amount":
 					v := strings.TrimSpace(value)
 					if strings.Index(v, ">=") == 0 {
 						if vv, err := strconv.Atoi(v[2:]); err == nil {
-							keys2 = append(keys2, fmt.Sprintf("%v >= ?", key))
-							values2 = append(values2, vv)
+							keys1 = append(keys1, fmt.Sprintf("transactions.%v >= ?", key))
+							values1 = append(values1, vv)
 						}
 					} else if strings.Index(v, "<=") == 0 {
 						if vv, err := strconv.Atoi(v[2:]); err == nil {
-							keys2 = append(keys2, fmt.Sprintf("%v <= ?", key))
-							values2 = append(values2, vv)
+							keys1 = append(keys1, fmt.Sprintf("transactions.%v <= ?", key))
+							values1 = append(values1, vv)
 						}
 					} else if strings.Index(v, "!=") == 0 || strings.Index(v, "<>") == 0 {
 						if vv, err := strconv.Atoi(v[2:]); err == nil {
-							keys2 = append(keys2, fmt.Sprintf("%v <> ?", key))
-							values2 = append(values2, vv)
+							keys1 = append(keys1, fmt.Sprintf("transactions.%v <> ?", key))
+							values1 = append(values1, vv)
 						}
 					} else if strings.Index(v, ">") == 0 {
 						if vv, err := strconv.Atoi(v[1:]); err == nil {
-							keys2 = append(keys2, fmt.Sprintf("%v > ?", key))
-							values2 = append(values2, vv)
+							keys1 = append(keys1, fmt.Sprintf("transactions.%v > ?", key))
+							values1 = append(values1, vv)
 						}
 					} else if strings.Index(v, "<") == 0 {
 						if vv, err := strconv.Atoi(v[1:]); err == nil {
-							keys2 = append(keys2, fmt.Sprintf("%v < ?", key))
-							values2 = append(values2, vv)
+							keys1 = append(keys1, fmt.Sprintf("transactions.%v < ?", key))
+							values1 = append(values1, vv)
 						}
 					} else {
 						if vv, err := strconv.Atoi(v); err == nil {
-							keys2 = append(keys2, fmt.Sprintf("%v = ?", key))
-							values2 = append(values2, vv)
+							keys1 = append(keys1, fmt.Sprintf("transactions.%v = ?", key))
+							values1 = append(values1, vv)
 						}
 					}
 				default:
-					keys1 = append(keys1, fmt.Sprintf("options.%v like ?", key))
+					keys1 = append(keys1, fmt.Sprintf("transactions.%v like ?", key))
 					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
 				}
 			}
@@ -6507,7 +6436,7 @@ func postTransactionsListHandler(c *fiber.Ctx) error {
 			rows.Close()
 		}
 	}()
-	if len(keys1) > 0 || len(keys2) > 0 {
+	if len(keys1) > 0 {
 		common.Database.Debug().Model(&models.Transaction{}).Count(&response.Total)
 	}else{
 		response.Total = response.Filtered
@@ -6726,7 +6655,7 @@ func postCalculateHandler(c *fiber.Ctx) error {
 							zoneId = zone.ID
 						}
 						// 3 Get Tariff by Transport and Zone
-						tariff, err := models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
+						tariff, _ := models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
 						if cost, err := Calculate(transport, tariff, request.Items); err == nil {
 							costs = append(costs, cost)
 						}
@@ -6747,8 +6676,6 @@ func postCalculateHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{"Content-Type not set"})
 	}
-	c.Status(http.StatusInternalServerError)
-	return c.JSON(HTTPError{"Something wend wrong"})
 }
 
 
@@ -8263,7 +8190,7 @@ func postPrepareHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
-			view.Output = string(buff.Bytes())
+			view.Output = buff.String()
 			view.Status = "OK"
 			//
 			return c.JSON(view)
@@ -8309,7 +8236,7 @@ func postRenderHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
-			view.Output = string(buff.Bytes())
+			view.Output = buff.String()
 			view.Status = "OK"
 			//
 			return c.JSON(view)
@@ -8366,7 +8293,7 @@ func postPublishHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
-			view.Output = string(buff.Bytes())
+			view.Output = buff.String()
 			view.Status = "OK"
 			//
 			if _, err := os.Stat(path.Join(dir, HAS_CHANGES)); err == nil {
@@ -8542,93 +8469,6 @@ func postAccountProfileHandler(c *fiber.Ctx) error {
 	return c.JSON(view)
 }
 
-type Cart struct {
-	Created time.Time
-	Items []CartItem
-	Total float64
-	Updated time.Time
-}
-
-func (c *Cart) AddItem(uuid string) error {
-	logger.Infof("AddItem: %v", uuid)
-	// Already in cart?
-	for i, item := range c.Items {
-		if item.UUID == uuid {
-			logger.Info("qty")
-			c.Items[i].Quantity ++
-			c.Total += item.Price
-			return nil
-		}
-	}
-	logger.Info("not qty")
-	// Add new item
-	var arr []int
-	if err := json.Unmarshal([]byte(uuid), &arr); err == nil && len(arr) > 2{
-		productId := arr[0]
-		var product *models.Product
-		if product, err = models.GetProduct(common.Database, productId); err != nil {
-			return err
-		}
-		variationId := arr[1]
-		var variation *models.Variation
-		if variation, err = models.GetVariation(common.Database, variationId); err != nil {
-			return err
-		}
-		if product.ID != variation.ProductId {
-			return fmt.Errorf("Product and Variation mismatch")
-		}
-		item := CartItem{
-			UUID:  uuid,
-			Title: product.Title + " " + variation.Title,
-			Price: variation.BasePrice,
-		}
-		if product.Thumbnail != "" {
-			item.Thumbnails = append(item.Thumbnails, product.Thumbnail)
-		}
-		if variation.Thumbnail != "" {
-			item.Thumbnails = append(item.Thumbnails, variation.Thumbnail)
-		}
-		for _, id := range arr[2:] {
-			if price, err := models.GetPrice(common.Database, id); err == nil {
-				item.Properties = append(item.Properties, ItemProperty{
-					Name: price.Property.Title,
-					Value: price.Value.Value,
-					Price: price.Price,
-				})
-				item.Price += price.Price
-			} else {
-				return err
-			}
-		}
-		item.Quantity = 1
-		
-		c.Items = append(c.Items, item)
-		c.Total += item.Price
-		return nil
-	}
-	return nil
-}
-
-
-func (c *Cart) RemoveItem(uuid string, count int) error {
-	logger.Infof("RemoveItem: %+v", uuid)
-	for i, item := range c.Items {
-		if item.UUID == uuid {
-			logger.Info("found")
-			if item.Quantity > count {
-				logger.Info("case1")
-				c.Items[i].Quantity -= count
-			}else{
-				logger.Info("case2")
-				c.Items = append(c.Items[:i], c.Items[i+1:]...)
-			}
-			c.Total -= item.Price
-			break
-		}
-	}
-	return nil
-}
-
 type CartItem struct {
 	UUID string // ProductId,VariationId,
 	Title string
@@ -8648,35 +8488,6 @@ type ItemProperty struct {
 	//
 	ValueId int
 	PriceId int
-}
-
-func (c *Cart) Save(store *session.Store) error {
-	if bts, err := json.Marshal(c); err == nil {
-		store.Set("cart", bts)
-		return nil
-	}else{
-		return err
-	}
-	return fmt.Errorf("something went wrong")
-}
-
-func LoadCart(store *session.Store) (*Cart, error) {
-	var cart Cart
-	v := store.Get("cart")
-	if v != nil {
-		if bts := v.([]byte); len(bts) > 0 {
-			if err := json.Unmarshal(bts, &cart); err != nil {
-				return nil, err
-			}
-		}else{
-			return nil, fmt.Errorf("not found")
-		}
-	}else{
-		cart = Cart{
-			Created: time.Now(),
-		}
-	}
-	return &cart, nil
 }
 
 // @security BasicAuth
@@ -8911,7 +8722,7 @@ func postFilterHandler(c *fiber.Ctx) error {
 								var values3 []interface{}
 								for _, value := range values {
 									if v, err := strconv.Atoi(value); err == nil {
-										keys3 = append(keys3, fmt.Sprintf("parameters.Value_id = ? or prices.Value_Id = ?"))
+										keys3 = append(keys3, "parameters.Value_id = ? or prices.Value_Id = ?")
 										values3 = append(values3, v, v)
 									}
 								}
@@ -8987,58 +8798,6 @@ type SearchResultProductView struct {
 	ProductView
 	Path string `json:",omitempty"`
 	BasePrice float64 `json:",omitempty"`
-}
-
-// Search godoc
-// @Summary Post search request
-// @Accept json
-// @Produce json
-// @Param search body SearchRequest true "body"
-// @Success 200 {object} SearchResult
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /search [post]
-func postSearchHandler(c *fiber.Ctx) error {
-	var request SearchRequest
-	if err := c.BodyParser(&request); err != nil {
-		return err
-	}
-	request.Term = strings.TrimSpace(request.Term)
-	if request.Term == "" {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(fiber.Map{"ERROR": "Empty request"})
-	}
-	//
-	result := SearchResult{Term: request.Term}
-	term := "%" + request.Term + "%"
-	limit := 20
-	if request.Limit > 0 && request.Limit < 100 {
-		limit = request.Limit
-	}
-	if products, err := models.SearchProducts(common.Database, term, limit); err == nil {
-		for _, product := range products {
-			if bts, err := json.Marshal(product); err == nil {
-				var view SearchResultProductView
-				if err = json.Unmarshal(bts, &view); err == nil {
-					if len(product.Categories) > 0 {
-						if breadcrumbs := models.GetBreadcrumbs(common.Database, product.Categories[0].ID); len(breadcrumbs) > 0 {
-							var names []string
-							for _, crumb := range breadcrumbs {
-								names = append(names, crumb.Name)
-							}
-							view.Path = "/" + path.Join(names...) + "/" + product.Name + "/"
-						}
-					}
-					if len(product.Variations) > 0 {
-						view.BasePrice = product.Variations[0].BasePrice
-					}
-					result.Products = append(result.Products, view)
-				}
-			}
-
-		}
-	}
-	return c.JSON(result)
 }
 
 type OrdersView []*OrderView
@@ -9198,7 +8957,7 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 			zoneId = zone.ID
 		}
 		// 3 Get Tariff by Transport and Zone
-		tariff, err := models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
+		tariff, _ := models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
 		if cost, err := Calculate(transport, tariff, request.Items); err == nil {
 			order.Delivery = cost.Value
 		}else{
@@ -9231,11 +8990,6 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 			if product, err = models.GetProduct(common.Database, productId); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
-			}
-			if len(product.Categories) > 0 {
-				if breadcrumbs := models.GetBreadcrumbs(common.Database, product.Categories[0].ID); len(breadcrumbs) > 0 {
-
-				}
 			}
 			variationId := arr[1]
 			var variation *models.Variation
@@ -9272,15 +9026,6 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 					chunks = append(chunks, crumb.Name)
 				}
 				orderItem.Path = "/" + path.Join(append(chunks, product.Name)...)
-			}
-
-			var thumbnails []string
-
-			if product.Thumbnail != "" {
-				if orderItem.Thumbnail == "" {
-					orderItem.Thumbnail = product.Thumbnail
-				}
-				thumbnails = append(thumbnails, product.Thumbnail)
 			}
 
 			if cache, err := models.GetCacheProductByProductId(common.Database, product.ID); err == nil {
@@ -9353,11 +9098,6 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
-	/*transaction := &models.Transaction{Amount: order.Total, Status: models.TRANSACTION_STATUS_NEW, OrderId: order.ID}
-	if _, err := models.CreateTransaction(common.Database, transaction); err != nil {
-		logger.Errorf("%v", err.Error())
-	}
-	logger.Infof("transaction: %+v", transaction)*/
 	return c.JSON(order)
 }
 
@@ -9504,7 +9244,7 @@ func postAccountOrderCheckoutHandler(c *fiber.Ctx) error {
 				PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
 					Currency: stripe.String("usd"),
 					ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
-						Name: stripe.String(fmt.Sprintf("Order #%d", order.Total)),
+						Name: stripe.String(fmt.Sprintf("Order #%d", order.ID)),
 					},
 					UnitAmount: stripe.Int64(int64(math.Round(order.Total * 100))),
 				},

@@ -17,7 +17,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -26,7 +25,6 @@ import (
 
 var (
 	VALUES = cmap.New()
-	reLeadingDigit = regexp.MustCompile(`^[0-9]+-`)
 )
 
 var renderCmd = &cobra.Command{
@@ -57,7 +55,9 @@ var renderCmd = &cobra.Command{
 			logger.Errorf("%v", err)
 			os.Exit(1)
 		}
-		common.Database.DB()
+		if _, err := common.Database.DB(); err != nil {
+			logger.Fatalf("%v", err)
+		}
 		//
 		logger.Infof("Configure Hugo Theme index")
 		if p := path.Join(dir, "hugo", "themes", common.Config.Hugo.Theme, "layouts", "partials", "scripts.html"); len(p) > 0 {
@@ -859,7 +859,7 @@ var renderCmd = &cobra.Command{
 									file := path.Join(p1, product.Name, fmt.Sprintf("index%s.html", language.Suffix))
 									if _, err := os.Stat(path.Dir(file)); err != nil {
 										if err = os.MkdirAll(path.Dir(file), 0755); err != nil {
-											logger.Error("%v", err)
+											logger.Errorf("%v", err)
 											return
 										}
 									}
@@ -888,7 +888,7 @@ var renderCmd = &cobra.Command{
 				}
 			}
 		}else{
-			logger.Error("%v", err)
+			logger.Errorf("%v", err)
 			return
 		}
 		//

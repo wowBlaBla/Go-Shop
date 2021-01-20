@@ -34,8 +34,5 @@ func HasCacheVariationByValueId(connector *gorm.DB, valueId uint) bool {
 	db := connector
 	var count int64
 	db.Model(CacheValue{}).Where("value_id = ?", valueId).Count(&count)
-	if count > 0 {
-		return true
-	}
-	return false
+	return count > 0
 }

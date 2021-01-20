@@ -3,12 +3,7 @@ package handler
 import (
 	"bufio"
 	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/md5"
-	"crypto/rand"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
@@ -17,7 +12,6 @@ import (
 	"github.com/gorilla/securecookie"
 	"github.com/yonnic/goshop/common"
 	"github.com/yonnic/goshop/models"
-	"io"
 	"io/ioutil"
 	math_rand "math/rand"
 	"net/http"
@@ -104,7 +98,9 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 	}
 	authMultipleConfig = config
 	// Create default user
-	common.Database.AutoMigrate(&models.User{})
+	if err := common.Database.AutoMigrate(&models.User{}); err != nil {
+		logger.Fatalf("%+v", err)
+	}
 	if users, err := models.GetUsers(common.Database); err != nil || len(users) == 0 {
 		user := models.User{
 			Enabled:        true,
@@ -115,13 +111,17 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 			Role: models.ROLE_ROOT,
 			Notification: true,
 		}
-		models.CreateUser(common.Database, &user)
+		if _, err := models.CreateUser(common.Database, &user); err != nil {
+			logger.Fatalf("%+v", err)
+		}
 	}
 	if config.UseForm {
 		// Check pages
 		if p := path.Join(dir, TEMPLATES_FOLDER); len(p) > 0 {
 			if _, err := os.Stat(p); err != nil {
-				os.MkdirAll(p, 0755)
+				if err := os.MkdirAll(p, 0755); err != nil {
+					logger.Fatalf("%+v", err)
+				}
 			}
 			if p := path.Join(p, "login.html"); len(p) > 0 {
 				if _, err := os.Stat(p); err != nil {
@@ -282,7 +282,9 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 						}
 					}
 				}
-				c.Redirect("/", http.StatusFound)
+				if err = c.Redirect("/", http.StatusFound); err != nil {
+					logger.Warningf("%+v", err)
+				}
 			}else{
 				c.Status(http.StatusInternalServerError)
 				c.JSON(fiber.Map{"ERROR": err.Error()})
@@ -647,46 +649,3 @@ type JWTClaims struct {
 var JWTSecret = []byte(HASH16)
 var JWTLoginDuration = time.Duration(1) * time.Hour
 var JWTRefreshDuration = time.Duration(5) * time.Minute
-
-func encrypt(key, text []byte) ([]byte, error) {
-	// IMPORTANT: Key should be 32 bytes length, if different make md5sum of key to have exactly 32 bytes!
-	if len(key) != 32 {
-		key = []byte(fmt.Sprintf("%x", md5.Sum(key)))
-	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	b := base64.StdEncoding.EncodeToString(text)
-	ciphertext := make([]byte, aes.BlockSize+len(b))
-	iv := ciphertext[:aes.BlockSize]
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		return nil, err
-	}
-	cfb := cipher.NewCFBEncrypter(block, iv)
-	cfb.XORKeyStream(ciphertext[aes.BlockSize:], []byte(b))
-	return ciphertext, nil
-}
-
-func decrypt(key, text []byte) ([]byte, error) {
-	// IMPORTANT: Key should be 32 bytes length, if different make md5sum of key to have exactly 32 bytes!
-	if len(key) != 32 {
-		key = []byte(fmt.Sprintf("%x", md5.Sum(key)))
-	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	if len(text) < aes.BlockSize {
-		return nil, errors.New("ciphertext too short")
-	}
-	iv := text[:aes.BlockSize]
-	text = text[aes.BlockSize:]
-	cfb := cipher.NewCFBDecrypter(block, iv)
-	cfb.XORKeyStream(text, text)
-	data, err := base64.StdEncoding.DecodeString(string(text))
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}

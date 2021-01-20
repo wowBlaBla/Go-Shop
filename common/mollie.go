@@ -74,7 +74,6 @@ func (m Mollie) GetOrders() ([]mollie.Order, error) {
 	}else{
 		return orders, err
 	}
-	return orders, nil
 }
 
 func (m Mollie) CreateOrder(params *mollie.Order) (*mollie.Order, map[string]*mollie.Link, error) {
@@ -192,7 +191,6 @@ func (m Mollie) GetPayments() ([]mollie.Payment, error) {
 	}else{
 		return payments, err
 	}
-	return payments, nil
 }
 
 func (m Mollie) CreatePayment(params *mollie.Payment) (*mollie.Payment, error) {

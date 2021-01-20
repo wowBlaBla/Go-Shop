@@ -1,5 +1,13 @@
 # Development
 
+Linter
+
+```bash
+$:~ docker run --rm -v $(pwd):/app -w /app golangci/golangci-lint:v1.35.2 golangci-lint run -v
+```
+
+Source: https://github.com/golangci/golangci-lint
+
 ## Swagger
 
 Run to update swagger doc after annotations changes

@@ -20,7 +20,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210118151640"
+	COMPILED = "20210119170039"
 	//
 	Started          time.Time
 	Config           *config.Config
@@ -141,7 +141,7 @@ func WriteCategoryFile(p string, categoryFile *CategoryFile) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(p, bts, 644)
+	return ioutil.WriteFile(p, bts, 0644)
 }
 
 /**/
@@ -298,7 +298,7 @@ func WriteProductFile(p string, productFile *ProductFile) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(p, bts, 644)
+	return ioutil.WriteFile(p, bts, 0644)
 }
 
 /* Option */
@@ -370,7 +370,7 @@ func WriteOptionFile(p string, optionFile *OptionFile) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(p, bts, 644)
+	return ioutil.WriteFile(p, bts, 0644)
 }
 
 /* Value */
@@ -451,7 +451,7 @@ func WriteValueFile(p string, valueFile *ValueFile) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(p, bts, 644)
+	return ioutil.WriteFile(p, bts, 0644)
 }
 /**/
 
