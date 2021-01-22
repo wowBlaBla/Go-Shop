@@ -831,7 +831,7 @@ func postCategoriesHandler(c *fiber.Ctx) error {
 								return c.JSON(HTTPError{err.Error()})
 							}
 							// TODO: Update category with Thumbnail
-							category.Thumbnail = "/" + path.Join("storage", "categories", filename)
+							category.Thumbnail = "/" + path.Join("categories", filename)
 							if err = models.UpdateCategory(common.Database, category); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
@@ -1256,7 +1256,7 @@ func putCategoryHandler(c *fiber.Ctx) error {
 							return c.JSON(HTTPError{err.Error()})
 						}
 						// TODO: Update category with Thumbnail
-						category.Thumbnail = "/" + path.Join("storage", "categories", filename)
+						category.Thumbnail = "/" + path.Join("categories", filename)
 					}
 				}
 			}
@@ -1879,11 +1879,17 @@ func postProductsHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Description"]; found && len(v) > 0 {
 				description = strings.TrimSpace(v[0])
 			}
+			var basePrice float64
+			if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					basePrice = vv
+				}
+			}
 			var content string
 			if v, found := data.Value["Content"]; found && len(v) > 0 {
 				content = strings.TrimSpace(v[0])
 			}
-			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Content: content}
+			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, BasePrice: basePrice, Content: content}
 			if id, err := models.CreateProduct(common.Database, product); err == nil {
 				// Create new product automatically
 				if name == "" {
@@ -1917,7 +1923,7 @@ func postProductsHandler(c *fiber.Ctx) error {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
 							}
-							product.Thumbnail = "/" + path.Join("storage", "products", filename)
+							product.Thumbnail = "/" + path.Join("products", filename)
 							if err = models.UpdateProduct(common.Database, product); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
@@ -2127,7 +2133,8 @@ func postProductsListHandler(c *fiber.Ctx) error {
 			for rows.Next() {
 				var item ProductsListItem
 				if err = common.Database.ScanRows(rows, &item); err == nil {
-
+					item.VariationsIds = strings.TrimRight(item.VariationsIds, ", ")
+					item.VariationsTitles = strings.TrimRight(item.VariationsTitles, ", ")
 					response.Data = append(response.Data, item)
 				} else {
 					logger.Errorf("%v", err)
@@ -2250,6 +2257,12 @@ func putProductHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Description"]; found && len(v) > 0 {
 				description = strings.TrimSpace(v[0])
 			}
+			var basePrice float64
+			if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					basePrice = vv
+				}
+			}
 			var content string
 			if v, found := data.Value["Content"]; found && len(v) > 0 {
 				content = strings.TrimSpace(v[0])
@@ -2258,6 +2271,8 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Name = name
 			product.Title = title
 			product.Description = description
+			oldBasePrice := product.BasePrice
+			product.BasePrice = basePrice
 			product.Content = content
 			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
 				// To delete existing
@@ -2288,11 +2303,20 @@ func putProductHandler(c *fiber.Ctx) error {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
 						}
-						product.Thumbnail = "/" + path.Join("storage", "products", filename)
+						product.Thumbnail = "/" + path.Join("products", filename)
 					}
 				}
 			}
-			logger.Infof("product.Description: %+v", product.Description)
+			if variations, err := models.GetProductVariations(common.Database, int(product.ID)); err == nil {
+				for _, variation := range variations {
+					if variation.Name == "default" && math.Abs(oldBasePrice - basePrice) > 0.01 {
+						variation.BasePrice = product.BasePrice
+						if err := models.UpdateVariation(common.Database, variation); err != nil {
+							logger.Warningf("%+v", err)
+						}
+					}
+				}
+			}
 			if err = models.UpdateProduct(common.Database, product); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
@@ -2746,7 +2770,8 @@ func postVariationsListHandler(c *fiber.Ctx) error {
 			for rows.Next() {
 				var item VariationsListItem
 				if err = common.Database.ScanRows(rows, &item); err == nil {
-					
+					item.PropertiesIds = strings.TrimRight(item.PropertiesIds, ", ")
+					item.PropertiesTitles = strings.TrimRight(item.PropertiesTitles, ", ")
 					response.Data = append(response.Data, item)
 				} else {
 					logger.Errorf("%v", err)
@@ -2919,7 +2944,7 @@ func postVariationHandler(c *fiber.Ctx) error {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
 							}
-							variation.Thumbnail = "/" + path.Join("storage", "variations", filename)
+							variation.Thumbnail = "/" + path.Join("variations", filename)
 							if err = models.UpdateVariation(common.Database, variation); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
@@ -3057,7 +3082,7 @@ func putVariationHandler(c *fiber.Ctx) error {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
 						}
-						variation.Thumbnail = "/" + path.Join("storage", "variations", filename)
+						variation.Thumbnail = "/" + path.Join("variations", filename)
 					}
 				}
 			}
@@ -3404,6 +3429,9 @@ func postPropertiesListHandler(c *fiber.Ctx) error {
 			for rows.Next() {
 				var item PropertiesListItem
 				if err = common.Database.ScanRows(rows, &item); err == nil {
+					item.ValuesValues = strings.TrimRight(item.ValuesValues, ", ")
+					item.PricesIds = strings.TrimRight(item.PricesIds, ", ")
+					item.PricesPrices = strings.TrimRight(item.PricesPrices, ", ")
 					response.Data = append(response.Data, item)
 				} else {
 					logger.Errorf("%v", err)
@@ -4472,6 +4500,7 @@ func postOptionsListHandler(c *fiber.Ctx) error {
 			for rows.Next() {
 				var item OptionsListItem
 				if err = common.Database.ScanRows(rows, &item); err == nil {
+					item.ValuesValues = strings.TrimRight(item.ValuesValues, ", ")
 					response.Data = append(response.Data, item)
 				} else {
 					logger.Errorf("%v", err)
@@ -4800,7 +4829,7 @@ func postValueHandler(c *fiber.Ctx) error {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
 							}
-							value.Thumbnail = "/" + path.Join("storage", "values", filename)
+							value.Thumbnail = "/" + path.Join("values", filename)
 							if err = models.UpdateValue(common.Database, value); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
@@ -5015,6 +5044,8 @@ func putValueHandler(c *fiber.Ctx) error {
 		if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
 			data, err := c.Request().MultipartForm()
 			if err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
 				return err
 			}
 			var title string
@@ -5069,7 +5100,7 @@ func putValueHandler(c *fiber.Ctx) error {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
 						}
-						value.Thumbnail = "/" + path.Join("storage", "values", filename)
+						value.Thumbnail = "/" + path.Join("values", filename)
 						if err = models.UpdateValue(common.Database, value); err != nil {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
@@ -6741,6 +6772,7 @@ type TransportView struct{
 	Enabled bool
 	Name string
 	Title string
+	Thumbnail string
 	Weight float64
 	Volume float64
 	Order string
@@ -6805,38 +6837,104 @@ type NewTransport struct {
 func postTransportHandler(c *fiber.Ctx) error {
 	var view TransportView
 	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
-			var request NewTransport
-			if err := c.BodyParser(&request); err != nil {
-				return err
-			}
-			request.Title = strings.TrimSpace(request.Title)
-			if request.Title == "" {
+		if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
+			data, err := c.Request().MultipartForm()
+			if err != nil {
 				c.Status(http.StatusInternalServerError)
-				return c.JSON(fiber.Map{"ERROR": "Title is not defined"})
+				return c.JSON(HTTPError{err.Error()})
 			}
-			if request.Name == "" {
-				request.Name = strings.TrimSpace(request.Name)
-				request.Name = reNotAbc.ReplaceAllString(strings.ToLower(request.Title), "-")
+			var enabled bool
+			if v, found := data.Value["Enabled"]; found && len(v) > 0 {
+				enabled, err = strconv.ParseBool(v[0])
+				if err != nil {
+					logger.Infof("%+v", err)
+				}
 			}
-			if transports, err := models.GetTransportsByName(common.Database, request.Name); err == nil && len(transports) > 0 {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Transport exists"})
+			var name string
+			if v, found := data.Value["Name"]; found && len(v) > 0 {
+				name = strings.TrimSpace(v[0])
 			}
-			request.Order = strings.TrimSpace(request.Order)
-			request.Item = strings.TrimSpace(request.Item)
+			var title string
+			if v, found := data.Value["Title"]; found && len(v) > 0 {
+				title = strings.TrimSpace(v[0])
+			}
+			var weight float64
+			if v, found := data.Value["Weight"]; found && len(v) > 0 {
+				weight, err = strconv.ParseFloat(v[0],10)
+				if err != nil {
+					logger.Infof("%+v", err)
+				}
+			}
+			var volume float64
+			if v, found := data.Value["Volume"]; found && len(v) > 0 {
+				volume, err = strconv.ParseFloat(v[0],10)
+				if err != nil {
+					logger.Infof("%+v", err)
+				}
+			}
+			var order string
+			if v, found := data.Value["Order"]; found && len(v) > 0 {
+				order = strings.TrimSpace(v[0])
+			}
+			var item string
+			if v, found := data.Value["Item"]; found && len(v) > 0 {
+				item = strings.TrimSpace(v[0])
+			}
+			var kg float64
+			if v, found := data.Value["Kg"]; found && len(v) > 0 {
+				kg, err = strconv.ParseFloat(v[0],10)
+				if err != nil {
+					logger.Infof("%+v", err)
+				}
+			}
+			var m3 float64
+			if v, found := data.Value["M3"]; found && len(v) > 0 {
+				m3, err = strconv.ParseFloat(v[0],10)
+				if err != nil {
+					logger.Infof("%+v", err)
+				}
+			}
 			transport := &models.Transport {
-				Enabled: request.Enabled,
-				Name: request.Name,
-				Title: request.Title,
-				Weight: request.Weight,
-				Volume: request.Volume,
-				Order: request.Order,
-				Item: request.Item,
-				Kg: request.Kg,
-				M3: request.M3,
+				Enabled: enabled,
+				Name: name,
+				Title: title,
+				Weight: weight,
+				Volume: volume,
+				Order: order,
+				Item: item,
+				Kg: kg,
+				M3: m3,
 			}
-			if _, err := models.CreateTransport(common.Database, transport); err != nil {
+			if id, err := models.CreateTransport(common.Database, transport); err == nil {
+				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
+					p := path.Join(dir, "storage", "values")
+					if _, err := os.Stat(p); err != nil {
+						if err = os.MkdirAll(p, 0755); err != nil {
+							logger.Errorf("%v", err)
+						}
+					}
+					filename := fmt.Sprintf("%d-%s-thumbnail%s", id, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(transport.Name, "-"), path.Ext(v[0].Filename))
+					if p := path.Join(p, filename); len(p) > 0 {
+						if in, err := v[0].Open(); err == nil {
+							out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
+							if err != nil {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+							defer out.Close()
+							if _, err := io.Copy(out, in); err != nil {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+							transport.Thumbnail = "/" + path.Join("transports", filename)
+							if err = models.UpdateTransport(common.Database, transport); err != nil {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+						}
+					}
+				}
+			}else{
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
@@ -7014,42 +7112,131 @@ func getTransportHandler(c *fiber.Ctx) error {
 // @Router /api/v1/transports/{id} [put]
 // @Tags transport
 func putTransportHandler(c *fiber.Ctx) error {
-	var request TransportView
-	if err := c.BodyParser(&request); err != nil {
-		return err
-	}
+	var transport *models.Transport
 	var id int
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)
+		var err error
+		if transport, err = models.GetTransport(common.Database, id); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
 	}else{
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
 	}
-	var transport *models.Transport
-	var err error
-	if transport, err = models.GetTransport(common.Database, int(id)); err != nil {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
+			data, err := c.Request().MultipartForm()
+			if err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			var enabled bool
+			if v, found := data.Value["Enabled"]; found && len(v) > 0 {
+				enabled, err = strconv.ParseBool(v[0])
+				if err != nil {
+					logger.Infof("%+v", err)
+				}
+			}
+			var title string
+			if v, found := data.Value["Title"]; found && len(v) > 0 {
+				title = strings.TrimSpace(v[0])
+			}
+			var weight float64
+			if v, found := data.Value["Weight"]; found && len(v) > 0 {
+				weight, err = strconv.ParseFloat(v[0],10)
+				if err != nil {
+					logger.Infof("%+v", err)
+				}
+			}
+			var volume float64
+			if v, found := data.Value["Volume"]; found && len(v) > 0 {
+				volume, err = strconv.ParseFloat(v[0],10)
+				if err != nil {
+					logger.Infof("%+v", err)
+				}
+			}
+			var order string
+			if v, found := data.Value["Order"]; found && len(v) > 0 {
+				order = strings.TrimSpace(v[0])
+			}
+			var item string
+			if v, found := data.Value["Item"]; found && len(v) > 0 {
+				item = strings.TrimSpace(v[0])
+			}
+			var kg float64
+			if v, found := data.Value["Kg"]; found && len(v) > 0 {
+				kg, err = strconv.ParseFloat(v[0],10)
+				if err != nil {
+					logger.Infof("%+v", err)
+				}
+			}
+			var m3 float64
+			if v, found := data.Value["M3"]; found && len(v) > 0 {
+				m3, err = strconv.ParseFloat(v[0],10)
+				if err != nil {
+					logger.Infof("%+v", err)
+				}
+			}
+			transport.Enabled = enabled
+			transport.Title = title
+			transport.Weight = weight
+			transport.Volume = volume
+			transport.Order = order
+			transport.Item = item
+			transport.Kg = kg
+			transport.M3 = m3
+			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
+				// To delete existing
+				if transport.Thumbnail != "" {
+					if err = os.Remove(path.Join(dir, transport.Thumbnail)); err != nil {
+						logger.Errorf("%v", err)
+					}
+					transport.Thumbnail = ""
+				}
+			}else if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
+				p := path.Join(dir, "storage", "transports")
+				if _, err := os.Stat(p); err != nil {
+					if err = os.MkdirAll(p, 0755); err != nil {
+						logger.Errorf("%v", err)
+					}
+				}
+				filename := fmt.Sprintf("%d-%s-thumbnail%s", id, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(transport.Name, "-"), path.Ext(v[0].Filename))
+				if p := path.Join(p, filename); len(p) > 0 {
+					if in, err := v[0].Open(); err == nil {
+						out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
+						if err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+						defer out.Close()
+						if _, err := io.Copy(out, in); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+						transport.Thumbnail = "/" + path.Join("transports", filename)
+						if err = models.UpdateTransport(common.Database, transport); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+					}
+				}
+			}
+			//
+			if err := models.UpdateTransport(common.Database, transport); err == nil {
+				return c.JSON(TransportView{ID: transport.ID, Title: transport.Title, Thumbnail: transport.Thumbnail})
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Unsupported Content-Type"})
+		}
 	}
-	request.Title = strings.TrimSpace(request.Title)
-	if request.Title == "" {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(fiber.Map{"ERROR": "Title is not defined"})
-	}
-	transport.Enabled = request.Enabled
-	transport.Title = request.Title
-	transport.Weight = request.Weight
-	transport.Volume = request.Volume
-	transport.Order = request.Order
-	transport.Item = request.Item
-	transport.Kg = request.Kg
-	transport.M3 = request.M3
-	if err := models.UpdateTransport(common.Database, transport); err == nil {
-		return c.JSON(TransportView{ID: transport.ID, Enabled: transport.Enabled, Name: transport.Name, Title: transport.Title})
-	}else{
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
+	c.Status(http.StatusInternalServerError)
+	return c.JSON(HTTPError{"Something went wrong"})
 }
 
 // @security BasicAuth
@@ -8221,17 +8408,28 @@ func postRenderHandler(c *fiber.Ctx) error {
 				return err
 			}
 			//
-			arguments := []string{"--cleanDestinationDir"}
+			bin := strings.Split(common.Config.Hugo.Bin, " ")
+			//
+			var arguments []string
+			if len(bin) > 1 {
+				for _, x := range bin[1:]{
+					arguments = append(arguments, x)
+				}
+			}
+			arguments = append(arguments, "--cleanDestinationDir")
 			if common.Config.Hugo.Minify {
 				arguments = append(arguments, "--minify")
 			}
-			arguments = append(arguments, []string{"-s", path.Join(dir, "hugo")}...)
-			cmd := exec.Command(common.Config.Hugo.Home, arguments...)
+			if len(bin) == 1 {
+				arguments = append(arguments, []string{"-s", path.Join(dir, "hugo")}...)
+			}
+			cmd := exec.Command(bin[0], arguments...)
 			buff := &bytes.Buffer{}
 			cmd.Stderr = buff
 			cmd.Stdout = buff
 			err := cmd.Run()
 			if err != nil {
+				logger.Infof("Output: %+v", buff.String())
 				logger.Errorf("%v", err.Error())
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
@@ -9610,7 +9808,7 @@ func postAccountOrderStripeSubmitHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
-			order.Status = models.ORDER_STATUS_PAYED
+			order.Status = models.ORDER_STATUS_PAID
 			if err = models.UpdateOrder(common.Database, order); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
@@ -9713,7 +9911,7 @@ func getAccountOrderStripeSuccessHandler(c *fiber.Ctx) error {
 												c.Status(http.StatusInternalServerError)
 												return c.JSON(HTTPError{err.Error()})
 											}
-											order.Status = models.ORDER_STATUS_PAYED
+											order.Status = models.ORDER_STATUS_PAID
 											if err = models.UpdateOrder(common.Database, order); err != nil {
 												c.Status(http.StatusInternalServerError)
 												return c.JSON(HTTPError{err.Error()})
@@ -10011,7 +10209,7 @@ func getAccountOrderMollieSuccessHandler(c *fiber.Ctx) error {
 									c.Status(http.StatusInternalServerError)
 									return c.JSON(HTTPError{err.Error()})
 								}
-								order.Status = models.ORDER_STATUS_PAYED
+								order.Status = models.ORDER_STATUS_PAID
 								if err = models.UpdateOrder(common.Database, order); err != nil {
 									c.Status(http.StatusInternalServerError)
 									return c.JSON(HTTPError{err.Error()})
@@ -10160,6 +10358,7 @@ type ProductView struct {
 	Thumbnail string `json:",omitempty"`
 	Description string `json:",omitempty"`
 	Parameters []ParameterView `json:",omitempty"`
+	BasePrice float64 `json:",omitempty"`
 	Content string
 	Upsale string
 	Variations []VariationView `json:",omitempty"`
@@ -10231,6 +10430,7 @@ func NewPassword(length int) string {
 type DeliveryCost struct {
 	ID uint
 	Title string
+	Thumbnail string
 	By string
 	OrderFee string `json:",omitempty"`
 	ItemFee string `json:",omitempty"`
@@ -10250,6 +10450,7 @@ func Calculate(transport *models.Transport, tariff *models.Tariff, items []NewIt
 	result := &DeliveryCost{
 		ID: transport.ID,
 		Title: transport.Title,
+		Thumbnail: transport.Thumbnail,
 		Special: tariff != nil,
 	}
 	//

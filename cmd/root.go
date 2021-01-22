@@ -13,6 +13,7 @@ import (
 	"github.com/yonnic/goshop/handler"
 	"github.com/yonnic/goshop/models"
 	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"io/ioutil"
@@ -67,8 +68,8 @@ func initConfig() {
 				Code: "de",
 			},
 		}*/
-		common.Config.Hugo.Home = config.DEFAULT_HUGO
-		common.Config.Hugo.Theme = "default"
+		common.Config.Hugo.Bin = config.DEFAULT_HUGO
+		common.Config.Hugo.Theme = "multikart"
 		common.Config.Hugo.Minify = true
 		common.Config.Resize.Quality = 75
 		common.Config.Currency = "usd"
@@ -111,8 +112,18 @@ func initConfig() {
 		}
 	}
 	if !ok {
-		crtPath := path.Join(dir, "server.crt")
-		keyPath := path.Join(dir, "server.key")
+		crtPath := path.Join(dir, os.Getenv("SSL_FOLDER"), "server.crt")
+		if _, err := os.Stat(path.Dir(crtPath)); err != nil {
+			if err = os.MkdirAll(path.Dir(crtPath), 0755); err != nil {
+				logger.Warningf("%+v", err)
+			}
+		}
+		keyPath := path.Join(dir, os.Getenv("SSL_FOLDER"), "server.key")
+		if _, err := os.Stat(path.Dir(keyPath)); err != nil {
+			if err = os.MkdirAll(path.Dir(keyPath), 0755); err != nil {
+				logger.Warningf("%+v", err)
+			}
+		}
 		if err := config.GenerateSSL(crtPath, keyPath, strings.Join([]string{"localhost"}, ",")); err == nil {
 			common.Config.Https.Crt = crtPath
 			common.Config.Https.Key = keyPath
@@ -152,10 +163,17 @@ var RootCmd = &cobra.Command{
 		var dialer gorm.Dialector
 		if common.Config.Database.Dialer == "mysql" {
 			dialer = mysql.Open(common.Config.Database.Uri)
+		} else if common.Config.Database.Dialer == "postgres" {
+			dialer = postgres.Open(common.Config.Database.Uri)
 		} else {
 			var uri = path.Join(dir, os.Getenv("DATABASE_FOLDER"), "database.sqlite")
 			if common.Config.Database.Uri != "" {
 				uri = common.Config.Database.Uri
+			}
+			if _, err := os.Stat(path.Dir(uri)); err != nil {
+				if err = os.MkdirAll(path.Dir(uri), 0755); err != nil {
+					logger.Warningf("%+v", err)
+				}
 			}
 			dialer = sqlite.Open(uri)
 		}
@@ -171,75 +189,75 @@ var RootCmd = &cobra.Command{
 			logger.Fatalf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Category{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Product{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Parameter{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.File{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Image{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Variation{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Property{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Option{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Value{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Price{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Order{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Item{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Transaction{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Tag{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Tariff{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Transport{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.Zone{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.EmailTemplate{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		//
 		if err := common.Database.AutoMigrate(&models.CacheProduct{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.CacheImage{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.CacheVariation{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.CacheValue{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		//
 		if err := common.Database.AutoMigrate(&models.Profile{}); err != nil {
-			logger.Fatalf("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 		// Project structure
 		if admin := path.Join(dir, "admin"); len(admin) > 0 {

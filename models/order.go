@@ -5,13 +5,13 @@ import (
 )
 
 const (
-	ORDER_STATUS_NEW = "new"
+	ORDER_STATUS_NEW                  = "new"
 	ORDER_STATUS_WAITING_FROM_PAYMENT = "waiting for payment"
-	ORDER_STATUS_PAYED = "payed"
-	ORDER_STATUS_MANUFACTURING = "manufacturing"
-	ORDER_STATUS_SHIPPING = "shipping"
-	ORDER_STATUS_COMPLETE = "complete"
-	ORDER_STATUS_CANCELED = "canceled"
+	ORDER_STATUS_PAID                 = "paid"
+	ORDER_STATUS_MANUFACTURING        = "manufacturing"
+	ORDER_STATUS_SHIPPING             = "shipping"
+	ORDER_STATUS_COMPLETE             = "complete"
+	ORDER_STATUS_CANCELED             = "canceled"
 )
 
 type Order struct {

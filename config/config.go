@@ -69,8 +69,8 @@ type Config struct {
 	Resize ResizeConfig
 	//
 	Hugo struct {
-		Home string
-		Theme string
+		Bin    string
+		Theme  string
 		Minify bool
 	}
 	//

@@ -110,21 +110,14 @@ server {
 }
 ```
 
-2) Install redis server to store cookies sessions
 
-```bash
-$:~ yum install redis
-$:~ systemctl enable redis
-$:~ systemctl start redis
-```
-
-3) Install hugo - download binary from https://github.com/gohugoio/hugo/releases
+2) Install hugo - download binary from https://github.com/gohugoio/hugo/releases
 Put in /opt/hugo
 ```bash
 $:~ ln -s /opt/hugo/hugo /bin/hugo
 ``` 
 
-4) Install wrangler - https://www.npmjs.com/package/@cloudflare/wrangler 
+3) Install wrangler - https://www.npmjs.com/package/@cloudflare/wrangler 
 use npm (node v12) make auth from console by
 
 ```bash

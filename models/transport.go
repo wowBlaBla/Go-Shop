@@ -7,6 +7,7 @@ type Transport struct {
 	Enabled bool
 	Name  string
 	Title string
+	Thumbnail string
 	Weight float64 `sql:"type:decimal(8,2);"`
 	Volume float64 `sql:"type:decimal(8,3);"`
 	Order string

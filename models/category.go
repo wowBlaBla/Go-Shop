@@ -7,7 +7,7 @@ import (
 
 type Category struct {
 	gorm.Model
-	Name string `gorm:"size:255;index:idx_name,unique"`
+	Name string `gorm:"size:255;index:idx_category_name,unique"`
 	Title string
 	Description string
 	Thumbnail string

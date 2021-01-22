@@ -10,6 +10,7 @@ import (
 	"github.com/yonnic/goshop/config"
 	"github.com/yonnic/goshop/models"
 	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"image/jpeg"
@@ -43,7 +44,9 @@ var renderCmd = &cobra.Command{
 		var dialer gorm.Dialector
 		if common.Config.Database.Dialer == "mysql" {
 			dialer = mysql.Open(common.Config.Database.Uri)
-		}else {
+		} else if common.Config.Database.Dialer == "postgres" {
+			dialer = postgres.Open(common.Config.Database.Uri)
+		} else {
 			var uri = path.Join(dir, os.Getenv("DATABASE_FOLDER"), "database.sqlite")
 			if common.Config.Database.Uri != "" {
 				uri = common.Config.Database.Uri
@@ -62,7 +65,6 @@ var renderCmd = &cobra.Command{
 		logger.Infof("Configure Hugo Theme index")
 		if p := path.Join(dir, "hugo", "themes", common.Config.Hugo.Theme, "layouts", "partials", "scripts.html"); len(p) > 0 {
 			if _, err = os.Stat(p); err == nil {
-				logger.Infof("p: %+v", p)
 				if bts, err := ioutil.ReadFile(p); err == nil {
 					content := string(bts)
 					content = strings.ReplaceAll(content, "%API_URL%", common.Config.Base)
@@ -143,7 +145,7 @@ var renderCmd = &cobra.Command{
 			}
 			logger.Infof("Categories found: %v", len(categories))
 			for i, category := range categories {
-				logger.Infof("Category %d: %+v", i, category)
+				logger.Infof("Category %d: %v %v", i, category.Name, category.Title)
 				breadcrumbs := &[]*models.Category{}
 				var f3 func(connector *gorm.DB, id uint)
 				f3 = func(connector *gorm.DB, id uint) {
@@ -190,34 +192,10 @@ var renderCmd = &cobra.Command{
 										Type:    "categories",
 										Content: category.Content,
 									}
-									// Copy image
-									/*if category.Thumbnail != "" {
-										if p1 := path.Join(dir, category.Thumbnail); len(p1) > 0 {
-											if fi, err := os.Stat(p1); err == nil {
-												p2 := path.Join(path.Dir(p2), fmt.Sprintf("thumbnail-%d%v", fi.ModTime().Unix(), path.Ext(p1)))
-												logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-												if err = common.Copy((p1, p2); err != nil {
-													logger.Warningf("%v", err)
-												}
-												//
-												if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
-													if images, err := imageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
-														thumbnails := []string{category.Thumbnail}
-														for _, image := range images {
-															thumbnails = append(thumbnails, fmt.Sprintf("/%s/resize/%s %s", path.Dir(category.Thumbnail), image.Filename, image.Size))
-														}
-														categoryFile.Thumbnail = strings.Join(thumbnails, ",")
-													} else {
-														logger.Warningf("%v", err)
-													}
-												}
-											}
-										}
-									}*/
 									//
 									if category.Thumbnail != "" {
 										//p0 := path.Join(p1, product.Country)
-										if p1 := path.Join(dir, category.Thumbnail); len(p1) > 0 {
+										if p1 := path.Join(dir, "storage", category.Thumbnail); len(p1) > 0 {
 											if fi, err := os.Stat(p1); err == nil {
 												filename := fmt.Sprintf("thumbnail-%d%v", fi.ModTime().Unix(), path.Ext(p1))
 												p2 := path.Join(path.Dir(p2), filename)
@@ -351,7 +329,7 @@ var renderCmd = &cobra.Command{
 																		//
 																		var thumbnail string
 																		if parameter.Value.Thumbnail != "" {
-																			if p1 := path.Join(dir, parameter.Value.Thumbnail); len(p1) > 0 {
+																			if p1 := path.Join(dir, "storage", parameter.Value.Thumbnail); len(p1) > 0 {
 																				if fi, err := os.Stat(p1); err == nil {
 																					filename := filepath.Base(p1)
 																					filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
@@ -406,7 +384,7 @@ var renderCmd = &cobra.Command{
 																}
 																var thumbnail string
 																if parameter.Value.Thumbnail != "" {
-																	if p1 := path.Join(dir, parameter.Value.Thumbnail); len(p1) > 0 {
+																	if p1 := path.Join(dir, "storage", parameter.Value.Thumbnail); len(p1) > 0 {
 																		if fi, err := os.Stat(p1); err == nil {
 																			filename := filepath.Base(p1)
 																			filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
@@ -473,7 +451,7 @@ var renderCmd = &cobra.Command{
 																			//
 																			var thumbnail string
 																			if price.Value.Thumbnail != "" {
-																				if p1 := path.Join(dir, price.Value.Thumbnail); len(p1) > 0 {
+																				if p1 := path.Join(dir, "storage", price.Value.Thumbnail); len(p1) > 0 {
 																					if fi, err := os.Stat(p1); err == nil {
 																						filename := filepath.Base(p1)
 																						filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
@@ -535,7 +513,7 @@ var renderCmd = &cobra.Command{
 																		//
 																		var thumbnail string
 																		if price.Value.Thumbnail != "" {
-																			if p1 := path.Join(dir, price.Value.Thumbnail); len(p1) > 0 {
+																			if p1 := path.Join(dir, "storage", price.Value.Thumbnail); len(p1) > 0 {
 																				if fi, err := os.Stat(p1); err == nil {
 																					filename := filepath.Base(p1)
 																					filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
@@ -615,7 +593,7 @@ var renderCmd = &cobra.Command{
 								var thumbnails []string
 								if product.Thumbnail != "" {
 									p0 := path.Join(p1, product.Name)
-									if p1 := path.Join(dir, product.Thumbnail); len(p1) > 0 {
+									if p1 := path.Join(dir, "storage", product.Thumbnail); len(p1) > 0 {
 										if fi, err := os.Stat(p1); err == nil {
 											filename := fmt.Sprintf("thumbnail-%d%v", fi.ModTime().Unix(), path.Ext(p1))
 											p2 := path.Join(p0, filename)
@@ -733,7 +711,7 @@ var renderCmd = &cobra.Command{
 										}
 										// Thumbnail
 										if variation.Thumbnail != "" {
-											if p1 := path.Join(dir, variation.Thumbnail); len(p1) > 0 {
+											if p1 := path.Join(dir, "storage", variation.Thumbnail); len(p1) > 0 {
 												if fi, err := os.Stat(p1); err == nil {
 													filename := filepath.Base(p1)
 													filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
@@ -785,7 +763,7 @@ var renderCmd = &cobra.Command{
 												}
 												// Thumbnail
 												if price.Value.Thumbnail != "" {
-													if p1 := path.Join(dir, price.Value.Thumbnail); len(p1) > 0 {
+													if p1 := path.Join(dir, "storage", price.Value.Thumbnail); len(p1) > 0 {
 														if fi, err := os.Stat(p1); err == nil {
 															filename := filepath.Base(p1)
 															filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
@@ -959,69 +937,27 @@ var renderCmd = &cobra.Command{
 				}
 			}
 		}
-
-		/*result := struct {
-			ZIP string
-			Date time.Time
-			Tags []string
-			Categories []string
-			Images []string
-			Thumbnail string
-			BasePrice string
-			ComparePrice *models.Price
-			InStock bool
-		}{
-			ZIP: "Duke2",
-			Date: time.Now(),
-			Tags: []string{"Floor Light"},
-			Categories: []string{"Floor Light"},
-			Images: []string{"img/duke/1.jpg", "img/duke/2.jpg", "img/duke/3.jpg"},
-			Thumbnail: "img/duke/thumbnail.jpg",
-			BasePrice: "₹ 87,341.00",
-			ComparePrice: nil,
-			InStock: true,
+		// Transports
+		if transports, err := models.GetTransports(common.Database); err == nil {
+			for _, transport := range transports {
+				if transport.Thumbnail != "" {
+					if p1 := path.Join(dir, "storage", transport.Thumbnail); len(p1) > 0 {
+						if fi, err := os.Stat(p1); err == nil {
+							p2 := path.Join(dir, "hugo", "static", "images", "transports", path.Base(p1))
+							logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+							if _, err := os.Stat(path.Dir(p2)); err != nil {
+								if err = os.MkdirAll(path.Dir(p2), 0755); err != nil {
+									logger.Warningf("%v", err)
+								}
+							}
+							if err = common.Copy(p1, p2); err != nil {
+								logger.Warningf("%v", err)
+							}
+						}
+					}
+				}
+			}
 		}
-		// JSON
-		if bts, err := json.MarshalIndent(&result, "", "   "); err == nil {
-			file := path.Join(output, fmt.Sprintf("%d-%s.md", 1, "hello"))
-			if _, err := os.Stat(path.Dir(file)); err != nil {
-				if err = os.MkdirAll(path.Dir(file), 0755); err != nil {
-					logger.Error("%v", err)
-					return
-				}
-			}
-			bts = []byte(fmt.Sprintf(`%s
-
-Some content here`, string(bts)))
-			if err = ioutil.WriteFile(file, bts, 0755); err == nil {
-				logger.Infof("File %v wrote %v", file, len(bts))
-			} else {
-				logger.Error("%v", err)
-			}
-		}else{
-			logger.Error("%v", err)
-		}*/
-		// YAML
-		/*if bts, err := yaml.Marshal(&result); err == nil {
-			file := path.Join(output, "first.md")
-			if _, err := os.Stat(path.Dir(file)); err != nil {
-				if err = os.MkdirAll(path.Dir(file), 0755); err != nil {
-					logger.Error("%v", err)
-					return
-				}
-			}
-			bts = []byte(fmt.Sprintf(`---
-%s
----
-Some content here`, string(bts)))
-			if err = ioutil.WriteFile(file, bts, 0755); err == nil {
-				logger.Infof("File %v wrote %v", file, len(bts))
-			} else {
-				logger.Error("%v", err)
-			}
-		}else{
-			logger.Error("%v", err)
-		}*/
 		logger.Infof("Rendered ~ %.3f ms", float64(time.Since(t1).Nanoseconds())/1000000)
 	},
 }

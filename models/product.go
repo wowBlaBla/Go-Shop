@@ -7,12 +7,15 @@ import (
 type Product struct {
 	gorm.Model
 	Enabled bool
-	Name        string `gorm:"size:255;index:idx_name,unique"`
+	Name        string `gorm:"size:255;index:idx_product_name,unique"`
 	Title       string
 	Description string
 	Thumbnail   string
 	Parameters  []*Parameter `gorm:"foreignKey:ProductId"`
 	Content 	string
+	// ONLY TO USE AS DEFAULT VALUE FOR VIRIATIONS
+	BasePrice float64          `sql:"type:decimal(8,2);"`
+	//
 	Categories  []*Category  `gorm:"many2many:categories_products;"`
 	Variations  []*Variation `gorm:"foreignKey:ProductId"`
 	Files       []*File     `gorm:"many2many:products_files;"`
