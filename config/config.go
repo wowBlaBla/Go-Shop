@@ -26,6 +26,7 @@ const (
 	DEFAULT_PORT = 18092
 	DEFAULT_HTTPS_PORT = 18492
 	DEFAULT_HUGO = "hugo"
+	DEFAULT_DATABASE_URI = "database/sqlite/database.sqlite"
 )
 
 var (
@@ -66,6 +67,8 @@ type Config struct {
 		Languages []Language
 	}
 	//
+	Products string
+	//
 	Resize ResizeConfig
 	//
 	Hugo struct {
@@ -73,6 +76,7 @@ type Config struct {
 		Theme  string
 		Minify bool
 	}
+	Wrangler WranglerConfig
 	//
 	Currency string // usd, eur
 	//
@@ -83,6 +87,12 @@ type Config struct {
 		Url string
 	}
 	Modified time.Time
+}
+
+type WranglerConfig struct {
+	Enabled bool
+	Bin string
+	ApiToken string
 }
 
 type PaymentConfig struct {
@@ -97,6 +107,14 @@ type PaymentConfig struct {
 		Enabled bool
 		Key string
 		ProfileID string
+		Methods string
+	}
+	AdvancePayment struct {
+		Enabled bool
+		Details string `json:",omitempty"`
+	}
+	OnDelivery struct {
+		Enabled bool
 	}
 	VAT float64
 }

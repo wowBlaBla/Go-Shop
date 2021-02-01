@@ -21,6 +21,7 @@ import (
 	"github.com/yonnic/goshop/config"
 	"github.com/yonnic/goshop/models"
 	"gorm.io/gorm"
+	"html/template"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -44,11 +45,13 @@ import (
 )
 
 const (
-	HAS_CHANGES = ".has_changes"
+	HAS_CHANGES = "temp/.has_changes"
 )
 
 var (
+	reCSV = regexp.MustCompile(`,\s*`)
 	reNotAbc = regexp.MustCompile("(?i)[^a-z0-9]+")
+	reVolume = regexp.MustCompile(`^(\d+)\s*x\s*(\d+)\s*x\s*(\d+)\s*$`)
 )
 
 
@@ -69,7 +72,15 @@ func GetFiber() *fiber.App {
 	//
 	changed := func (messages ...string) func (c *fiber.Ctx) error {
 		return func (c *fiber.Ctx) error {
-			file, err := os.OpenFile(path.Join(dir, HAS_CHANGES),
+			p := path.Join(dir, HAS_CHANGES)
+			if pp := path.Dir(p); len(pp) > 0 {
+				if _, err := os.Stat(pp); err != nil {
+					if err = os.MkdirAll(pp, 0755); err != nil {
+						logger.Warningf("%v", err)
+					}
+				}
+			}
+			file, err := os.OpenFile(p,
 				os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
 				logger.Warningf("%v", err)
@@ -111,6 +122,8 @@ func GetFiber() *fiber.App {
 	v1.Put("/settings/basic", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("basic settings updated"), putBasicSettingsHandler)
 	v1.Get("/settings/hugo", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getHugoSettingsHandler)
 	v1.Put("/settings/hugo", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("hugo settings updated"), putHugoSettingsHandler)
+	v1.Get("/settings/wrangler", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getWranglerSettingsHandler)
+	v1.Put("/settings/wrangler", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("wrangler settings updated"), putWranglerSettingsHandler)
 	//
 	v1.Get("/categories", authMulti, getCategoriesHandler)
 	v1.Post("/categories", authMulti, changed("category created"), postCategoriesHandler)
@@ -238,6 +251,7 @@ func GetFiber() *fiber.App {
 	v1.Post("/publish", authMulti, postPublishHandler)
 	//
 	v1.Get("/account", authMulti, getAccountHandler)
+	v1.Put("/account", authMulti, putAccountHandler)
 	v1.Post("/account/profiles", authMulti, postAccountProfileHandler)
 	//
 	v1.Get("/account/orders", authMulti, getAccountOrdersHandler)
@@ -245,6 +259,11 @@ func GetFiber() *fiber.App {
 	v1.Get("/account/orders/:id", authMulti, getAccountOrderHandler)
 	v1.Put("/account/orders/:id", authMulti, putAccountOrderHandler)
 	v1.Post("/account/orders/:id/checkout", authMulti, postAccountOrderCheckoutHandler)
+	v1.Get("/account/orders/:id/payment_methods", authMulti, getAccountPaymentMethodsHandler)
+	// Advance Payment
+	v1.Post("/account/orders/:id/advance_payment/submit", authMulti, postAccountOrderAdvancePaymentSubmitHandler)
+	// On Delivery
+	v1.Post("/account/orders/:id/on_delivery/submit", authMulti, postAccountOrderOnDeliverySubmitHandler)
 	// Stripe
 	v1.Get("/account/orders/:id/stripe/customer", authMulti, getAccountOrderStripeCustomerHandler) // +
 	v1.Get("/account/orders/:id/stripe/card", authMulti, getAccountOrderStripeCardHandler) // +
@@ -603,8 +622,6 @@ type HugoSettingsRequest struct {
 // @Router /api/v1/settings/hugo [put]
 // @Tags settings
 func putHugoSettingsHandler(c *fiber.Ctx) error {
-	var request HugoSettingsRequest
-
 	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
 		if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
 			data, err := c.Request().MultipartForm()
@@ -658,7 +675,7 @@ func putHugoSettingsHandler(c *fiber.Ctx) error {
 					conf.Paginate = vv
 				}
 			}
-			f, err := os.Create(path.Join(dir, "hugo", "config2.toml"))
+			f, err := os.Create(path.Join(dir, "hugo", "config.toml"))
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -673,21 +690,118 @@ func putHugoSettingsHandler(c *fiber.Ctx) error {
 			return c.JSON(HTTPError{"Unsupported Content-Type"})
 		}
 	}
+	c.Status(http.StatusInternalServerError)
+	return c.JSON(HTTPError{"Something went wrong"})
+}
 
 
 
+type WranglerSettingsView struct {
+	Name string `toml:"name"`
+	Type string `toml:"type"`
+	AccountId string `toml:"account_id"`
+	WorkersDev bool `toml:"workers_dev"`
+	Route string `toml:"route"`
+	ZoneId string `toml:"zone_id"`
+	Site struct {
+		Bucket string `toml:"bucket"`
+	} `toml:"site"`
+}
 
-
-	f, err := os.Create(path.Join(dir, "hugo", "config.toml"))
-	if err != nil {
-		log.Fatal(err)
+// GetWranglerSettings godoc
+// @Summary Get wrangler settings
+// @Accept json
+// @Produce json
+// @Success 200 {object} BasicWranglerView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/settings/wrangler [get]
+// @Tags settings
+func getWranglerSettingsHandler(c *fiber.Ctx) error {
+	var conf struct {
+		WranglerSettingsView
+		config.WranglerConfig
 	}
-	defer f.Close()
-	if err = toml.NewEncoder(f).Encode(request); err != nil {
+	if _, err := toml.DecodeFile(path.Join(dir, "worker", "wrangler.toml"), &conf); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
-	return c.JSON(HTTPMessage{"OK"})
+	conf.Enabled = common.Config.Wrangler.Enabled
+	conf.ApiToken = common.Config.Wrangler.ApiToken
+	return c.JSON(conf)
+}
+
+// @security BasicAuth
+// PutWranglerSettings godoc
+// @Summary Set wrangler settings
+// @Accept json
+// @Produce json
+// @Param category body WranglerSettingsView true "body"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/settings/wrangler [put]
+// @Tags settings
+func putWranglerSettingsHandler(c *fiber.Ctx) error {
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
+			data, err := c.Request().MultipartForm()
+			if err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			if v, found := data.Value["Enabled"]; found && len(v) > 0 {
+				if value, err := strconv.ParseBool(v[0]); err == nil {
+					common.Config.Wrangler.Enabled = value
+				}
+			}
+			if v, found := data.Value["ApiToken"]; found && len(v) > 0 {
+				common.Config.Wrangler.ApiToken = v[0]
+			}
+			if err = common.Config.Save(); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			//
+			var conf WranglerSettingsView
+			if _, err := toml.DecodeFile(path.Join(dir, "worker", "wrangler.toml"), &conf); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			if v, found := data.Value["Name"]; found && len(v) > 0 {
+				conf.Name = v[0]
+			}
+			if v, found := data.Value["AccountId"]; found && len(v) > 0 {
+				conf.AccountId = v[0]
+			}
+			if v, found := data.Value["DeveloperMode"]; found && len(v) > 0 {
+				if value, err := strconv.ParseBool(v[0]); err == nil {
+					conf.WorkersDev = value
+				}
+			}
+			if v, found := data.Value["Route"]; found && len(v) > 0 {
+				conf.Route = v[0]
+			}
+			if v, found := data.Value["ZoneId"]; found && len(v) > 0 {
+				conf.ZoneId = v[0]
+			}
+			f, err := os.Create(path.Join(dir, "worker", "wrangler.toml"))
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer f.Close()
+			if err = toml.NewEncoder(f).Encode(conf); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			return c.JSON(HTTPMessage{"OK"})
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Unsupported Content-Type"})
+		}
+	}
+	c.Status(http.StatusInternalServerError)
+	return c.JSON(HTTPError{"Something went wrong"})
 }
 
 // @security BasicAuth
@@ -712,7 +826,13 @@ func getCategoriesHandler(c *fiber.Ctx) error {
 	if v := c.Query("depth"); v != "" {
 		depth, _ = strconv.Atoi(v)
 	}
-	view, err := GetCategoriesView(common.Database, id, depth)
+	var noProducts = false
+	if v := c.Query("no-products"); v != "" {
+		if vv, err := strconv.ParseBool(v); err == nil {
+			noProducts = vv
+		}
+	}
+	view, err := GetCategoriesView(common.Database, id, depth, noProducts)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
@@ -1583,6 +1703,14 @@ func patchContentHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
+			page := NewPage()
+			page.Title = request.Title
+			if bts, err := page.MarshalJSON(); err == nil {
+				if err = ioutil.WriteFile(path.Join(p, "index.html"), bts, 0644); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
 			c.Status(http.StatusOK)
 			return c.JSON(HTTPMessage{"OK"})
 		case "file":
@@ -1894,7 +2022,7 @@ func postProductsHandler(c *fiber.Ctx) error {
 				// Create new product automatically
 				if name == "" {
 					product.Name = fmt.Sprintf("new-product-%d", product.ID)
-					product.Title = fmt.Sprintf("New Product %d", product.ID)
+					product.Title = fmt.Sprintf("New Products %d", product.ID)
 					if err = models.UpdateProduct(common.Database, product); err != nil {
 						c.Status(http.StatusInternalServerError)
 						return c.JSON(HTTPError{err.Error()})
@@ -2168,7 +2296,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 // @Summary Get product
 // @Accept json
 // @Produce json
-// @Param id path int true "Product ID"
+// @Param id path int true "Products ID"
 // @Success 200 {object} ProductView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
@@ -2203,7 +2331,7 @@ func getProductHandler(c *fiber.Ctx) error {
 // @Summary Update product
 // @Accept multipart/form-data
 // @Produce json
-// @Param id query int false "Product id"
+// @Param id query int false "Products id"
 // @Param product body NewProduct true "body"
 // @Success 200 {object} ProductView
 // @Failure 404 {object} HTTPError
@@ -2381,7 +2509,7 @@ func putProductHandler(c *fiber.Ctx) error {
 // @Summary Delete product
 // @Accept json
 // @Produce json
-// @Param id path int true "Product ID"
+// @Param id path int true "Products ID"
 // @Success 200 {object} HTTPMessage
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
@@ -2476,7 +2604,7 @@ type NewParameter struct {
 // @Summary Create parameter
 // @Accept json
 // @Produce json
-// @Param product_id query int true "Product id"
+// @Param product_id query int true "Products id"
 // @Param property body NewParameter true "body"
 // @Success 200 {object} ParameterView
 // @Failure 404 {object} HTTPError
@@ -2665,7 +2793,7 @@ func deleteParameterHandler(c *fiber.Ctx) error {
 // @Summary Search variations
 // @Accept json
 // @Produce json
-// @Param id query int false "Product ID"
+// @Param id query int false "Products ID"
 // @Param request body ListRequest true "body"
 // @Success 200 {object} VariationsListResponse
 // @Failure 404 {object} HTTPError
@@ -2803,7 +2931,7 @@ func postVariationsListHandler(c *fiber.Ctx) error {
 // @Summary Get variations
 // @Accept json
 // @Produce json
-// @Param id path int false "Product ID"
+// @Param id path int false "Products ID"
 // @Success 200 {object} VariationsView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
@@ -2843,7 +2971,7 @@ type NewVariation struct {
 // @Summary Create variation
 // @Accept multipart/form-data
 // @Produce json
-// @Query product_id query int true "Product id"
+// @Query product_id query int true "Products id"
 // @Param category body NewVariation true "body"
 // @Success 200 {object} VariationView
 // @Failure 404 {object} HTTPError
@@ -5636,7 +5764,7 @@ type NewImage struct {
 // @Summary Create image
 // @Accept multipart/form-data
 // @Produce json
-// @Param pid query int false "Product id"
+// @Param pid query int false "Products id"
 // @Param image body NewImage true "body"
 // @Success 200 {object} HTTPMessage
 // @Failure 404 {object} HTTPError
@@ -7673,7 +7801,6 @@ type EmailTemplateView struct{
 	ID      uint
 	Enabled bool
 	Type string
-	From string
 	Topic string
 	Message string
 }
@@ -7818,7 +7945,7 @@ func postEmailTemplatesListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.EmailTemplate{}).Select("email_templates.ID, email_templates.Enabled, email_templates.Type, email_templates.`From`, email_templates.Topic, email_templates.Message").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.EmailTemplate{}).Select("email_templates.ID, email_templates.Enabled, email_templates.Type, email_templates.Topic, email_templates.Message").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -7834,7 +7961,7 @@ func postEmailTemplatesListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.EmailTemplate{}).Select("email_templates.ID, email_templates.Enabled, email_templates.Type, email_templates.`From`, email_templates.Topic, email_templates.Message").Where(strings.Join(keys1, " and "), values1...).Rows()
+	rows, err = common.Database.Debug().Model(&models.EmailTemplate{}).Select("email_templates.ID, email_templates.Enabled, email_templates.Type, email_templates.Topic, email_templates.Message").Where(strings.Join(keys1, " and "), values1...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -8413,6 +8540,7 @@ func postRenderHandler(c *fiber.Ctx) error {
 			var arguments []string
 			if len(bin) > 1 {
 				for _, x := range bin[1:]{
+					x = strings.Replace(x, "%DIR%", dir, -1)
 					arguments = append(arguments, x)
 				}
 			}
@@ -8474,19 +8602,38 @@ func postPublishHandler(c *fiber.Ctx) error {
 				return err
 			}
 			//
-			p := path.Join(dir, "worker", "publish.sh")
-			if _, err := os.Stat(p); err != nil {
+			if !common.Config.Wrangler.Enabled{
+				err := fmt.Errorf("wrangler disabled")
 				logger.Errorf("%v", err.Error())
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
 			//
-			cmd := exec.Command(p)
+			bin := strings.Split(common.Config.Wrangler.Bin, " ")
+			//
+			var arguments []string
+			if len(bin) > 1 {
+				for _, x := range bin[1:]{
+					x = strings.Replace(x, "%DIR%", dir, -1)
+					arguments = append(arguments, x)
+				}
+				if common.Config.Wrangler.ApiToken == "" {
+					err := fmt.Errorf("api_token is not specified")
+					logger.Errorf("%v", err.Error())
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+				arguments = append(arguments, common.Config.Wrangler.ApiToken)
+			}
+			//
+			logger.Infof("Run: %v %+v", bin[0], arguments)
+			cmd := exec.Command(bin[0], arguments...)
 			buff := &bytes.Buffer{}
 			cmd.Stdout = buff
 			cmd.Stderr = buff
 			err := cmd.Run()
 			if err != nil {
+				logger.Infof("Output: %+v", buff.String())
 				logger.Errorf("%v", err.Error())
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
@@ -8548,6 +8695,69 @@ func getAccountHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
+	return c.JSON(HTTPError{"Something went wrong"})
+}
+
+type User2View struct {
+	OldPassword string
+	NewPassword string
+	NewPassword2 string
+}
+
+// @security BasicAuth
+// UpdateAccount godoc
+// @Summary update account
+// @Accept json
+// @Produce json
+// @Param account body AccountView true "body"
+// @Success 200 {object} User2View
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account [put]
+// @Tags order
+func putAccountHandler(c *fiber.Ctx) error {
+	if v := c.Locals("user"); v != nil {
+		var user *models.User
+		var ok bool
+		if user, ok = v.(*models.User); ok {
+			//
+			var request User2View
+			if err := c.BodyParser(&request); err != nil {
+				return err
+			}
+			request.OldPassword = strings.TrimSpace(request.OldPassword)
+			request.NewPassword = strings.TrimSpace(request.NewPassword)
+			request.NewPassword2 = strings.TrimSpace(request.NewPassword2)
+			//
+			if models.MakeUserPassword(request.OldPassword) != user.Password {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Incorrect password"})
+			}
+			if len(request.NewPassword) < 6 {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Too short password"})
+			}
+			if len(request.NewPassword) > 32 {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Too long password"})
+			}
+			if request.NewPassword != request.NewPassword2 {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Passwords mismatch"})
+			}
+			user.Password = models.MakeUserPassword(request.NewPassword2)
+			if err := models.UpdateUser(common.Database, user); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			c.Status(http.StatusOK)
+			return c.JSON(HTTPMessage{"OK"})
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"User not found"})
+		}
+	}
+	c.Status(http.StatusInternalServerError)
 	return c.JSON(HTTPError{"Something went wrong"})
 }
 
@@ -9083,6 +9293,8 @@ type OrderShortView struct{
 	Sum float64
 	Delivery float64
 	Total float64
+	Volume float64
+	Weight float64
 	Comment string `json:",omitempty"`
 }
 
@@ -9096,6 +9308,8 @@ type ItemShortView struct {
 	Price float64                  `json:",omitempty"`
 	Quantity int                   `json:",omitempty"`
 	Total      float64             `json:",omitempty"`
+	Volume float64 `json:",omitempty"`
+	Weight float64 `json:",omitempty"`
 }
 
 type VariationShortView struct {
@@ -9196,7 +9410,7 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 				return c.JSON(HTTPError{err.Error()})
 			}
 			if product.ID != variation.ProductId {
-				err = fmt.Errorf("Product and Variation mismatch")
+				err = fmt.Errorf("Products and Variation mismatch")
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
@@ -9209,6 +9423,22 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 				Price:    variation.BasePrice,
 				Quantity: item.Quantity,
 			}
+			if res := reVolume.FindAllStringSubmatch(variation.Dimensions, 1); len(res) > 0 && len(res[0]) > 1 {
+				var width float64
+				if v, err := strconv.ParseFloat(res[0][1], 10); err == nil {
+					width = v
+				}
+				var height float64
+				if v, err := strconv.ParseFloat(res[0][2], 10); err == nil {
+					height = v
+				}
+				var depth float64
+				if v, err := strconv.ParseFloat(res[0][3], 10); err == nil {
+					depth = v
+				}
+				orderItem.Volume = width * height * depth / 1000000.0
+			}
+			orderItem.Weight = variation.Weight
 			//
 			itemShortView := ItemShortView{
 				Uuid: item.UUID,
@@ -9216,6 +9446,8 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 				Variation: VariationShortView{
 					Title:variation.Title,
 				},
+				Volume: orderItem.Volume,
+				Weight: orderItem.Weight,
 			}
 			//
 			if breadcrumbs := models.GetBreadcrumbs(common.Database, categoryId); len(breadcrumbs) > 0 {
@@ -9249,7 +9481,6 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 						propertyShortView := PropertyShortView{}
 						propertyShortView.Title = price.Property.Title
 						//
-						logger.Infof("price: %+v, value: %+v", price, price.Value)
 						if cache, err := models.GetCacheValueByValueId(common.Database, price.Value.ID); err == nil {
 							propertyShortView.Thumbnail = cache.Thumbnail
 						}
@@ -9282,9 +9513,14 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 			//
 			orderShortView.Quantity += itemShortView.Quantity
 			orderShortView.Items = append(orderShortView.Items, itemShortView)
+			//
+			orderShortView.Volume += itemShortView.Volume * float64(itemShortView.Quantity)
+			orderShortView.Weight += itemShortView.Weight * float64(itemShortView.Quantity)
 		}
 	}
 	order.Total = order.Sum + order.Delivery
+	order.Volume = orderShortView.Volume
+	order.Weight = orderShortView.Weight
 	orderShortView.Sum = order.Sum
 	orderShortView.Delivery = order.Delivery
 	orderShortView.Total = order.Total
@@ -9463,6 +9699,204 @@ func postAccountOrderCheckoutHandler(c *fiber.Ctx) error {
 
 	c.Status(http.StatusOK)
 	return c.JSON(data)
+}
+
+type PaymentMethodsView struct {
+	Default string
+	Stripe struct {
+		Enabled bool `json:",omitempty"`
+	} `json:",omitempty"`
+	Mollie struct {
+		Enabled bool `json:",omitempty"`
+		Methods []string `json:",omitempty"`
+	} `json:",omitempty"`
+	AdvancePayment struct {
+		Enabled bool `json:",omitempty"`
+		Details string `json:",omitempty"`
+	}
+	OnDelivery struct {
+		Enabled bool `json:",omitempty"`
+	}
+}
+
+// GetAccountPaymentMethods godoc
+// @Summary Get account payment methods
+// @Accept json
+// @Produce json
+// @Success 200 {object} PaymentMethodsView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/orders/:id/payment_methods [get]
+// @Tags account
+func getAccountPaymentMethodsHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	var userId uint
+	if v := c.Locals("user"); v != nil {
+		if user, ok := v.(*models.User); ok {
+			userId = user.ID
+		}
+	}
+	if order, err := models.GetOrder(common.Database, id); err == nil {
+		if order.UserId != userId {
+			c.Status(http.StatusForbidden)
+			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
+		}
+		//
+		if !common.Config.Payment.Enabled {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Payment is not enabled, please contact support"})
+		}
+		var view PaymentMethodsView
+		if common.Config.Payment.Stripe.Enabled {
+			view.Stripe.Enabled = true
+			view.Default = "stripe"
+		}
+		if common.Config.Payment.Mollie.Enabled {
+			view.Mollie.Enabled = true
+			view.Mollie.Methods = reCSV.Split(common.Config.Payment.Mollie.Methods, -1)
+			view.Default = "mollie"
+		}
+		if common.Config.Payment.AdvancePayment.Enabled {
+			view.AdvancePayment.Enabled = true
+			if tmpl, err := template.New("details").Parse(common.Config.Payment.AdvancePayment.Details); err == nil {
+				var tpl bytes.Buffer
+				vars := map[string]interface{}{
+					"Order": map[string]interface{}{
+						"ID": order.ID,
+						"Total": order.Total,
+					},
+				}
+				if err := tmpl.Execute(&tpl, vars); err == nil {
+					view.AdvancePayment.Details = tpl.String()
+				}else{
+					logger.Errorf("%v", err)
+				}
+			}else{
+				logger.Errorf("%v", err)
+			}
+		}
+		if common.Config.Payment.OnDelivery.Enabled {
+			view.OnDelivery.Enabled = true
+		}
+		//
+		if bts, err := json.MarshalIndent(order, "", "   "); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+// PostAdvancePaymentOrder godoc
+// @Summary Post advance-payment order
+// @Accept json
+// @Produce json
+// @Param id path int true "Order ID"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/orders/{id}/advance_payment/submit [get]
+// @Tags account
+func postAccountOrderAdvancePaymentSubmitHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	var user *models.User
+	if v := c.Locals("user"); v != nil {
+		var ok bool
+		if user, ok = v.(*models.User); !ok {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"User not found"})
+		}
+	}
+	if order, err := models.GetOrder(common.Database, id); err == nil {
+		if order.UserId != user.ID {
+			c.Status(http.StatusForbidden)
+			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
+		}
+		order.Status = models.ORDER_STATUS_WAITING_FROM_PAYMENT
+		if err = models.UpdateOrder(common.Database, order); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+		transaction := &models.Transaction{Amount: order.Total, Status: models.TRANSACTION_STATUS_NEW, Order: order}
+		transactionPayment := models.TransactionPayment{AdvancePayment: &models.TransactionPaymentAdvancePayment{Total: order.Total}}
+		if bts, err := json.Marshal(transactionPayment); err == nil {
+			transaction.Payment = string(bts)
+		}
+		if _, err = models.CreateTransaction(common.Database, transaction); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+		c.Status(http.StatusOK)
+		return c.JSON(HTTPMessage{"OK"})
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+// PostOnDeliveryOrder godoc
+// @Summary Post on-delivery order
+// @Accept json
+// @Produce json
+// @Param id path int true "Order ID"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/orders/{id}/on_delivery/submit [get]
+// @Tags account
+func postAccountOrderOnDeliverySubmitHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	var user *models.User
+	if v := c.Locals("user"); v != nil {
+		var ok bool
+		if user, ok = v.(*models.User); !ok {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"User not found"})
+		}
+	}
+	if order, err := models.GetOrder(common.Database, id); err == nil {
+		if order.UserId != user.ID {
+			c.Status(http.StatusForbidden)
+			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
+		}
+		order.Status = models.ORDER_STATUS_WAITING_FROM_PAYMENT
+		if err = models.UpdateOrder(common.Database, order); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+		transaction := &models.Transaction{Amount: order.Total, Status: models.TRANSACTION_STATUS_NEW, Order: order}
+		transactionPayment := models.TransactionPayment{OnDelivery: &models.TransactionPaymentOnDelivery{Total: order.Total}}
+		if bts, err := json.Marshal(transactionPayment); err == nil {
+			transaction.Payment = string(bts)
+		}
+		if _, err = models.CreateTransaction(common.Database, transaction); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+		c.Status(http.StatusOK)
+		return c.JSON(HTTPMessage{"OK"})
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
 }
 
 type StripeCustomerView struct {
@@ -9724,7 +10158,7 @@ func postAccountOrderStripeSubmitHandler(c *fiber.Ctx) error {
 			return c.JSON(HTTPError{"User not found"})
 		}
 	}
-	if order, err := models.GetOrder(common.Database, id); err == nil {
+	if order, err := models.GetOrderFull(common.Database, id); err == nil {
 		if order.UserId != user.ID {
 			c.Status(http.StatusForbidden)
 			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
@@ -9892,7 +10326,7 @@ func getAccountOrderStripeSuccessHandler(c *fiber.Ctx) error {
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)
 	}
-	if order, err := models.GetOrder(common.Database, id); err == nil {
+	if order, err := models.GetOrderFull(common.Database, id); err == nil {
 		paymentIntentClientSecret := c.Query("payment_intent_client_secret")
 		if paymentIntentClientSecret != "" {
 			if res := regexp.MustCompile(`^(pi_[A-Za-z0-9]+)_secret`).FindAllStringSubmatch(paymentIntentClientSecret, 1); len(res) > 0 && len(res[0]) > 1 {
@@ -10067,6 +10501,7 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 
 		var request struct {
 			Language string `json:"language"`
+			Method string
 		}
 		if err := c.BodyParser(&request); err != nil {
 			return err
@@ -10143,13 +10578,16 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 				o.Locale = "de_DE"
 			}
 		}
+		// Method
+		if request.Method != "" {
+			o.Method = request.Method
+		}
 		if bts, err := json.Marshal(o); err == nil {
 			logger.Infof("Bts: %+v", string(bts))
 		}
 
 		if o, links, err := common.MOLLIE.CreateOrder(o); err == nil {
 			logger.Infof("o: %+v", o)
-
 			transaction := &models.Transaction{Amount: order.Total, Status: models.TRANSACTION_STATUS_NEW, Order: order}
 			transactionPayment := models.TransactionPayment{Mollie: &models.TransactionPaymentMollie{Id: o.Id}}
 			if bts, err := json.Marshal(transactionPayment); err == nil {
@@ -10196,7 +10634,7 @@ func getAccountOrderMollieSuccessHandler(c *fiber.Ctx) error {
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)
 	}
-	if order, err := models.GetOrder(common.Database, id); err == nil {
+	if order, err := models.GetOrderFull(common.Database, id); err == nil {
 		if transactions, err := models.GetTransactionsByOrderId(common.Database, id); err == nil {
 			for _, transaction := range transactions {
 				var payment models.TransactionPayment
@@ -10303,12 +10741,12 @@ type CategoryView struct {
 	Products int64 `json:",omitempty"`
 }
 
-func GetCategoriesView(connector *gorm.DB, id int, depth int) (*CategoryView, error) {
+func GetCategoriesView(connector *gorm.DB, id int, depth int, noProducts bool) (*CategoryView, error) {
 	if id == 0 {
-		return getChildrenCategoriesView(connector, &CategoryView{Name: "root", Title: "Root", Type: "category"}, depth), nil
+		return getChildrenCategoriesView(connector, &CategoryView{Name: "root", Title: "Root", Type: "category"}, depth, noProducts), nil
 	} else {
 		if category, err := models.GetCategory(connector, id); err == nil {
-			view := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category"}, depth)
+			view := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category"}, depth, noProducts)
 			if view != nil {
 				if err = getParentCategoriesView(connector, view, category.ParentId); err != nil {
 					return nil, err
@@ -10321,16 +10759,18 @@ func GetCategoriesView(connector *gorm.DB, id int, depth int) (*CategoryView, er
 	}
 }
 
-func getChildrenCategoriesView(connector *gorm.DB, root *CategoryView, depth int) *CategoryView {
+func getChildrenCategoriesView(connector *gorm.DB, root *CategoryView, depth int, noProducts bool) *CategoryView {
 	for _, category := range models.GetChildrenOfCategoryById(connector, root.ID) {
 		if depth > 0 {
-			child := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category"}, depth - 1)
+			child := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category"}, depth - 1, noProducts)
 			root.Children = append(root.Children, child)
 		}
 	}
-	if products, err := models.GetProductsByCategoryId(connector, root.ID); err == nil {
-		for _, product := range products {
-			root.Children = append(root.Children, &CategoryView{ID: product.ID, Name: product.Name, Title: product.Title, Thumbnail: product.Thumbnail, Description: product.Description, Type: "product"})
+	if !noProducts {
+		if products, err := models.GetProductsByCategoryId(connector, root.ID); err == nil {
+			for _, product := range products {
+				root.Children = append(root.Children, &CategoryView{ID: product.ID, Name: product.Name, Title: product.Title, Thumbnail: product.Thumbnail, Description: product.Description, Type: "product"})
+			}
 		}
 	}
 	return root
@@ -10360,7 +10800,6 @@ type ProductView struct {
 	Parameters []ParameterView `json:",omitempty"`
 	BasePrice float64 `json:",omitempty"`
 	Content string
-	Upsale string
 	Variations []VariationView `json:",omitempty"`
 	Files []File2View `json:",omitempty"`
 	Images []ImageView `json:",omitempty"`
@@ -10524,7 +10963,6 @@ func Calculate(transport *models.Transport, tariff *models.Tariff, items []NewIt
 	}
 
 	// 2 Calculate Volume and Weight
-	reVolume := regexp.MustCompile(`^(\d+)\s*x\s*(\d+)\s*x\s*(\d+)\s*$`)
 	for _, item := range items {
 		var arr []int
 		if err := json.Unmarshal([]byte(item.UUID), &arr); err == nil && len(arr) >= 2 {
@@ -10540,7 +10978,7 @@ func Calculate(transport *models.Transport, tariff *models.Tariff, items []NewIt
 				return nil, err
 			}
 			if product.ID != variation.ProductId {
-				err = fmt.Errorf("Product and Variation mismatch")
+				err = fmt.Errorf("Products and Variation mismatch")
 				return nil, err
 			}
 			// Sum

@@ -24,6 +24,8 @@ type Order struct {
 	Total float64 `sql:"type:decimal(8,2);"`
 	Status string
 	Comment string
+	Volume float64 `sql:"type:decimal(8,3);"`
+	Weight float64 `sql:"type:decimal(8,3);"`
 	//
 	User *User `gorm:"foreignKey:UserId"`
 	UserId uint
@@ -65,7 +67,7 @@ func GetOrder(connector *gorm.DB, id int) (*Order, error) {
 func GetOrderFull(connector *gorm.DB, id int) (*Order, error) {
 	db := connector
 	var order Order
-	db.Debug().Preload("Items").Preload("Profile").Preload("Profile.Transport").Preload("User").Find(&order, id)
+	db.Debug().Preload("Items").Preload("Profile").Preload("Transport").Preload("User").Find(&order, id)
 	if err := db.Error; err != nil {
 		return nil, err
 	}

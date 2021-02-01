@@ -93,7 +93,7 @@ var renderCmd = &cobra.Command{
 				}
 			}
 		}
-		if p := path.Join(dir, "hugo", "assets", "images", "values"); p != "" {
+		if p := path.Join(dir, "hugo", "static", "images", "values"); p != "" {
 			if _, err = os.Stat(p); err != nil {
 				if err = os.MkdirAll(p, 0755); err != nil {
 					logger.Warningf("%v", err)
@@ -163,7 +163,11 @@ var renderCmd = &cobra.Command{
 					}
 				}
 				f3(common.Database, category.ID)
-				*breadcrumbs = append([]*models.Category{{Name: "products", Title: "Products", Model: gorm.Model{UpdatedAt: time.Now()}}}, *breadcrumbs...)
+				products := common.Config.Products
+				if products == "" {
+					products = "Products"
+				}
+				*breadcrumbs = append([]*models.Category{{Name: "products", Title: products, Model: gorm.Model{UpdatedAt: time.Now()}}}, *breadcrumbs...)
 				var names []string
 				for _, crumb := range *breadcrumbs {
 					names = append(names, crumb.Name)
@@ -241,7 +245,7 @@ var renderCmd = &cobra.Command{
 			logger.Infof("Products found: %v", len(products))
 			for i, product := range products {
 				if product.Enabled {
-					logger.Infof("[%d] Product ID: %+v Name: %v Title: %v", i, product.ID, product.Name, product.Title)
+					logger.Infof("[%d] Products ID: %+v Name: %v Title: %v", i, product.ID, product.Name, product.Title)
 					product, _ = models.GetProductFull(common.Database, int(product.ID))
 					if categories, err := models.GetCategoriesOfProduct(common.Database, product); err == nil {
 						var canonical string
@@ -312,7 +316,7 @@ var renderCmd = &cobra.Command{
 													if max < variation.BasePrice {
 														max = variation.BasePrice
 													}
-													// Product parameters
+													// Products parameters
 													for _, parameter := range product.Parameters {
 														if parameter.ID > 0 && parameter.Filtering {
 															var found bool
@@ -378,7 +382,7 @@ var renderCmd = &cobra.Command{
 															if !found {
 																opt := &common.OptionCF{
 																	ID:    parameter.Option.ID,
-																	Type:  "Product",
+																	Type:  "Products",
 																	Name:  parameter.Option.Name,
 																	Title: parameter.Option.Title,
 																}
@@ -566,7 +570,7 @@ var renderCmd = &cobra.Command{
 												}
 												categoryFile.BasePriceMin = min
 												categoryFile.BasePriceMax = max
-												// Sort to put Product options above Variation options
+												// Sort to put Products options above Variation options
 												sort.Slice(categoryFile.Options, func(i, j int) bool {
 													if categoryFile.Options[i].Type == categoryFile.Options[j].Type {
 														return categoryFile.Options[i].Title < categoryFile.Options[j].Title
@@ -990,7 +994,7 @@ type CategoryView struct {
 	Images     []string
 	Thumbnail  string
 	BasePrice  string
-	Product    ProductView
+	Products    ProductView
 }
 
 type ProductView struct {

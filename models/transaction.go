@@ -25,8 +25,18 @@ type Transaction struct {
 }
 
 type TransactionPayment struct {
+	AdvancePayment *TransactionPaymentAdvancePayment `json:",omitempty"`
+	OnDelivery *TransactionPaymentOnDelivery `json:",omitempty"`
 	Mollie *TransactionPaymentMollie `json:",omitempty"`
 	Stripe *TransactionPaymentStripe `json:",omitempty"`
+}
+
+type TransactionPaymentAdvancePayment struct {
+	Total float64 `json:",omitempty"`
+}
+
+type TransactionPaymentOnDelivery struct {
+	Total float64 `json:",omitempty"`
 }
 
 type TransactionPaymentMollie struct {

@@ -58,8 +58,21 @@ func initConfig() {
 		common.Config.Https.Enabled = true
 		common.Config.Https.Host = config.DEFAULT_HOST
 		common.Config.Https.Port = config.DEFAULT_HTTPS_PORT
-		common.Config.Database.Dialer = "sqlite"
-		common.Config.Database.Uri = path.Join(dir, "database.sqlite")
+		if os.Getenv("DOCKER") == "true" {
+			common.Config.Database.Dialer = "mysql"
+			common.Config.Database.Uri = "root:mysecret@tcp(mysql:3306)/goshop?parseTime=true"
+		}else{
+			common.Config.Database.Dialer = "sqlite"
+			p := path.Join(dir, config.DEFAULT_DATABASE_URI)
+			if pp := path.Dir(p); len(pp) > 0 {
+				if _, err = os.Stat(pp); err != nil {
+					if err = os.MkdirAll(pp, 0755); err != nil {
+						logger.Warningf("%v", err)
+					}
+				}
+			}
+			common.Config.Database.Uri = p
+		}
 		/*common.Config.I18n.Enabled = true
 		common.Config.I18n.Languages = []config.Language{
 			{
@@ -68,10 +81,20 @@ func initConfig() {
 				Code: "de",
 			},
 		}*/
-		common.Config.Hugo.Bin = config.DEFAULT_HUGO
+		if os.Getenv("DOCKER") == "true" {
+			common.Config.Hugo.Bin = "/usr/bin/docker run --rm -v %DIR%/hugo:/src klakegg/hugo:0.80.0"
+		}else{
+			common.Config.Hugo.Bin = config.DEFAULT_HUGO
+		}
 		common.Config.Hugo.Theme = "multikart"
 		common.Config.Hugo.Minify = true
+		if os.Getenv("DOCKER") == "true" {
+			common.Config.Wrangler.Bin = "/usr/bin/docker run --rm -v %DIR%/hugo/public:/hugo/public goshop_wrangler"
+		}
+		common.Config.Products = "Products"
 		common.Config.Resize.Quality = 75
+		common.Config.Resize.Thumbnail.Size = "64x0,128x0,256x0"
+		common.Config.Resize.Image.Size= "128x0,324x0,512x0"
 		common.Config.Currency = "usd"
 		common.Config.Payment.Default = "stripe"
 		common.Config.Payment.VAT = 19
@@ -112,13 +135,17 @@ func initConfig() {
 		}
 	}
 	if !ok {
-		crtPath := path.Join(dir, os.Getenv("SSL_FOLDER"), "server.crt")
+		folder := os.Getenv("SSL_FOLDER")
+		if folder == ""{
+			folder = "ssl"
+		}
+		crtPath := path.Join(dir, folder, "server.crt")
 		if _, err := os.Stat(path.Dir(crtPath)); err != nil {
 			if err = os.MkdirAll(path.Dir(crtPath), 0755); err != nil {
 				logger.Warningf("%+v", err)
 			}
 		}
-		keyPath := path.Join(dir, os.Getenv("SSL_FOLDER"), "server.key")
+		keyPath := path.Join(dir, folder, "server.key")
 		if _, err := os.Stat(path.Dir(keyPath)); err != nil {
 			if err = os.MkdirAll(path.Dir(keyPath), 0755); err != nil {
 				logger.Warningf("%+v", err)
@@ -322,6 +349,8 @@ var RootCmd = &cobra.Command{
 <table>
 <tbody>
 <tr><th style="text-align: left">Created</th><td>{{.Order.CreatedAt.Format "2006-01-02 15:04:05"}}</td></tr>
+<tr><th style="text-align: left">Volume</th><td>{{printf "%.3f" .Order.Volume}}</td>
+<tr><th style="text-align: left">Weight</th><td>{{printf "%.1f" .Order.Weight}}</td>
 <tr><th style="text-align: left">Status</th><td>{{.Order.Status}}</td>
 <tr><th style="text-align: left">Sum</th><td>{{printf "%.2f" .Order.Sum}}</td>
 <tr><th style="text-align: left">Delivery</th><td>{{printf "%.2f" .Order.Delivery}}</td>
@@ -332,7 +361,7 @@ var RootCmd = &cobra.Command{
 <div>
 <h2>Items</h2>
 <table>
-<thead><tr style="background-color: lightgray;"><th style="min-width: 50px;">#</th><th>UUID</th><th>Product</th><th>Variation</th><th>Properties</th><th>Price</th><th>Quantity</th><th>Total</th></tr></thead>
+<thead><tr style="background-color: lightgray;"><th style="min-width: 50px;">#</th><th>UUID</th><th>Products</th><th>Variation</th><th>Properties</th><th>Volume</th><th>Weight</th><th>Price</th><th>Quantity</th><th>Total</th></tr></thead>
 <tbody>
 {{range $index, $item := .Order.Items}}
 <tr style="background-color: {{if even $index}}#fff{{else}}#f5f5f5{{end}}">
@@ -341,6 +370,8 @@ var RootCmd = &cobra.Command{
 <td style="padding: 0 10px;"><a href="http://example.com{{$item.Path}}?uuid={{toUuid $item.Uuid}}">{{.Title}}</a></td>
 <td style="padding: 0 10px;">{{$item.Variation.Title}}</td>
 <td><ul style="padding: 0 20px;">{{range $item.Properties}}<li><span>{{.Title}}:&nbsp;</span><span>{{.Value}}</span></li>{{end}}</ul></td>
+<td style="padding: 0 10px;">{{printf "%.3f" $item.Volume}}</td>
+<td style="padding: 0 10px;">{{printf "%.1f" $item.Weight}}</td>
 <td style="padding: 0 10px;">{{printf "%.2f" $item.Price}}</td>
 <td style="text-align: center;">{{$item.Quantity}}</td>
 <td style="padding: 0 10px;">{{printf "%.2f" $item.Total}}</td>
@@ -377,6 +408,8 @@ var RootCmd = &cobra.Command{
 <table>
 <tbody>
 <tr><th style="text-align: left">Created</th><td>{{.Order.CreatedAt.Format "2006-01-02 15:04:05"}}</td></tr>
+<tr><th style="text-align: left">Volume</th><td>{{printf "%.3f" .Order.Volume}}</td>
+<tr><th style="text-align: left">Weight</th><td>{{printf "%.1f" .Order.Weight}}</td>
 <tr><th style="text-align: left">Status</th><td>{{.Order.Status}}</td>
 <tr><th style="text-align: left">Sum</th><td>{{printf "%.2f" .Order.Sum}}</td>
 <tr><th style="text-align: left">Delivery</th><td>{{printf "%.2f" .Order.Delivery}}</td>
@@ -387,7 +420,7 @@ var RootCmd = &cobra.Command{
 <div>
 <h2>Items</h2>
 <table>
-<thead><tr style="background-color: lightgray;"><th style="min-width: 50px;">#</th><th>UUID</th><th>Product</th><th>Variation</th><th>Properties</th><th>Price</th><th>Quantity</th><th>Total</th></tr></thead>
+<thead><tr style="background-color: lightgray;"><th style="min-width: 50px;">#</th><th>UUID</th><th>Products</th><th>Variation</th><th>Properties</th><th>Volume</th><th>Weight</th><th>Price</th><th>Quantity</th><th>Total</th></tr></thead>
 <tbody>
 {{range $index, $item := .Order.Items}}
 <tr style="background-color: {{if even $index}}#fff{{else}}#f5f5f5{{end}}">
@@ -396,6 +429,8 @@ var RootCmd = &cobra.Command{
 <td style="padding: 0 10px;"><a href="http://example.com{{$item.Path}}?uuid={{toUuid $item.Uuid}}">{{.Title}}</a></td>
 <td style="padding: 0 10px;">{{$item.Variation.Title}}</td>
 <td><ul style="padding: 0 20px;">{{range $item.Properties}}<li><span>{{.Title}}:&nbsp;</span><span>{{.Value}}</span></li>{{end}}</ul></td>
+<td style="padding: 0 10px;">{{printf "%.3f" $item.Volume}}</td>
+<td style="padding: 0 10px;">{{printf "%.1f" $item.Weight}}</td>
 <td style="padding: 0 10px;">{{printf "%.2f" $item.Price}}</td>
 <td style="text-align: center;">{{$item.Quantity}}</td>
 <td style="padding: 0 10px;">{{printf "%.2f" $item.Total}}</td>

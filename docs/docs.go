@@ -1563,7 +1563,7 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Product id",
+                        "description": "Products id",
                         "name": "pid",
                         "in": "query"
                     },
@@ -2513,7 +2513,7 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Product id",
+                        "description": "Products id",
                         "name": "product_id",
                         "in": "query",
                         "required": true
@@ -3156,7 +3156,7 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Product ID",
+                        "description": "Products ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -3202,7 +3202,7 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Product id",
+                        "description": "Products id",
                         "name": "id",
                         "in": "query"
                     },
@@ -3256,7 +3256,7 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Product ID",
+                        "description": "Products ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -5163,7 +5163,7 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Product ID",
+                        "description": "Products ID",
                         "name": "id",
                         "in": "path"
                     }
@@ -5258,7 +5258,7 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Product ID",
+                        "description": "Products ID",
                         "name": "id",
                         "in": "query"
                     },

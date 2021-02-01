@@ -14,6 +14,8 @@ type Item struct {
 	Quantity    int
 	Total       float64          `sql:"type:decimal(8,2);"`
 	OrderId     uint
+	Volume float64 `sql:"type:decimal(8,3);"`
+	Weight float64 `sql:"type:decimal(8,3);"`
 }
 
 func DeleteItem(connector *gorm.DB, item *Item) error {

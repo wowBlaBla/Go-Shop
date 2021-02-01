@@ -137,6 +137,10 @@ func UpdateProduct(connector *gorm.DB, product *Product) error {
 
 func DeleteProduct(connector *gorm.DB, product *Product) error {
 	db := connector
+	db.Debug().Unscoped().Model(&product).Association("Categories").Clear()
+	db.Debug().Unscoped().Model(&product).Association("Files").Clear()
+	db.Debug().Unscoped().Model(&product).Association("Images").Clear()
+	db.Debug().Unscoped().Model(&product).Association("Tags").Clear()
 	db.Debug().Unscoped().Delete(&product)
 	return db.Error
 }
