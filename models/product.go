@@ -12,9 +12,15 @@ type Product struct {
 	Description string
 	Thumbnail   string
 	Parameters  []*Parameter `gorm:"foreignKey:ProductId"`
+	CustomParameters 	string
 	Content 	string
 	// ONLY TO USE AS DEFAULT VALUE FOR VIRIATIONS
 	BasePrice float64          `sql:"type:decimal(8,2);"`
+	Dimensions string // width x height x depth in cm
+	Weight float64 `sql:"type:decimal(8,2);"`
+	Availability string
+	Sending string
+	Sku string
 	//
 	Categories  []*Category  `gorm:"many2many:categories_products;"`
 	Variations  []*Variation `gorm:"foreignKey:ProductId"`

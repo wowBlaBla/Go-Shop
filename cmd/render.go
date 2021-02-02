@@ -687,6 +687,10 @@ var renderCmd = &cobra.Command{
 											parameterView.CustomValue = parameter.CustomValue
 										}
 										productView.Parameters = append(productView.Parameters, parameterView)
+										productView.Dimensions = product.Dimensions
+										productView.Weight = product.Weight
+										productView.Availability = product.Availability
+										productView.Sending = product.Sending
 									}
 								}
 								if p := path.Join(p1, product.Name); p != "" {
@@ -708,6 +712,10 @@ var renderCmd = &cobra.Command{
 											//Thumbnail:   variation.Thumbnail,
 											Description: variation.Description,
 											BasePrice:   variation.BasePrice,
+											Dimensions: variation.Dimensions,
+											Weight: variation.Weight,
+											Availability: variation.Availability,
+											Sending: variation.Sending,
 											Selected:    i == 0,
 										}
 										if basePriceMin > variation.BasePrice || basePriceMin == 0 {

@@ -20,7 +20,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210129181247"
+	COMPILED = "20210202143515"
 	//
 	Started          time.Time
 	Config           *config.Config
@@ -170,6 +170,10 @@ type ProductPF struct {
 	Thumbnail  string `json:",omitempty"`
 	Images     []string
 	Parameters []ParameterPF
+	Dimensions string `json:",omitempty"`
+	Weight float64 `json:",omitempty"`
+	Availability string `json:",omitempty"`
+	Sending string `json:",omitempty"`
 	Path       string
 	Variations []VariationPF
 }
@@ -197,6 +201,10 @@ type VariationPF struct {
 	Thumbnail string `json:",omitempty"`
 	Description string
 	BasePrice float64
+	Dimensions string `json:",omitempty"`
+	Weight float64 `json:",omitempty"`
+	Availability string `json:",omitempty"`
+	Sending string `json:",omitempty"`
 	Properties []PropertyPF
 	Selected bool
 }

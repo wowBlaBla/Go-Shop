@@ -259,7 +259,6 @@ func GetFiber() *fiber.App {
 	v1.Get("/account/orders/:id", authMulti, getAccountOrderHandler)
 	v1.Put("/account/orders/:id", authMulti, putAccountOrderHandler)
 	v1.Post("/account/orders/:id/checkout", authMulti, postAccountOrderCheckoutHandler)
-	v1.Get("/account/orders/:id/payment_methods", authMulti, getAccountPaymentMethodsHandler)
 	// Advance Payment
 	v1.Post("/account/orders/:id/advance_payment/submit", authMulti, postAccountOrderAdvancePaymentSubmitHandler)
 	// On Delivery
@@ -273,6 +272,8 @@ func GetFiber() *fiber.App {
 	// Mollie
 	v1.Post("/account/orders/:id/mollie/submit", authMulti, postAccountOrderMollieSubmitHandler)
 	v1.Get("/account/orders/:id/mollie/success", authMulti, getAccountOrderMollieSuccessHandler)
+	//
+	v1.Get("/payment_methods", authMulti, getPaymentMethodsHandler)
 	//
 	v1.Post("/profiles", postProfileHandler)
 	//
@@ -2007,17 +2008,43 @@ func postProductsHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Description"]; found && len(v) > 0 {
 				description = strings.TrimSpace(v[0])
 			}
+			var customParameters string
+			if v, found := data.Value["CustomParameters"]; found && len(v) > 0 {
+				customParameters = strings.TrimSpace(v[0])
+			}
 			var basePrice float64
 			if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
 				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
 					basePrice = vv
 				}
 			}
+			var dimensions string
+			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
+				dimensions = strings.TrimSpace(v[0])
+			}
+			var weight float64
+			if v, found := data.Value["Weight"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					weight = vv
+				}
+			}
+			var availability string
+			if v, found := data.Value["Availability"]; found && len(v) > 0 {
+				availability = strings.TrimSpace(v[0])
+			}
+			var sending string
+			if v, found := data.Value["Sending"]; found && len(v) > 0 {
+				sending = strings.TrimSpace(v[0])
+			}
+			var sku string
+			if v, found := data.Value["Sku"]; found && len(v) > 0 {
+				sku = strings.TrimSpace(v[0])
+			}
 			var content string
 			if v, found := data.Value["Content"]; found && len(v) > 0 {
 				content = strings.TrimSpace(v[0])
 			}
-			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, BasePrice: basePrice, Content: content}
+			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, CustomParameters: customParameters, BasePrice: basePrice, Dimensions: dimensions, Weight: weight, Availability: availability, Sending: sending, Sku: sku, Content: content}
 			if id, err := models.CreateProduct(common.Database, product); err == nil {
 				// Create new product automatically
 				if name == "" {
@@ -2385,11 +2412,37 @@ func putProductHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Description"]; found && len(v) > 0 {
 				description = strings.TrimSpace(v[0])
 			}
+			var customParameters string
+			if v, found := data.Value["CustomParameters"]; found && len(v) > 0 {
+				customParameters = strings.TrimSpace(v[0])
+			}
 			var basePrice float64
 			if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
 				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
 					basePrice = vv
 				}
+			}
+			var dimensions string
+			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
+				dimensions = strings.TrimSpace(v[0])
+			}
+			var weight float64
+			if v, found := data.Value["Weight"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					weight = vv
+				}
+			}
+			var availability string
+			if v, found := data.Value["Availability"]; found && len(v) > 0 {
+				availability = strings.TrimSpace(v[0])
+			}
+			var sending string
+			if v, found := data.Value["Sending"]; found && len(v) > 0 {
+				sending = strings.TrimSpace(v[0])
+			}
+			var sku string
+			if v, found := data.Value["Sku"]; found && len(v) > 0 {
+				sku = strings.TrimSpace(v[0])
 			}
 			var content string
 			if v, found := data.Value["Content"]; found && len(v) > 0 {
@@ -2399,8 +2452,19 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Name = name
 			product.Title = title
 			product.Description = description
+			product.CustomParameters = customParameters
 			oldBasePrice := product.BasePrice
 			product.BasePrice = basePrice
+			oldDimensions := product.Dimensions
+			product.Dimensions = dimensions
+			oldWeight := product.Weight
+			product.Weight = weight
+			oldAvailability := product.Availability
+			product.Availability = availability
+			oldSending := product.Sending
+			product.Sending = sending
+			oldSku := product.Sku
+			product.Sku = sku
 			product.Content = content
 			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
 				// To delete existing
@@ -2437,8 +2501,25 @@ func putProductHandler(c *fiber.Ctx) error {
 			}
 			if variations, err := models.GetProductVariations(common.Database, int(product.ID)); err == nil {
 				for _, variation := range variations {
-					if variation.Name == "default" && math.Abs(oldBasePrice - basePrice) > 0.01 {
-						variation.BasePrice = product.BasePrice
+					if variation.Name == "default" {
+						if math.Abs(oldBasePrice - basePrice) > 0.01 {
+							variation.BasePrice = product.BasePrice
+						}
+						if oldDimensions != dimensions {
+							variation.Dimensions = product.Dimensions
+						}
+						if math.Abs(oldWeight - weight) > 0.01 {
+							variation.Weight = product.Weight
+						}
+						if oldAvailability != availability {
+							variation.Availability = product.Availability
+						}
+						if oldSending != sending {
+							variation.Sending = product.Sending
+						}
+						if oldSku != sku {
+							variation.Sku = product.Sku
+						}
 						if err := models.UpdateVariation(common.Database, variation); err != nil {
 							logger.Warningf("%+v", err)
 						}
@@ -6820,6 +6901,7 @@ func postCalculateHandler(c *fiber.Ctx) error {
 						}
 					}
 				}
+				//
 				c.Status(http.StatusOK)
 				return c.JSON(costs)
 			}else{
@@ -6920,9 +7002,9 @@ type TransportView struct{
 // @Router /api/v1/transports [get]
 // @Tags transport
 func getTransportsHandler(c *fiber.Ctx) error {
-	if tags, err := models.GetTransports(common.Database); err == nil {
+	if transports, err := models.GetTransports(common.Database); err == nil {
 		var view TransportsView
-		if bts, err := json.MarshalIndent(tags, "", "   "); err == nil {
+		if bts, err := json.MarshalIndent(transports, "", "   "); err == nil {
 			if err = json.Unmarshal(bts, &view); err == nil {
 				return c.JSON(view)
 			}else{
@@ -7024,14 +7106,14 @@ func postTransportHandler(c *fiber.Ctx) error {
 			}
 			transport := &models.Transport {
 				Enabled: enabled,
-				Name: name,
-				Title: title,
-				Weight: weight,
-				Volume: volume,
-				Order: order,
-				Item: item,
-				Kg: kg,
-				M3: m3,
+				Name:    name,
+				Title:   title,
+				Weight:  weight,
+				Volume:  volume,
+				Order:   order,
+				Item:    item,
+				Kg:      kg,
+				M3:      m3,
 			}
 			if id, err := models.CreateTransport(common.Database, transport); err == nil {
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
@@ -7118,7 +7200,7 @@ func postTransportsListHandler(c *fiber.Ctx) error {
 		return err
 	}
 	if len(request.Sort) == 0 {
-		request.Sort["ID"] = "desc"
+		request.Sort["ID"] = "asc"
 	}
 	if request.Length == 0 {
 		request.Length = 10
@@ -9378,7 +9460,7 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 		}
 	}
 	// //
-	if v := c.Locals("user"); v != nil {
+	/*if v := c.Locals("user"); v != nil {
 		if user, ok := v.(*models.User); ok {
 			order.User = user
 			//
@@ -9391,7 +9473,7 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
-	}
+	}*/
 	var orderShortView OrderShortView
 	for _, item := range request.Items {
 		var arr []int
@@ -9726,77 +9808,44 @@ type PaymentMethodsView struct {
 // @Success 200 {object} PaymentMethodsView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
-// @Router /api/v1/account/orders/:id/payment_methods [get]
+// @Router /api/v1/payment_methods [get]
 // @Tags account
-func getAccountPaymentMethodsHandler(c *fiber.Ctx) error {
-	var id int
-	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
+func getPaymentMethodsHandler(c *fiber.Ctx) error {
+	if !common.Config.Payment.Enabled {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{"Payment is not enabled, please contact support"})
 	}
-	var userId uint
-	if v := c.Locals("user"); v != nil {
-		if user, ok := v.(*models.User); ok {
-			userId = user.ID
-		}
+	var view PaymentMethodsView
+	if common.Config.Payment.Stripe.Enabled {
+		view.Stripe.Enabled = true
+		view.Default = "stripe"
 	}
-	if order, err := models.GetOrder(common.Database, id); err == nil {
-		if order.UserId != userId {
-			c.Status(http.StatusForbidden)
-			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
-		}
-		//
-		if !common.Config.Payment.Enabled {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Payment is not enabled, please contact support"})
-		}
-		var view PaymentMethodsView
-		if common.Config.Payment.Stripe.Enabled {
-			view.Stripe.Enabled = true
-			view.Default = "stripe"
-		}
-		if common.Config.Payment.Mollie.Enabled {
-			view.Mollie.Enabled = true
-			view.Mollie.Methods = reCSV.Split(common.Config.Payment.Mollie.Methods, -1)
-			view.Default = "mollie"
-		}
-		if common.Config.Payment.AdvancePayment.Enabled {
-			view.AdvancePayment.Enabled = true
-			if tmpl, err := template.New("details").Parse(common.Config.Payment.AdvancePayment.Details); err == nil {
-				var tpl bytes.Buffer
-				vars := map[string]interface{}{
-					"Order": map[string]interface{}{
-						"ID": order.ID,
-						"Total": order.Total,
-					},
-				}
-				if err := tmpl.Execute(&tpl, vars); err == nil {
-					view.AdvancePayment.Details = tpl.String()
-				}else{
-					logger.Errorf("%v", err)
-				}
+	if common.Config.Payment.Mollie.Enabled {
+		view.Mollie.Enabled = true
+		view.Mollie.Methods = reCSV.Split(common.Config.Payment.Mollie.Methods, -1)
+		view.Default = "mollie"
+	}
+	if common.Config.Payment.AdvancePayment.Enabled {
+		view.AdvancePayment.Enabled = true
+		if tmpl, err := template.New("details").Parse(common.Config.Payment.AdvancePayment.Details); err == nil {
+			var tpl bytes.Buffer
+			vars := map[string]interface{}{
+				/* Something should be here */
+			}
+			if err := tmpl.Execute(&tpl, vars); err == nil {
+				view.AdvancePayment.Details = tpl.String()
 			}else{
 				logger.Errorf("%v", err)
 			}
-		}
-		if common.Config.Payment.OnDelivery.Enabled {
-			view.OnDelivery.Enabled = true
-		}
-		//
-		if bts, err := json.MarshalIndent(order, "", "   "); err == nil {
-			if err = json.Unmarshal(bts, &view); err == nil {
-				return c.JSON(view)
-			}else{
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
 		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
+			logger.Errorf("%v", err)
 		}
-	}else{
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
 	}
+	if common.Config.Payment.OnDelivery.Enabled {
+		view.OnDelivery.Enabled = true
+	}
+	//
+	return c.JSON(view)
 }
 
 // PostAdvancePaymentOrder godoc
@@ -10798,7 +10847,13 @@ type ProductView struct {
 	Thumbnail string `json:",omitempty"`
 	Description string `json:",omitempty"`
 	Parameters []ParameterView `json:",omitempty"`
+	CustomParameters string `json:",omitempty"`
 	BasePrice float64 `json:",omitempty"`
+	Dimensions string `json:",omitempty"`
+	Weight float64 `json:",omitempty"`
+	Availability string `json:",omitempty"`
+	Sending string `json:",omitempty"`
+	Sku string
 	Content string
 	Variations []VariationView `json:",omitempty"`
 	Files []File2View `json:",omitempty"`
