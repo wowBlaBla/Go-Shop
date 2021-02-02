@@ -18,6 +18,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -26,6 +27,7 @@ import (
 
 var (
 	VALUES = cmap.New()
+	reKV = regexp.MustCompile(`^([^\:]+):\s*(.*)$`)
 )
 
 var renderCmd = &cobra.Command{
@@ -687,6 +689,20 @@ var renderCmd = &cobra.Command{
 											parameterView.CustomValue = parameter.CustomValue
 										}
 										productView.Parameters = append(productView.Parameters, parameterView)
+										productView.CustomParameters = []common.CustomParameterPF{}
+										if product.CustomParameters != "" {
+											for _, line := range strings.Split(strings.TrimSpace(product.CustomParameters), "\n"){
+												if res := reKV.FindAllStringSubmatch(strings.TrimSpace(line), -1); len(res) > 0 && len(res[0]) > 1 {
+													parameter := common.CustomParameterPF{
+														Key:   res[0][1],
+													}
+													if len(res[0]) > 2 {
+														parameter.Value = res[0][2]
+													}
+													productView.CustomParameters = append(productView.CustomParameters, parameter)
+												}
+											}
+										}
 										productView.Dimensions = product.Dimensions
 										productView.Weight = product.Weight
 										productView.Availability = product.Availability

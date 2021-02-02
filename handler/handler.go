@@ -45,6 +45,7 @@ import (
 )
 
 const (
+	BODY_LIMIT = 20 * 1024 * 1024
 	HAS_CHANGES = "temp/.has_changes"
 )
 

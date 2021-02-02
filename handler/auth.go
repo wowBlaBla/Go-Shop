@@ -150,6 +150,7 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 		return securecookie.New([]byte(HASH16),[]byte(HASH32))
 	} ()
 	//
+	config.FiberConfig.BodyLimit = BODY_LIMIT
 	if config.UseForm {
 		engine := html.New(path.Join(dir, TEMPLATES_FOLDER), ".html")
 		// You can add engine function here
