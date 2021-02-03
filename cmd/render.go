@@ -639,7 +639,8 @@ var renderCmd = &cobra.Command{
 													logger.Warningf("%v", err)
 												}
 											}
-											if p1 := path.Join(dir, image.Path); len(p1) > 0 {
+											if p1 := path.Join(dir, "storage", image.Path); len(p1) > 0 {
+												logger.Infof("p1: %+v", p1)
 												if fi, err := os.Stat(p1); err == nil {
 													filename := fmt.Sprintf("image-%d-%d%v", i+1, fi.ModTime().Unix(), path.Ext(p1))
 													p2 := path.Join(p0, filename)
@@ -660,6 +661,12 @@ var renderCmd = &cobra.Command{
 																logger.Warningf("%v", err)
 															}
 														}
+														// Generate thumbnail
+														if i == 0 || product.ImageId == image.ID {
+															view.Thumbnail = strings.Join(images2, ",")
+															productView.Thumbnail = strings.Join(images2, ",")
+														}
+														//
 														images = append(images, strings.Join(images2, ","))
 													} else {
 														logger.Warningf("%v", err)

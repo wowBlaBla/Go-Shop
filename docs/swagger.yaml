@@ -1,7 +1,34 @@
 basePath: /
 definitions:
+  config.EmailConfig:
+    properties:
+      email:
+        type: string
+      enabled:
+        type: boolean
+      key:
+        description: SendGrid key
+        type: string
+      name:
+        type: string
+    type: object
+  config.NotificationConfig:
+    properties:
+      email:
+        $ref: '#/definitions/config.EmailConfig'
+        type: object
+      enabled:
+        type: boolean
+    type: object
   config.PaymentConfig:
     properties:
+      advancePayment:
+        properties:
+          details:
+            type: string
+          enabled:
+            type: boolean
+        type: object
       default:
         type: string
       enabled:
@@ -12,8 +39,15 @@ definitions:
             type: boolean
           key:
             type: string
+          methods:
+            type: string
           profileID:
             type: string
+        type: object
+      onDelivery:
+        properties:
+          enabled:
+            type: boolean
         type: object
       stripe:
         properties:
@@ -50,6 +84,15 @@ definitions:
             type: string
         type: object
     type: object
+  config.WranglerConfig:
+    properties:
+      apiToken:
+        type: string
+      bin:
+        type: string
+      enabled:
+        type: boolean
+    type: object
   handler.AccountView:
     properties:
       admin:
@@ -64,6 +107,8 @@ definitions:
         type: integer
       login:
         type: string
+      notification:
+        type: boolean
       profiles:
         items:
           $ref: '#/definitions/handler.ProfileView'
@@ -80,6 +125,9 @@ definitions:
     type: object
   handler.BasicSettingsView:
     properties:
+      notification:
+        $ref: '#/definitions/config.NotificationConfig'
+        type: object
       payment:
         $ref: '#/definitions/config.PaymentConfig'
         type: object
@@ -87,6 +135,8 @@ definitions:
         $ref: '#/definitions/config.ResizeConfig'
         type: object
     type: object
+  handler.BasicWranglerView:
+    $ref: '#/definitions/config.WranglerConfig'
   handler.CategoriesAutocompleteItem:
     properties:
       id:
@@ -214,6 +264,41 @@ definitions:
         $ref: '#/definitions/handler.TransferView'
         type: object
     type: object
+  handler.EmailTemplateView:
+    properties:
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      message:
+        type: string
+      topic:
+        type: string
+      type:
+        type: string
+    type: object
+  handler.EmailsListItem:
+    properties:
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      topic:
+        type: string
+      type:
+        type: string
+    type: object
+  handler.EmailsListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.EmailsListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
   handler.ExistingFile:
     type: object
   handler.ExistingImage:
@@ -232,14 +317,20 @@ definitions:
     type: object
   handler.ExistingUser:
     properties:
+      email:
+        type: string
       emailConfirmed:
+        type: boolean
+      notification:
         type: boolean
       password:
         type: string
+      role:
+        type: integer
     type: object
   handler.File2View:
     properties:
-      created:
+      createdAt:
         type: string
       id:
         type: integer
@@ -359,7 +450,7 @@ definitions:
     type: object
   handler.ImageView:
     properties:
-      created:
+      createdAt:
         type: string
       height:
         type: integer
@@ -454,6 +545,10 @@ definitions:
       variation:
         $ref: '#/definitions/handler.VariationShortView'
         type: object
+      volume:
+        type: number
+      weight:
+        type: number
     type: object
   handler.ItemView:
     properties:
@@ -561,6 +656,17 @@ definitions:
     type: object
   handler.NewCommand:
     type: object
+  handler.NewEmailTemplate:
+    properties:
+      enabled:
+        type: boolean
+      message:
+        type: string
+      topic:
+        type: string
+      type:
+        type: string
+    type: object
   handler.NewFile:
     properties:
       file:
@@ -604,6 +710,8 @@ definitions:
           $ref: '#/definitions/handler.NewItem'
         type: array
       profileId:
+        type: integer
+      transportId:
         type: integer
     type: object
   handler.NewParameter:
@@ -663,8 +771,6 @@ definitions:
         type: string
       region:
         type: string
-      transportId:
-        type: integer
       zip:
         type: string
     type: object
@@ -728,6 +834,10 @@ definitions:
         type: string
       title:
         type: string
+      volume:
+        type: number
+      weight:
+        type: number
     type: object
   handler.NewValue:
     properties:
@@ -860,9 +970,15 @@ definitions:
         items:
           $ref: '#/definitions/handler.ItemShortView'
         type: array
+      quantity:
+        type: integer
       sum:
         type: number
       total:
+        type: number
+      volume:
+        type: number
+      weight:
         type: number
     type: object
   handler.OrderView:
@@ -958,6 +1074,37 @@ definitions:
       valueId:
         type: integer
     type: object
+  handler.PaymentMethodsView:
+    properties:
+      advancePayment:
+        properties:
+          details:
+            type: string
+          enabled:
+            type: boolean
+        type: object
+      default:
+        type: string
+      mollie:
+        properties:
+          enabled:
+            type: boolean
+          methods:
+            items:
+              type: string
+            type: array
+        type: object
+      onDelivery:
+        properties:
+          enabled:
+            type: boolean
+        type: object
+      stripe:
+        properties:
+          enabled:
+            type: boolean
+        type: object
+    type: object
   handler.PriceView:
     properties:
       enabled:
@@ -1007,6 +1154,13 @@ definitions:
       total:
         type: integer
     type: object
+  handler.ProductPatch:
+    properties:
+      images:
+        items:
+          type: integer
+        type: array
+    type: object
   handler.ProductShortView:
     properties:
       description:
@@ -1022,19 +1176,33 @@ definitions:
     type: object
   handler.ProductView:
     properties:
+      availability:
+        type: string
+      basePrice:
+        type: number
       categories:
         items:
           $ref: '#/definitions/handler.CategoryView'
         type: array
       content:
         type: string
+      customParameters:
+        type: string
+      customization:
+        type: string
       description:
         type: string
+      dimensions:
+        type: string
+      enabled:
+        type: boolean
       files:
         items:
           $ref: '#/definitions/handler.File2View'
         type: array
       id:
+        type: integer
+      imageId:
         type: integer
       images:
         items:
@@ -1046,6 +1214,10 @@ definitions:
         items:
           $ref: '#/definitions/handler.ParameterView'
         type: array
+      sending:
+        type: string
+      sku:
+        type: string
       tags:
         items:
           $ref: '#/definitions/handler.TagView'
@@ -1054,12 +1226,12 @@ definitions:
         type: string
       title:
         type: string
-      upsale:
-        type: string
       variations:
         items:
           $ref: '#/definitions/handler.VariationView'
         type: array
+      weight:
+        type: number
     type: object
   handler.ProductsFilterItem:
     properties:
@@ -1101,6 +1273,8 @@ definitions:
         type: integer
       description:
         type: string
+      enabled:
+        type: boolean
       id:
         type: integer
       name:
@@ -1179,67 +1353,6 @@ definitions:
         type: string
       type:
         type: string
-    type: object
-  handler.SearchRequest:
-    properties:
-      limit:
-        type: integer
-      term:
-        type: string
-    type: object
-  handler.SearchResult:
-    properties:
-      products:
-        items:
-          $ref: '#/definitions/handler.SearchResultProductView'
-        type: array
-      term:
-        type: string
-    type: object
-  handler.SearchResultProductView:
-    properties:
-      basePrice:
-        type: number
-      categories:
-        items:
-          $ref: '#/definitions/handler.CategoryView'
-        type: array
-      content:
-        type: string
-      description:
-        type: string
-      files:
-        items:
-          $ref: '#/definitions/handler.File2View'
-        type: array
-      id:
-        type: integer
-      images:
-        items:
-          $ref: '#/definitions/handler.ImageView'
-        type: array
-      name:
-        type: string
-      parameters:
-        items:
-          $ref: '#/definitions/handler.ParameterView'
-        type: array
-      path:
-        type: string
-      tags:
-        items:
-          $ref: '#/definitions/handler.TagView'
-        type: array
-      thumbnail:
-        type: string
-      title:
-        type: string
-      upsale:
-        type: string
-      variations:
-        items:
-          $ref: '#/definitions/handler.VariationView'
-        type: array
     type: object
   handler.StripeCardView:
     type: object
@@ -1394,8 +1507,14 @@ definitions:
         type: string
       order:
         type: string
+      thumbnail:
+        type: string
       title:
         type: string
+      volume:
+        type: number
+      weight:
+        type: number
     type: object
   handler.TransportsListItem:
     properties:
@@ -1415,6 +1534,10 @@ definitions:
         type: string
       title:
         type: string
+      volume:
+        type: number
+      weight:
+        type: number
     type: object
   handler.TransportsListResponse:
     properties:
@@ -1431,6 +1554,15 @@ definitions:
     items:
       $ref: '#/definitions/handler.TransportView'
     type: array
+  handler.User2View:
+    properties:
+      newPassword:
+        type: string
+      newPassword2:
+        type: string
+      oldPassword:
+        type: string
+    type: object
   handler.UserView:
     properties:
       email:
@@ -1443,6 +1575,8 @@ definitions:
         type: integer
       login:
         type: string
+      notification:
+        type: boolean
       role:
         type: integer
     type: object
@@ -1459,6 +1593,8 @@ definitions:
       login:
         type: string
       orders:
+        type: integer
+      role:
         type: integer
       updatedAt:
         type: string
@@ -1635,6 +1771,26 @@ definitions:
     items:
       $ref: '#/definitions/handler.VariationView'
     type: array
+  handler.WranglerSettingsView:
+    properties:
+      accountId:
+        type: string
+      name:
+        type: string
+      route:
+        type: string
+      site:
+        properties:
+          bucket:
+            type: string
+        type: object
+      type:
+        type: string
+      workersDev:
+        type: boolean
+      zoneId:
+        type: string
+    type: object
   handler.ZoneView:
     properties:
       country:
@@ -1739,6 +1895,37 @@ paths:
       summary: Get account
       tags:
       - account
+      - frontend
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: account
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AccountView'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.User2View'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update account
+      tags:
+      - order
   /api/v1/account/orders:
     get:
       consumes:
@@ -1761,6 +1948,7 @@ paths:
       summary: Get account orders
       tags:
       - account
+      - frontend
     post:
       consumes:
       - application/json
@@ -1789,6 +1977,7 @@ paths:
       summary: Post account order
       tags:
       - account
+      - frontend
   /api/v1/account/orders/{id}:
     get:
       consumes:
@@ -1817,6 +2006,71 @@ paths:
       summary: Get order
       tags:
       - account
+      - frontend
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ExistingOrder'
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.UserView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update order by user
+      tags:
+      - order
+  /api/v1/account/orders/{id}/advance_payment/submit:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Post advance-payment order
+      tags:
+      - account
+      - frontend
   /api/v1/account/orders/{id}/mollie/submit:
     get:
       consumes:
@@ -1845,6 +2099,7 @@ paths:
       summary: Post mollie order
       tags:
       - account
+      - frontend
   /api/v1/account/orders/{id}/mollie/success:
     get:
       consumes:
@@ -1873,6 +2128,36 @@ paths:
       summary: Get mollie payment success
       tags:
       - account
+      - frontend
+  /api/v1/account/orders/{id}/on_delivery/submit:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Post on-delivery order
+      tags:
+      - account
+      - frontend
   /api/v1/account/orders/{id}/stripe/card:
     get:
       consumes:
@@ -2097,6 +2382,8 @@ paths:
       security:
       - BasicAuth: []
       summary: Calculate shipping cost
+      tags:
+      - frontend
   /api/v1/categories:
     get:
       consumes:
@@ -2641,12 +2928,14 @@ paths:
       security:
       - BasicAuth: []
       summary: Filter products
+      tags:
+      - frontend
   /api/v1/images:
     post:
       consumes:
       - multipart/form-data
       parameters:
-      - description: Product id
+      - description: Products id
         in: query
         name: pid
         type: integer
@@ -2853,6 +3142,7 @@ paths:
       summary: login
       tags:
       - auth
+      - frontend
   /api/v1/logout:
     get:
       consumes:
@@ -2878,6 +3168,7 @@ paths:
       summary: logout
       tags:
       - auth
+      - frontend
   /api/v1/me:
     get:
       consumes:
@@ -2900,6 +3191,162 @@ paths:
       security:
       - BasicAuth: []
       summary: Get me
+  /api/v1/notification/email:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: zone
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewEmailTemplate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.EmailTemplateView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create email template
+      tags:
+      - notification
+  /api/v1/notification/email/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Email template ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete email template
+      tags:
+      - notification
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: EmailTemplate ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.EmailTemplateView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get email template
+      tags:
+      - notification
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: transport
+        required: true
+        schema:
+          $ref: '#/definitions/handler.EmailTemplateView'
+      - description: Email Template ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.EmailTemplateView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update email template
+      tags:
+      - notification
+  /api/v1/notification/email/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.EmailsListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search email templates
+      tags:
+      - notification
   /api/v1/options:
     get:
       consumes:
@@ -3243,7 +3690,7 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Product id
+      - description: Products id
         in: query
         name: product_id
         required: true
@@ -3333,6 +3780,29 @@ paths:
       summary: Get parameter
       tags:
       - parameter
+  /api/v1/payment_methods:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.PaymentMethodsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get account payment methods
+      tags:
+      - account
+      - frontend
   /api/v1/prepare:
     post:
       consumes:
@@ -3611,7 +4081,7 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Product ID
+      - description: Products ID
         in: path
         name: id
         required: true
@@ -3640,7 +4110,7 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Product ID
+      - description: Products ID
         in: path
         name: id
         required: true
@@ -3665,11 +4135,45 @@ paths:
       summary: Get product
       tags:
       - product
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Products id
+        in: query
+        name: id
+        type: integer
+      - description: body
+        in: body
+        name: product
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ProductPatch'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Patch product
+      tags:
+      - product
     put:
       consumes:
       - multipart/form-data
       parameters:
-      - description: Product id
+      - description: Products id
         in: query
         name: id
         type: integer
@@ -3950,6 +4454,9 @@ paths:
           schema:
             $ref: '#/definitions/handler.HTTPError'
       summary: reset password
+      tags:
+      - auth
+      - frontend
   /api/v1/settings/basic:
     get:
       consumes:
@@ -4052,6 +4559,58 @@ paths:
       security:
       - BasicAuth: []
       summary: Set hugo settings
+      tags:
+      - settings
+  /api/v1/settings/wrangler:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.BasicWranglerView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get wrangler settings
+      tags:
+      - settings
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.WranglerSettingsView'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Set wrangler settings
       tags:
       - settings
   /api/v1/tags:
@@ -4908,7 +5467,7 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Product ID
+      - description: Products ID
         in: path
         name: id
         type: integer
@@ -5060,7 +5619,7 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Product ID
+      - description: Products ID
         in: query
         name: id
         type: integer
@@ -5224,7 +5783,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.TagView'
+            $ref: '#/definitions/handler.ZoneView'
         "404":
           description: Not Found
           schema:
@@ -5305,33 +5864,6 @@ paths:
       summary: Create property
       tags:
       - property
-  /search:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: body
-        in: body
-        name: search
-        required: true
-        schema:
-          $ref: '#/definitions/handler.SearchRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.SearchResult'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      summary: Post search request
 securityDefinitions:
   BasicAuth:
     type: basic

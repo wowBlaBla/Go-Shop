@@ -1,7 +1,9 @@
 package models
 
 import (
+	"encoding/json"
 	"gorm.io/gorm"
+	"sort"
 )
 
 type Product struct {
@@ -25,8 +27,14 @@ type Product struct {
 	Categories  []*Category  `gorm:"many2many:categories_products;"`
 	Variations  []*Variation `gorm:"foreignKey:ProductId"`
 	Files       []*File     `gorm:"many2many:products_files;"`
+	//
+	ImageId uint
+	Image       *Image `gorm:"foreignKey:image_id;"`
+	//
 	Images      []*Image     `gorm:"many2many:products_images;"`
 	Tags        []*Tag `gorm:"many2many:products_tags;"`
+	//
+	Customization string
 }
 
 func SearchProducts(connector *gorm.DB, term string, limit int) ([]*Product, error) {
@@ -72,8 +80,30 @@ func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	db := connector
 	var product Product
-	if err := db.Preload("Categories").Preload("Parameters").Preload("Parameters.Option").Preload("Parameters.Value").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Preload("Tags").First(&product, id).Error; err != nil {
+	if err := db.Debug().Preload("Categories").Preload("Parameters").Preload("Parameters.Option").Preload("Parameters.Value").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Preload("Tags").First(&product, id).Error; err != nil {
 		return nil, err
+	}
+	var customization struct {
+		Images struct {
+			Order []uint
+		}
+	}
+	// Customization
+	if err := json.Unmarshal([]byte(product.Customization), &customization); err == nil {
+		images := product.Images
+		sort.SliceStable(images, func(i, j int) bool {
+			var x, y int
+			for k, id := range customization.Images.Order {
+				if id == images[i].ID {
+					x = k
+				}
+				if id == images[j].ID {
+					y = k
+				}
+			}
+			return x < y
+		})
+		product.Images = images
 	}
 	return &product, nil
 }
@@ -123,6 +153,11 @@ func AddFileToProduct(connector *gorm.DB, product *Product, file *File) error {
 func AddImageToProduct(connector *gorm.DB, product *Product, image *Image) error {
 	db := connector
 	return db.Model(&product).Association("Images").Append(image)
+}
+
+func DeleteAllImagesFromProduct(connector *gorm.DB, product *Product) error {
+	db := connector
+	return db.Debug().Unscoped().Model(&product).Association("Images").Clear()
 }
 
 func DeleteAllCategoriesFromProduct(connector *gorm.DB, product *Product) error {

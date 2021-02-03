@@ -144,6 +144,7 @@ func GetFiber() *fiber.App {
 	v1.Post("/products", authMulti, changed("product created"), postProductsHandler)
 	v1.Post("/products/list", authMulti, postProductsListHandler)
 	v1.Get("/products/:id", authMulti, getProductHandler)
+	v1.Patch("/products/:id", authMulti, changed("product patched"), patchProductHandler)
 	v1.Put("/products/:id", authMulti, changed("product updated"), putProductHandler)
 	v1.Delete("/products/:id", authMulti, changed("product deleted"), delProductHandler)
 	//
@@ -329,6 +330,8 @@ func GetFiber() *fiber.App {
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/reset [post]
+// @Tags auth
+// @Tags frontend
 func postResetHandler(c *fiber.Ctx) error {
 	var request LoginRequest
 	if err := c.BodyParser(&request); err != nil {
@@ -709,6 +712,8 @@ type WranglerSettingsView struct {
 		Bucket string `toml:"bucket"`
 	} `toml:"site"`
 }
+
+type BasicWranglerView config.WranglerConfig
 
 // GetWranglerSettings godoc
 // @Summary Get wrangler settings
@@ -2045,12 +2050,16 @@ func postProductsHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Content"]; found && len(v) > 0 {
 				content = strings.TrimSpace(v[0])
 			}
-			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, CustomParameters: customParameters, BasePrice: basePrice, Dimensions: dimensions, Weight: weight, Availability: availability, Sending: sending, Sku: sku, Content: content}
+			var customization string
+			if v, found := data.Value["Customization"]; found && len(v) > 0 {
+				customization = strings.TrimSpace(v[0])
+			}
+			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, CustomParameters: customParameters, BasePrice: basePrice, Dimensions: dimensions, Weight: weight, Availability: availability, Sending: sending, Sku: sku, Content: content, Customization: customization}
 			if id, err := models.CreateProduct(common.Database, product); err == nil {
 				// Create new product automatically
 				if name == "" {
 					product.Name = fmt.Sprintf("new-product-%d", product.ID)
-					product.Title = fmt.Sprintf("New Products %d", product.ID)
+					product.Title = fmt.Sprintf("New Product %d", product.ID)
 					if err = models.UpdateProduct(common.Database, product); err != nil {
 						c.Status(http.StatusInternalServerError)
 						return c.JSON(HTTPError{err.Error()})
@@ -2283,7 +2292,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, products.Thumbnail, products.Description, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles, category_id as CategoryId").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles, category_id as CategoryId").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -2301,7 +2310,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, products.Thumbnail, products.Description, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles, category_id as CategoryId").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles, category_id as CategoryId").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -2353,6 +2362,56 @@ func getProductHandler(c *fiber.Ctx) error {
 		return c.JSON(HTTPError{err.Error()})
 	}
 }
+
+type ProductPatch struct {
+	Images []uint
+}
+
+// @security BasicAuth
+// PatchProduct godoc
+// @Summary Patch product
+// @Accept json
+// @Produce json
+// @Param id query int false "Products id"
+// @Param product body ProductPatch true "body"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/products/{id} [patch]
+// @Tags product
+func patchProductHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	var product *models.Product
+	var err error
+	if product, err = models.GetProduct(common.Database, id); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	logger.Infof("product: %+v", product)
+	var request ProductPatch
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	//
+	if len(request.Images) > 0 {
+		logger.Infof("request: %+v", request)
+		if err = models.DeleteAllImagesFromProduct(common.Database, product); err == nil {
+			for _, image := range request.Images {
+				if err = models.AddImageToProduct(common.Database, product, &models.Image{
+					Model:  gorm.Model{ID: image},
+				}); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+		}
+	}
+	return c.JSON(HTTPMessage{"OK"})
+}
+
 
 // @security BasicAuth
 // UpdateProduct godoc
@@ -2449,6 +2508,16 @@ func putProductHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Content"]; found && len(v) > 0 {
 				content = strings.TrimSpace(v[0])
 			}
+			var imageId uint
+			if v, found := data.Value["ImageId"]; found && len(v) > 0 {
+				if vv, _ := strconv.Atoi(v[0]); err == nil {
+					imageId = uint(vv)
+				}
+			}
+			var customization string
+			if v, found := data.Value["Customization"]; found && len(v) > 0 {
+				customization = strings.TrimSpace(v[0])
+			}
 			product.Enabled = enabled
 			product.Name = name
 			product.Title = title
@@ -2466,7 +2535,9 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Sending = sending
 			oldSku := product.Sku
 			product.Sku = sku
+			product.ImageId = imageId
 			product.Content = content
+			product.Customization = customization
 			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
 				// To delete existing
 				if product.Thumbnail != "" {
@@ -5890,8 +5961,8 @@ func postImageHandler(c *fiber.Ctx) error {
 									c.Status(http.StatusInternalServerError)
 									return c.JSON(HTTPError{err.Error()})
 								}
-								img.Url = common.Config.Base + "/" + path.Join("storage", "images", filename)
-								img.Path = "/" + path.Join("storage", "images", filename)
+								img.Url = common.Config.Base + "/" + path.Join("images", filename)
+								img.Path = "/" + path.Join("images", filename)
 								if reader, err := os.Open(p); err == nil {
 									defer reader.Close()
 									if config, _, err := image.DecodeConfig(reader); err == nil {
@@ -5951,7 +6022,7 @@ type ImagesListResponse struct {
 type ImagesListItem struct {
 	ID uint
 	Created time.Time
-	Url string
+	Path string
 	Name string
 	Height int
 	Width int
@@ -6054,7 +6125,7 @@ func postImagesListHandler(c *fiber.Ctx) error {
 		//id, _ = strconv.Atoi(v)
 		keys1 = append(keys1, "products_images.product_id = ?")
 		values1 = append(values1, v)
-		rows, err := common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Url, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join products_images on products_images.image_id = images.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+		rows, err := common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Path, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join products_images on products_images.image_id = images.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 		if err == nil {
 			if err == nil {
 				for rows.Next() {
@@ -6070,7 +6141,7 @@ func postImagesListHandler(c *fiber.Ctx) error {
 			}
 			rows.Close()
 		}
-		rows, err = common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Url, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join products_images on products_images.image_id = images.id").Where(strings.Join(keys1, " and "), values1...).Rows()
+		rows, err = common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Path, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join products_images on products_images.image_id = images.id").Where(strings.Join(keys1, " and "), values1...).Rows()
 		if err == nil {
 			for rows.Next() {
 				response.Filtered ++
@@ -6083,7 +6154,7 @@ func postImagesListHandler(c *fiber.Ctx) error {
 			response.Total = response.Filtered
 		}
 	}else{
-		rows, err := common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Url, images.Height, images.Width, images.Size, images.Updated_At as Updated").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+		rows, err := common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Path, images.Height, images.Width, images.Size, images.Updated_At as Updated").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 		if err == nil {
 			if err == nil {
 				for rows.Next() {
@@ -6099,7 +6170,7 @@ func postImagesListHandler(c *fiber.Ctx) error {
 			}
 			rows.Close()
 		}
-		rows, err = common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Url, images.Height, images.Width, images.Size, images.Updated_At as Updated").Where(strings.Join(keys1, " and "), values1...).Rows()
+		rows, err = common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Path, images.Height, images.Width, images.Size, images.Updated_At as Updated").Where(strings.Join(keys1, " and "), values1...).Rows()
 		if err == nil {
 			for rows.Next() {
 				response.Filtered ++
@@ -6203,7 +6274,7 @@ func putImageHandler(c *fiber.Ctx) error {
 				return err
 			}
 			if v, found := data.File["Image"]; found && len(v) > 0 {
-				p := path.Dir(path.Join(dir, img.Path))
+				p := path.Dir(path.Join(dir, "storage", img.Path))
 				if _, err := os.Stat(p); err != nil {
 					if err = os.MkdirAll(p, 0755); err != nil {
 						logger.Errorf("%v", err)
@@ -6276,7 +6347,7 @@ func delImageHandler(c *fiber.Ctx) error {
 	if v := c.Params("id"); v != "" {
 		oid, _ = strconv.Atoi(v)
 		if image, err := models.GetImage(common.Database, oid); err == nil {
-			if err = os.Remove(path.Join(dir, image.Path)); err != nil {
+			if err = os.Remove(path.Join(dir, image.Path, "storage")); err != nil {
 				logger.Errorf("%v", err.Error())
 			}
 			if err = models.DeleteImage(common.Database, image); err == nil {
@@ -6872,6 +6943,7 @@ func getMeHandler(c *fiber.Ctx) error {
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/calculate [post]
+// @Tags frontend
 func postCalculateHandler(c *fiber.Ctx) error {
 	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
 		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
@@ -8755,6 +8827,7 @@ type AccountView struct {
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/account [get]
 // @Tags account
+// @Tags frontend
 func getAccountHandler(c *fiber.Ctx) error {
 	if v := c.Locals("user"); v != nil {
 		if user, ok := v.(*models.User); ok {
@@ -9156,6 +9229,7 @@ type ProductsFilterItem struct {
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/filter [post]
+// @Tags frontend
 func postFilterHandler(c *fiber.Ctx) error {
 	var relPath string
 	if v := c.Query("relPath"); v != "" {
@@ -9328,6 +9402,7 @@ type ItemView struct{
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/account/orders [get]
 // @Tags account
+// @Tags frontend
 func getAccountOrdersHandler(c *fiber.Ctx) error {
 	var userId uint
 	if v := c.Locals("user"); v != nil {
@@ -9417,6 +9492,7 @@ type PropertyShortView struct {
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/account/orders [post]
 // @Tags account
+// @Tags frontend
 func postAccountOrdersHandler(c *fiber.Ctx) error {
 	var request NewOrder
 	if err := c.BodyParser(&request); err != nil {
@@ -9628,6 +9704,7 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/account/orders/{id} [get]
 // @Tags account
+// @Tags frontend
 func getAccountOrderHandler(c *fiber.Ctx) error {
 	var id int
 	if v := c.Params("id"); v != "" {
@@ -9811,6 +9888,7 @@ type PaymentMethodsView struct {
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/payment_methods [get]
 // @Tags account
+// @Tags frontend
 func getPaymentMethodsHandler(c *fiber.Ctx) error {
 	if !common.Config.Payment.Enabled {
 		c.Status(http.StatusInternalServerError)
@@ -9859,6 +9937,7 @@ func getPaymentMethodsHandler(c *fiber.Ctx) error {
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/account/orders/{id}/advance_payment/submit [get]
 // @Tags account
+// @Tags frontend
 func postAccountOrderAdvancePaymentSubmitHandler(c *fiber.Ctx) error {
 	var id int
 	if v := c.Params("id"); v != "" {
@@ -9909,6 +9988,7 @@ func postAccountOrderAdvancePaymentSubmitHandler(c *fiber.Ctx) error {
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/account/orders/{id}/on_delivery/submit [get]
 // @Tags account
+// @Tags frontend
 func postAccountOrderOnDeliverySubmitHandler(c *fiber.Ctx) error {
 	var id int
 	if v := c.Params("id"); v != "" {
@@ -10515,6 +10595,7 @@ type MollieOrderView struct {
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/account/orders/{id}/mollie/submit [get]
 // @Tags account
+// @Tags frontend
 func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 	logger.Infof("postAccountOrderMollieSubmitHandler")
 	var id int
@@ -10677,6 +10758,7 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/account/orders/{id}/mollie/success [get]
 // @Tags account
+// @Tags frontend
 func getAccountOrderMollieSuccessHandler(c *fiber.Ctx) error {
 	log.Printf("getAccountOrderMollieSuccessHandler")
 	c.Response().Header.Set("Content-Type", "text/html")
@@ -10858,10 +10940,13 @@ type ProductView struct {
 	Content string
 	Variations []VariationView `json:",omitempty"`
 	Files []File2View `json:",omitempty"`
+	ImageId int `json:",omitempty"`
 	Images []ImageView `json:",omitempty"`
 	//
 	Categories []CategoryView `json:",omitempty"`
 	Tags []TagView `json:",omitempty"`
+	//
+	Customization string `json:",omitempty"`
 }
 
 type VariationsView []VariationView
