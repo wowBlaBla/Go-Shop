@@ -3,6 +3,11 @@ package handler
 import (
 	"bufio"
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/md5"
+	crypto_rand "crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -57,7 +62,7 @@ var (
 
 
 func GetFiber() *fiber.App {
-	app, authMulti := CreateFiberAppWithAuthMultiple(AuthMultipleConfig{
+	app, authRequired, authOptional := CreateFiberAppWithAuthMultiple(AuthMultipleConfig{
 			CookieDuration: time.Duration(365 * 24) * time.Hour,
 			Log: true,
 			//UseForm: true,
@@ -116,166 +121,167 @@ func GetFiber() *fiber.App {
 	v1 := api.Group("/v1")
 	v1.Post("/login", postLoginHandler)
 	v1.Post("/reset", postResetHandler)
-	v1.Get("/logout", authMulti, getLogoutHandler)
-	v1.Get("/info", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getInfoHandler)
-	v1.Get("/dashboard", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getDashboardHandler)
-	v1.Get("/settings/basic", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getBasicSettingsHandler)
-	v1.Put("/settings/basic", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("basic settings updated"), putBasicSettingsHandler)
-	v1.Get("/settings/hugo", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getHugoSettingsHandler)
-	v1.Put("/settings/hugo", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("hugo settings updated"), putHugoSettingsHandler)
-	v1.Get("/settings/wrangler", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getWranglerSettingsHandler)
-	v1.Put("/settings/wrangler", authMulti, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("wrangler settings updated"), putWranglerSettingsHandler)
+	v1.Get("/logout", authRequired, getLogoutHandler)
+	v1.Get("/preview", authOptional, getPreviewHandler)
+	v1.Get("/info", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getInfoHandler)
+	v1.Get("/dashboard", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getDashboardHandler)
+	v1.Get("/settings/basic", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getBasicSettingsHandler)
+	v1.Put("/settings/basic", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("basic settings updated"), putBasicSettingsHandler)
+	v1.Get("/settings/hugo", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getHugoSettingsHandler)
+	v1.Put("/settings/hugo", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("hugo settings updated"), putHugoSettingsHandler)
+	v1.Get("/settings/wrangler", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getWranglerSettingsHandler)
+	v1.Put("/settings/wrangler", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("wrangler settings updated"), putWranglerSettingsHandler)
 	//
-	v1.Get("/categories", authMulti, getCategoriesHandler)
-	v1.Post("/categories", authMulti, changed("category created"), postCategoriesHandler)
-	v1.Post("/categories/autocomplete", authMulti, postCategoriesAutocompleteHandler)
-	v1.Post("/categories/list", authMulti, postCategoriesListHandler)
-	v1.Get("/categories/:id", authMulti, getCategoryHandler)
-	v1.Put("/categories/:id", authMulti, changed("category updated"), putCategoryHandler)
-	v1.Delete("/categories/:id", authMulti, changed("category deleted"), delCategoryHandler)
+	v1.Get("/categories", authRequired, getCategoriesHandler)
+	v1.Post("/categories", authRequired, changed("category created"), postCategoriesHandler)
+	v1.Post("/categories/autocomplete", authRequired, postCategoriesAutocompleteHandler)
+	v1.Post("/categories/list", authRequired, postCategoriesListHandler)
+	v1.Get("/categories/:id", authRequired, getCategoryHandler)
+	v1.Put("/categories/:id", authRequired, changed("category updated"), putCategoryHandler)
+	v1.Delete("/categories/:id", authRequired, changed("category deleted"), delCategoryHandler)
 	//
-	v1.Get("/contents", authMulti, getContentsHandler)
-	v1.Get("/contents/*", authMulti, getContentHandler)
-	v1.Patch("/contents/*", authMulti, changed("content updated"), patchContentHandler)
-	v1.Post("/contents/*", authMulti, changed("content created"), postContentHandler)
-	v1.Put("/contents/*", authMulti, changed("content updated"), putContentHandler)
+	v1.Get("/contents", authRequired, getContentsHandler)
+	v1.Get("/contents/*", authRequired, getContentHandler)
+	v1.Patch("/contents/*", authRequired, changed("content updated"), patchContentHandler)
+	v1.Post("/contents/*", authRequired, changed("content created"), postContentHandler)
+	v1.Put("/contents/*", authRequired, changed("content updated"), putContentHandler)
 	//
-	v1.Get("/products", authMulti, getProductsHandler)
-	v1.Post("/products", authMulti, changed("product created"), postProductsHandler)
-	v1.Post("/products/list", authMulti, postProductsListHandler)
-	v1.Get("/products/:id", authMulti, getProductHandler)
-	v1.Patch("/products/:id", authMulti, changed("product patched"), patchProductHandler)
-	v1.Put("/products/:id", authMulti, changed("product updated"), putProductHandler)
-	v1.Delete("/products/:id", authMulti, changed("product deleted"), delProductHandler)
+	v1.Get("/products", authRequired, getProductsHandler)
+	v1.Post("/products", authRequired, changed("product created"), postProductsHandler)
+	v1.Post("/products/list", authRequired, postProductsListHandler)
+	v1.Get("/products/:id", authRequired, getProductHandler)
+	v1.Put("/products/:id", authRequired, changed("product updated"), putProductHandler)
+	v1.Delete("/products/:id", authRequired, changed("product deleted"), delProductHandler)
 	//
-	v1.Post("/parameters", authMulti, changed("parameter created"), postParameterHandler)
-	v1.Get("/parameters/:id", authMulti, getParameterHandler)
-	v1.Put("/parameters/:id", authMulti, changed("parameter updated"), putParameterHandler)
-	v1.Delete("/parameters/:id", authMulti, changed("parameter deleted"), deleteParameterHandler)
+	v1.Post("/parameters", authRequired, changed("parameter created"), postParameterHandler)
+	v1.Get("/parameters/:id", authRequired, getParameterHandler)
+	v1.Put("/parameters/:id", authRequired, changed("parameter updated"), putParameterHandler)
+	v1.Delete("/parameters/:id", authRequired, changed("parameter deleted"), deleteParameterHandler)
 	//
-	v1.Get("/variations", authMulti, getVariationsHandler)
-	v1.Post("/variations", authMulti, changed("variation created"), postVariationHandler)
-	v1.Post("/variations/list", authMulti, postVariationsListHandler)
-	v1.Get("/variations/:id", authMulti, getVariationHandler)
-	v1.Put("/variations/:id", authMulti, changed("variation updated"), putVariationHandler)
-	v1.Delete("/variations/:id", authMulti, changed("variation deleted"), delVariationHandler)
+	v1.Get("/variations", authRequired, getVariationsHandler)
+	v1.Post("/variations", authRequired, changed("variation created"), postVariationHandler)
+	v1.Post("/variations/list", authRequired, postVariationsListHandler)
+	v1.Get("/variations/:id", authRequired, getVariationHandler)
+	v1.Put("/variations/:id", authRequired, changed("variation updated"), putVariationHandler)
+	v1.Delete("/variations/:id", authRequired, changed("variation deleted"), delVariationHandler)
 	//
-	v1.Post("/properties", authMulti, changed("property created"), postPropertyHandler)
-	v1.Post("/properties/list", authMulti, postPropertiesListHandler)
-	v1.Get("/properties/:id", authMulti, getPropertyHandler)
-	v1.Put("/properties/:id", authMulti, changed("property updated"), putPropertyHandler)
-	v1.Delete("/properties/:id", authMulti, changed("property deleted"), deletePropertyHandler)
+	v1.Post("/properties", authRequired, changed("property created"), postPropertyHandler)
+	v1.Post("/properties/list", authRequired, postPropertiesListHandler)
+	v1.Get("/properties/:id", authRequired, getPropertyHandler)
+	v1.Put("/properties/:id", authRequired, changed("property updated"), putPropertyHandler)
+	v1.Delete("/properties/:id", authRequired, changed("property deleted"), deletePropertyHandler)
 	//
-	v1.Get("/prices", authMulti, getPricesHandler)
-	v1.Post("/prices/list", authMulti, postPricesListHandler)
-	v1.Post("/prices", authMulti, changed("price created"), postPriceHandler)
-	v1.Get("/prices/:id", authMulti, getPriceHandler)
-	v1.Put("/prices/:id", authMulti, changed("price updated"), putPriceHandler)
-	v1.Delete("/prices/:id", authMulti, changed("price deleted"), deletePriceHandler)
+	v1.Get("/prices", authRequired, getPricesHandler)
+	v1.Post("/prices/list", authRequired, postPricesListHandler)
+	v1.Post("/prices", authRequired, changed("price created"), postPriceHandler)
+	v1.Get("/prices/:id", authRequired, getPriceHandler)
+	v1.Put("/prices/:id", authRequired, changed("price updated"), putPriceHandler)
+	v1.Delete("/prices/:id", authRequired, changed("price deleted"), deletePriceHandler)
 	//
-	v1.Get("/tags", authMulti, getTagsHandler)
-	v1.Post("/tags", authMulti, changed("tag created"), postTagHandler)
-	v1.Post("/tags/list", authMulti, postTagsListHandler)
-	v1.Get("/tags/:id", authMulti, getTagHandler)
-	v1.Put("/tags/:id", authMulti, changed("tag updated"), putTagHandler)
-	v1.Delete("/tags/:id", authMulti, changed("tag deleted"), delTagHandler)
+	v1.Get("/tags", authRequired, getTagsHandler)
+	v1.Post("/tags", authRequired, changed("tag created"), postTagHandler)
+	v1.Post("/tags/list", authRequired, postTagsListHandler)
+	v1.Get("/tags/:id", authRequired, getTagHandler)
+	v1.Put("/tags/:id", authRequired, changed("tag updated"), putTagHandler)
+	v1.Delete("/tags/:id", authRequired, changed("tag deleted"), delTagHandler)
 	//
-	v1.Get("/options", authMulti, getOptionsHandler)
-	v1.Post("/options", authMulti, changed("option created"), postOptionHandler)
-	v1.Post("/options/list", authMulti, postOptionsListHandler)
-	v1.Get("/options/:id", authMulti, getOptionHandler)
-	v1.Put("/options/:id", authMulti, changed("option updated"), putOptionHandler)
-	v1.Delete("/options/:id", authMulti, changed("option deleted"), delOptionHandler)
+	v1.Get("/options", authRequired, getOptionsHandler)
+	v1.Post("/options", authRequired, changed("option created"), postOptionHandler)
+	v1.Post("/options/list", authRequired, postOptionsListHandler)
+	v1.Get("/options/:id", authRequired, getOptionHandler)
+	v1.Patch("/options/:id", authRequired, changed("option updated"), patchOptionHandler)
+	v1.Put("/options/:id", authRequired, changed("option updated"), putOptionHandler)
+	v1.Delete("/options/:id", authRequired, changed("option deleted"), delOptionHandler)
 	//
-	v1.Get("/values", authMulti, getValuesHandler)
-	v1.Post("/values", authMulti, changed("value created"), postValueHandler)
-	v1.Post("/values/list", authMulti, postValuesListHandler)
-	v1.Get("/values/:id", authMulti, getValueHandler)
-	v1.Put("/values/:id", authMulti, changed("value updated"), putValueHandler)
-	v1.Delete("/values/:id", authMulti, changed("value deleted"), delValueHandler)
+	v1.Get("/values", authRequired, getValuesHandler)
+	v1.Post("/values", authRequired, changed("value created"), postValueHandler)
+	v1.Post("/values/list", authRequired, postValuesListHandler)
+	v1.Get("/values/:id", authRequired, getValueHandler)
+	v1.Put("/values/:id", authRequired, changed("value updated"), putValueHandler)
+	v1.Delete("/values/:id", authRequired, changed("value deleted"), delValueHandler)
 	// File
-	v1.Post("/files", authMulti, changed("file created"), postFileHandler)
-	v1.Post("/files/list", authMulti, postFilesListHandler)
-	v1.Get("/files/:id", authMulti, getFileHandler)
-	v1.Put("/files/:id", authMulti, changed("file updated"), putFileHandler)
-	v1.Delete("/files/:id", authMulti, changed("file deleted"), delFileHandler)
+	v1.Post("/files", authRequired, changed("file created"), postFileHandler)
+	v1.Post("/files/list", authRequired, postFilesListHandler)
+	v1.Get("/files/:id", authRequired, getFileHandler)
+	v1.Put("/files/:id", authRequired, changed("file updated"), putFileHandler)
+	v1.Delete("/files/:id", authRequired, changed("file deleted"), delFileHandler)
 	// Images
-	v1.Post("/images", authMulti, changed("image created"), postImageHandler)
-	v1.Post("/images/list", authMulti, postImagesListHandler)
-	v1.Get("/images/:id", authMulti, getImageHandler)
-	v1.Put("/images/:id", authMulti, changed("image updated"), putImageHandler)
-	v1.Delete("/images/:id", authMulti, changed("image deleted"), delImageHandler)
+	v1.Post("/images", authRequired, changed("image created"), postImageHandler)
+	v1.Post("/images/list", authRequired, postImagesListHandler)
+	v1.Get("/images/:id", authRequired, getImageHandler)
+	v1.Put("/images/:id", authRequired, changed("image updated"), putImageHandler)
+	v1.Delete("/images/:id", authRequired, changed("image deleted"), delImageHandler)
 	//
-	v1.Post("/orders/list", authMulti, postOrdersListHandler)
-	v1.Get("/orders/:id", authMulti, getOrderHandler)
-	v1.Put("/orders/:id", authMulti, putOrderHandler)
-	v1.Delete("/orders/:id", authMulti, delOrderHandler)
+	v1.Post("/orders/list", authRequired, postOrdersListHandler)
+	v1.Get("/orders/:id", authRequired, getOrderHandler)
+	v1.Put("/orders/:id", authRequired, putOrderHandler)
+	v1.Delete("/orders/:id", authRequired, delOrderHandler)
 	//
-	v1.Post("/transactions/list", authMulti, postTransactionsListHandler)
-	v1.Get("/transactions/:id", authMulti, getTransactionHandler)
-	v1.Put("/transactions/:id", authMulti, putTransactionHandler)
-	v1.Delete("/transactions/:id", authMulti, delTransactionHandler)
+	v1.Post("/transactions/list", authRequired, postTransactionsListHandler)
+	v1.Get("/transactions/:id", authRequired, getTransactionHandler)
+	v1.Put("/transactions/:id", authRequired, putTransactionHandler)
+	v1.Delete("/transactions/:id", authRequired, delTransactionHandler)
 	//
-	v1.Get("/me", authMulti, getMeHandler)
+	v1.Get("/me", authRequired, getMeHandler)
 	//
 	v1.Post("/calculate", postCalculateHandler)
 	//
-	v1.Get("/tariffs", authMulti, getTariffsHandler)
+	v1.Get("/tariffs", authRequired, getTariffsHandler)
 	//
 	v1.Get("/transports", getTransportsHandler)
-	v1.Post("/transports", authMulti, changed("transport created"), postTransportHandler)
-	v1.Post("/transports/list", authMulti, postTransportsListHandler)
-	v1.Get("/transports/:id", authMulti, getTransportHandler)
-	v1.Put("/transports/:id", authMulti, changed("transport updated"), putTransportHandler)
-	v1.Delete("/transports/:id", authMulti, changed("transport deleted"), delTransportHandler)
+	v1.Post("/transports", authRequired, changed("transport created"), postTransportHandler)
+	v1.Post("/transports/list", authRequired, postTransportsListHandler)
+	v1.Get("/transports/:id", authRequired, getTransportHandler)
+	v1.Put("/transports/:id", authRequired, changed("transport updated"), putTransportHandler)
+	v1.Delete("/transports/:id", authRequired, changed("transport deleted"), delTransportHandler)
 	//
-	v1.Get("/zones", authMulti, getZonesHandler)
-	v1.Post("/zones", authMulti, changed("zone created"), postZoneHandler)
-	v1.Post("/zones/list", authMulti, postZonesListHandler)
-	v1.Get("/zones/:id", authMulti, getZoneHandler)
-	v1.Put("/zones/:id", authMulti, changed("zone updated"), putZoneHandler)
-	v1.Delete("/zones/:id", authMulti, changed("zone deleted"), delZoneHandler)
+	v1.Get("/zones", authRequired, getZonesHandler)
+	v1.Post("/zones", authRequired, changed("zone created"), postZoneHandler)
+	v1.Post("/zones/list", authRequired, postZonesListHandler)
+	v1.Get("/zones/:id", authRequired, getZoneHandler)
+	v1.Put("/zones/:id", authRequired, changed("zone updated"), putZoneHandler)
+	v1.Delete("/zones/:id", authRequired, changed("zone deleted"), delZoneHandler)
 	//
-	v1.Post("/notification/email", authMulti, postEmailTemplateHandler)
-	v1.Post("/notification/email/list", authMulti, changed("email template created"), postEmailTemplatesListHandler)
-	v1.Get("/notification/email/:id", authMulti, getEmailTemplateHandler)
-	v1.Put("/notification/email/:id", authMulti, changed("email template updated"), putEmailTemplateHandler)
-	v1.Delete("/notification/email/:id", authMulti, changed("email template deleted"), delEmailTemplateHandler)
+	v1.Post("/notification/email", authRequired, postEmailTemplateHandler)
+	v1.Post("/notification/email/list", authRequired, changed("email template created"), postEmailTemplatesListHandler)
+	v1.Get("/notification/email/:id", authRequired, getEmailTemplateHandler)
+	v1.Put("/notification/email/:id", authRequired, changed("email template updated"), putEmailTemplateHandler)
+	v1.Delete("/notification/email/:id", authRequired, changed("email template deleted"), delEmailTemplateHandler)
 	//
-	v1.Get("/users", authMulti, getUsersHandler)
-	v1.Post("/users/list", authMulti, postUsersListHandler)
-	v1.Get("/users/:id", authMulti, getUserHandler)
-	v1.Put("/users/:id", authMulti, putUserHandler)
-	v1.Delete("/users/:id", authMulti, delUserHandler)
+	v1.Get("/users", authRequired, getUsersHandler)
+	v1.Post("/users/list", authRequired, postUsersListHandler)
+	v1.Get("/users/:id", authRequired, getUserHandler)
+	v1.Put("/users/:id", authRequired, putUserHandler)
+	v1.Delete("/users/:id", authRequired, delUserHandler)
 	//
-	v1.Post("/prepare", authMulti, postPrepareHandler)
-	v1.Post("/render", authMulti, postRenderHandler)
-	v1.Post("/publish", authMulti, postPublishHandler)
+	v1.Post("/prepare", authRequired, postPrepareHandler)
+	v1.Post("/render", authRequired, postRenderHandler)
+	v1.Post("/publish", authRequired, postPublishHandler)
 	//
-	v1.Get("/account", authMulti, getAccountHandler)
-	v1.Put("/account", authMulti, putAccountHandler)
-	v1.Post("/account/profiles", authMulti, postAccountProfileHandler)
+	v1.Get("/account", authRequired, getAccountHandler)
+	v1.Put("/account", authRequired, putAccountHandler)
+	v1.Post("/account/profiles", authRequired, postAccountProfileHandler)
 	//
-	v1.Get("/account/orders", authMulti, getAccountOrdersHandler)
-	v1.Post("/account/orders", authMulti, postAccountOrdersHandler)
-	v1.Get("/account/orders/:id", authMulti, getAccountOrderHandler)
-	v1.Put("/account/orders/:id", authMulti, putAccountOrderHandler)
-	v1.Post("/account/orders/:id/checkout", authMulti, postAccountOrderCheckoutHandler)
+	v1.Get("/account/orders", authRequired, getAccountOrdersHandler)
+	v1.Post("/account/orders", authRequired, postAccountOrdersHandler)
+	v1.Get("/account/orders/:id", authRequired, getAccountOrderHandler)
+	v1.Put("/account/orders/:id", authRequired, putAccountOrderHandler)
+	v1.Post("/account/orders/:id/checkout", authRequired, postAccountOrderCheckoutHandler)
 	// Advance Payment
-	v1.Post("/account/orders/:id/advance_payment/submit", authMulti, postAccountOrderAdvancePaymentSubmitHandler)
+	v1.Post("/account/orders/:id/advance_payment/submit", authRequired, postAccountOrderAdvancePaymentSubmitHandler)
 	// On Delivery
-	v1.Post("/account/orders/:id/on_delivery/submit", authMulti, postAccountOrderOnDeliverySubmitHandler)
+	v1.Post("/account/orders/:id/on_delivery/submit", authRequired, postAccountOrderOnDeliverySubmitHandler)
 	// Stripe
-	v1.Get("/account/orders/:id/stripe/customer", authMulti, getAccountOrderStripeCustomerHandler) // +
-	v1.Get("/account/orders/:id/stripe/card", authMulti, getAccountOrderStripeCardHandler) // +
-	v1.Post("/account/orders/:id/stripe/card", authMulti, postAccountOrderStripeCardHandler) // +
-	v1.Post("/account/orders/:id/stripe/submit", authMulti, postAccountOrderStripeSubmitHandler) // +
-	v1.Get("/account/orders/:id/stripe/success", authMulti, getAccountOrderStripeSuccessHandler) // +
+	v1.Get("/account/orders/:id/stripe/customer", authRequired, getAccountOrderStripeCustomerHandler) // +
+	v1.Get("/account/orders/:id/stripe/card", authRequired, getAccountOrderStripeCardHandler)         // +
+	v1.Post("/account/orders/:id/stripe/card", authRequired, postAccountOrderStripeCardHandler)       // +
+	v1.Post("/account/orders/:id/stripe/submit", authRequired, postAccountOrderStripeSubmitHandler)   // +
+	v1.Get("/account/orders/:id/stripe/success", authRequired, getAccountOrderStripeSuccessHandler)   // +
 	// Mollie
-	v1.Post("/account/orders/:id/mollie/submit", authMulti, postAccountOrderMollieSubmitHandler)
-	v1.Get("/account/orders/:id/mollie/success", authMulti, getAccountOrderMollieSuccessHandler)
+	v1.Post("/account/orders/:id/mollie/submit", authRequired, postAccountOrderMollieSubmitHandler)
+	v1.Get("/account/orders/:id/mollie/success", authRequired, getAccountOrderMollieSuccessHandler)
 	//
-	v1.Get("/payment_methods", authMulti, getPaymentMethodsHandler)
+	v1.Get("/payment_methods", authRequired, getPaymentMethodsHandler)
 	//
 	v1.Post("/profiles", postProfileHandler)
 	//
@@ -365,6 +371,106 @@ func postResetHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
+}
+
+// @security BasicAuth
+// Logout godoc
+// @Summary preview
+// @Description run preview
+// @Accept json
+// @Produce json
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/preview [get]
+// @Tags frontend
+func getPreviewHandler (c *fiber.Ctx) error {
+	logger.Infof("getPreviewHandler")
+	if v := c.Query("step", "1"); v == "1" {
+		logger.Infof("Step1")
+		if v := c.Locals("auth"); v != nil {
+			logger.Infof("v: %+v", v)
+			if vv, ok := v.(bool); ok && vv {
+				if u, err := url.Parse(c.Request().URI().String()); err == nil {
+					u.Host = common.Config.Preview
+					query := u.Query()
+					query.Set("step", "2")
+					enc, err := encrypt([]byte(common.SECRET), []byte(fmt.Sprintf("%d", time.Now().Unix())))
+					if err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.SendString(err.Error())
+					}
+					query.Set("token", base64.URLEncoding.EncodeToString(enc))
+					u.RawQuery = query.Encode()
+					logger.Infof("Redirect: %+v", u.String())
+					return c.Redirect(u.String(), http.StatusFound)
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.SendString(err.Error())
+				}
+			}
+		}else{
+			err := fmt.Errorf("auth: %+v", v)
+			c.Status(http.StatusInternalServerError)
+			return c.SendString(err.Error())
+		}
+	}else if v == "2" {
+		logger.Infof("Step2")
+		if v := c.Query("token", ""); v != "" {
+			if token, err := base64.URLEncoding.DecodeString(v); err == nil {
+				if bts, err := decrypt([]byte(common.SECRET), token); err == nil {
+					if vvv, err := strconv.Atoi(string(bts)); err == nil {
+						t := time.Unix(int64(vvv), 0)
+						if time.Now().Sub(t).Seconds() <= 30 {
+							cookie := &fiber.Cookie{
+								Name:  "preview",
+								Value: "true",
+								Path:  "/",
+								Expires: time.Now().AddDate(0, 0, 1),
+								SameSite: authMultipleConfig.SameSite,
+								HTTPOnly: true,
+							}
+							c.Cookie(cookie)
+							return c.Redirect("/", http.StatusFound)
+						}else{
+							err := fmt.Errorf("token expired")
+							c.Status(http.StatusInternalServerError)
+							return c.SendString(err.Error())
+						}
+					}else{
+						c.Status(http.StatusInternalServerError)
+						return c.SendString(err.Error())
+					}
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.SendString(err.Error())
+				}
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.SendString(err.Error())
+			}
+		}else{
+			err := fmt.Errorf("empty token")
+			c.Status(http.StatusInternalServerError)
+			return c.SendString(err.Error())
+		}
+	}
+	/*var auth bool
+	if v := c.Locals("auth"); v != nil {
+		if vv, ok := v.(bool); ok {
+			auth = vv
+		}
+	}
+	logger.Infof("auth: %+v", auth)
+	if auth {
+
+	}else{
+		logger.Infof("case2")
+		c.Status(http.StatusForbidden)
+		return c.SendString("Unauthenticated")
+	}*/
+	c.Status(http.StatusInternalServerError)
+	return c.SendString("Something went wrong")
 }
 
 type InfoView struct {
@@ -911,14 +1017,14 @@ func postCategoriesHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Invalid name"})
 			}
-			if category, err := models.GetCategoryByName(common.Database, name); err == nil {
+			/*if category, err := models.GetCategoryByName(common.Database, name); err == nil {
 				if parentCategory, err := models.GetCategory(common.Database, pid); err == nil {
 					if category.ParentId == parentCategory.ID {
 						c.Status(http.StatusInternalServerError)
 						return c.JSON(HTTPError{"Name is already in use"})
 					}
 				}
-			}
+			}*/
 			var title string
 			if v, found := data.Value["Title"]; found && len(v) > 0 {
 				title = strings.TrimSpace(v[0])
@@ -1333,14 +1439,14 @@ func putCategoryHandler(c *fiber.Ctx) error {
 				return c.JSON(HTTPError{"Invalid name"})
 			}
 			//
-			if parentCategory, err := models.GetCategory(common.Database, pid); err == nil {
+			/*if parentCategory, err := models.GetCategory(common.Database, pid); err == nil {
 				for _, category := range models.GetChildrenOfCategoryById(common.Database, parentCategory.ID) {
 					if int(category.ID) != id && category.Name == request.Name {
 						c.Status(http.StatusInternalServerError)
 						return c.JSON(HTTPError{"Name is already in use"})
 					}
 				}
-			}
+			}*/
 			//
 			var title string
 			if v, found := data.Value["Title"]; found && len(v) > 0 {
@@ -2363,56 +2469,6 @@ func getProductHandler(c *fiber.Ctx) error {
 	}
 }
 
-type ProductPatch struct {
-	Images []uint
-}
-
-// @security BasicAuth
-// PatchProduct godoc
-// @Summary Patch product
-// @Accept json
-// @Produce json
-// @Param id query int false "Products id"
-// @Param product body ProductPatch true "body"
-// @Success 200 {object} HTTPMessage
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/products/{id} [patch]
-// @Tags product
-func patchProductHandler(c *fiber.Ctx) error {
-	var id int
-	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
-	}
-	var product *models.Product
-	var err error
-	if product, err = models.GetProduct(common.Database, id); err != nil {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-	logger.Infof("product: %+v", product)
-	var request ProductPatch
-	if err := c.BodyParser(&request); err != nil {
-		return err
-	}
-	//
-	if len(request.Images) > 0 {
-		logger.Infof("request: %+v", request)
-		if err = models.DeleteAllImagesFromProduct(common.Database, product); err == nil {
-			for _, image := range request.Images {
-				if err = models.AddImageToProduct(common.Database, product, &models.Image{
-					Model:  gorm.Model{ID: image},
-				}); err != nil {
-					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{err.Error()})
-				}
-			}
-		}
-	}
-	return c.JSON(HTTPMessage{"OK"})
-}
-
-
 // @security BasicAuth
 // UpdateProduct godoc
 // @Summary Update product
@@ -2732,6 +2788,7 @@ type ParameterView struct {
 		Name string
 		Title string
 		Description string `json:",omitempty"`
+		Weight int
 	}
 	ValueId uint
 	Value struct {
@@ -4031,6 +4088,8 @@ type NewPrice struct {
 	PropertyId uint
 	ValueId uint
 	Price float64
+	Availability string
+	Sending string
 	Sku string
 }
 
@@ -4040,6 +4099,8 @@ type PriceView struct {
 	PropertyId uint
 	ValueId uint
 	Price float64
+	Availability string
+	Sending string
 	Sku string
 }
 
@@ -4088,6 +4149,8 @@ func postPriceHandler(c *fiber.Ctx) error {
 				PropertyId: property.ID,
 				ValueId: request.ValueId,
 				Price: request.Price,
+				Availability: request.Availability,
+				Sending: request.Sending,
 				Sku: request.Sku,
 			}
 			logger.Infof("price: %+v", price)
@@ -4215,6 +4278,8 @@ func putPriceHandler(c *fiber.Ctx) error {
 				return err
 			}
 			price.Price = request.Price
+			price.Availability = request.Availability
+			price.Sending = request.Sending
 			price.Sku = request.Sku
 			if err = models.UpdatePrice(common.Database, price); err != nil {
 				c.Status(http.StatusInternalServerError)
@@ -4602,12 +4667,14 @@ type OptionShortView struct {
 	Name string `json:",omitempty"`
 	Title string `json:",omitempty"`
 	Description string `json:",omitempty"`
+	Sort int `json:",omitempty"`
 }
 
 type NewOption struct {
 	Name string
 	Title string
 	Description string
+	Sort int
 }
 
 // @security BasicAuth
@@ -4649,6 +4716,7 @@ func postOptionHandler(c *fiber.Ctx) error {
 				Name: request.Name,
 				Title: request.Title,
 				Description: request.Description,
+				Sort: request.Sort,
 			}
 			if _, err := models.CreateOption(common.Database, option); err != nil {
 				c.Status(http.StatusInternalServerError)
@@ -4681,6 +4749,7 @@ type OptionsListItem struct {
 	Title string
 	Description string
 	ValuesValues string
+	Sort int
 }
 
 // @security BasicAuth
@@ -4701,7 +4770,7 @@ func postOptionsListHandler(c *fiber.Ctx) error {
 		return err
 	}
 	if len(request.Sort) == 0 {
-		request.Sort["ID"] = "desc"
+		request.Sort["Sort"] = "desc"
 	}
 	if request.Length == 0 {
 		request.Length = 10
@@ -4775,7 +4844,7 @@ func postOptionsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Option{}).Select("options.ID, options.Name, options.Title, options.Description, group_concat(`values`.Value, ', ') as ValuesValues").Joins("left join `values` on `values`.option_id = options.id").Group("options.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Option{}).Select("options.ID, options.Name, options.Title, options.Description, options.Sort, group_concat(`values`.Value, ', ') as ValuesValues").Joins("left join `values` on `values`.option_id = options.id").Group("options.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -4792,7 +4861,7 @@ func postOptionsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Option{}).Select("options.ID, options.Name, options.Title, options.Description, group_concat(`values`.Value, ', ') as ValuesValues").Joins("left join `values` on `values`.option_id = options.id").Group("options.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Option{}).Select("options.ID, options.Name, options.Title, options.Description, options.Sort, group_concat(`values`.Value, ', ') as ValuesValues").Joins("left join `values` on `values`.option_id = options.id").Group("options.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -4852,6 +4921,7 @@ type OptionView struct {
 	Title string `json:",omitempty"`
 	Description string `json:",omitempty"`
 	Values []ValueView
+	Sort int
 }
 
 type ValuesView []ValueView
@@ -4862,6 +4932,8 @@ type ValueView struct {
 	Description string `json:",omitempty"`
 	Thumbnail string `json:",omitempty"`
 	Value string `json:",omitempty"`
+	Availability string `json:",omitempty"`
+	Sending string `json:",omitempty"`
 }
 
 // @security BasicAuth
@@ -4893,6 +4965,49 @@ func getOptionHandler(c *fiber.Ctx) error {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
 		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+type OptionPatchRequest struct {
+	Sort int
+}
+
+// @security BasicAuth
+// PatchOption godoc
+// @Summary patch option
+// @Accept json
+// @Produce json
+// @Param option body OptionPatchRequest true "body"
+// @Param id path int true "Option ID"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/options/{id} [put]
+// @Tags option
+func patchOptionHandler(c *fiber.Ctx) error {
+	var request OptionPatchRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
+	}
+	var option *models.Option
+	var err error
+	if option, err = models.GetOption(common.Database, int(id)); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	option.Sort = request.Sort
+	if err := models.UpdateOption(common.Database, option); err == nil {
+		return c.JSON(HTTPMessage{"OK"})
 	}else{
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
@@ -4944,8 +5059,9 @@ func putOptionHandler(c *fiber.Ctx) error {
 	option.Name = request.Name
 	option.Title = request.Title
 	option.Description = request.Description
+	option.Sort = request.Sort
 	if err := models.UpdateOption(common.Database, option); err == nil {
-		return c.JSON(OptionShortView{ID: option.ID, Name: option.Name, Title: option.Title, Description: option.Description})
+		return c.JSON(OptionShortView{ID: option.ID, Name: option.Name, Title: option.Title, Description: option.Description, Sort: option.Sort})
 	}else{
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
@@ -5088,7 +5204,15 @@ func postValueHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Invalid value"})
 			}
-			value := &models.Value{Title: title, Description: description, Value: val, OptionId: option.ID}
+			var availability string
+			if v, found := data.Value["Availability"]; found && len(v) > 0 {
+				availability = strings.TrimSpace(v[0])
+			}
+			var sending string
+			if v, found := data.Value["Sending"]; found && len(v) > 0 {
+				sending = strings.TrimSpace(v[0])
+			}
+			value := &models.Value{Title: title, Description: description, Value: val, OptionId: option.ID, Availability: availability, Sending: sending}
 			if id, err := models.CreateValue(common.Database, value); err == nil {
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
 					p := path.Join(dir, "storage", "values")
@@ -5349,9 +5473,19 @@ func putValueHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Invalid value"})
 			}
+			var availability string
+			if v, found := data.Value["Availability"]; found && len(v) > 0 {
+				availability = strings.TrimSpace(v[0])
+			}
+			var sending string
+			if v, found := data.Value["Sending"]; found && len(v) > 0 {
+				sending = strings.TrimSpace(v[0])
+			}
 			value.Title = title
 			value.Description = description
 			value.Value = val
+			value.Availability = availability
+			value.Sending = sending
 			//
 			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
 				// To delete existing
@@ -9329,7 +9463,7 @@ func postFilterHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.CacheProduct{}).Select("cache_products.ID, cache_products.Name, cache_products.Title, cache_products.Path, cache_products.Description, cache_products.Thumbnail, cache_products.Images, cache_products.Variations, cache_products.Base_Price as BasePrice, cache_products.Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join prices on prices.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...)/*.Having(strings.Join(keys2, " and "), values2...)*/.Group("cache_products.id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.CacheProduct{}).Select("cache_products.ID, cache_products.Name, cache_products.Title, cache_products.Path, cache_products.Description, cache_products.Thumbnail, cache_products.Images, cache_products.Variations, cache_products.Base_Price as BasePrice, cache_products.Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join prices on prices.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...)/*.Having(strings.Join(keys2, " and "), values2...)*/.Group("cache_products.product_id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		for rows.Next() {
 			var item ProductsFilterItem
@@ -10976,8 +11110,12 @@ type VariationView struct {
 				ID uint
 				Title string
 				Thumbnail string `json:",omitempty"`
+				Availability string `json:",omitempty"`
+				Sending string `json:",omitempty"`
 			}
 			Price float64
+			Availability string `json:",omitempty"`
+			Sending string `json:",omitempty"`
 		}
 	}
 	Dimensions string `json:",omitempty"`
@@ -11216,4 +11354,47 @@ func SendOrderPaidEmail(to *mail.Email, orderId int, template *models.EmailTempl
 	}
 	//
 	return common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), to, template.Topic, template.Message, vars)
+}
+
+func encrypt(key, text []byte) ([]byte, error) {
+	// IMPORTANT: Key should be 32 bytes length, if different make md5sum of key to have exactly 32 bytes!
+	if len(key) != 32 {
+		key = []byte(fmt.Sprintf("%x", md5.Sum(key)))
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	b := base64.StdEncoding.EncodeToString(text)
+	ciphertext := make([]byte, aes.BlockSize+len(b))
+	iv := ciphertext[:aes.BlockSize]
+	if _, err := io.ReadFull(crypto_rand.Reader, iv); err != nil {
+		return nil, err
+	}
+	cfb := cipher.NewCFBEncrypter(block, iv)
+	cfb.XORKeyStream(ciphertext[aes.BlockSize:], []byte(b))
+	return ciphertext, nil
+}
+
+func decrypt(key, text []byte) ([]byte, error) {
+	// IMPORTANT: Key should be 32 bytes length, if different make md5sum of key to have exactly 32 bytes!
+	if len(key) != 32 {
+		key = []byte(fmt.Sprintf("%x", md5.Sum(key)))
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	if len(text) < aes.BlockSize {
+		return nil, errors.New("ciphertext too short")
+	}
+	iv := text[:aes.BlockSize]
+	text = text[aes.BlockSize:]
+	cfb := cipher.NewCFBDecrypter(block, iv)
+	cfb.XORKeyStream(text, text)
+	data, err := base64.StdEncoding.DecodeString(string(text))
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }

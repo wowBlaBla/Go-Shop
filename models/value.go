@@ -10,6 +10,8 @@ type Value struct {
 	Description string `json:",omitempty"`
 	Thumbnail string
 	Value string
+	Availability string
+	Sending string
 }
 
 func GetValues(connector *gorm.DB) ([]*Value, error) {
@@ -24,7 +26,7 @@ func GetValues(connector *gorm.DB) ([]*Value, error) {
 func GetValuesByOptionId(connector *gorm.DB, id int) ([]*Value, error) {
 	db := connector
 	var value []*Value
-	if err := db.Where("option_id = ?", id).Find(&value).Error; err != nil {
+	if err := db.Debug().Where("option_id = ?", id).Order("Title asc").Find(&value).Error; err != nil {
 		return nil, err
 	}
 	return value, nil

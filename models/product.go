@@ -88,6 +88,18 @@ func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 			Order []uint
 		}
 	}
+	// Parameters
+	parameters := product.Parameters
+	sort.SliceStable(parameters, func(i, j int) bool {
+		if parameters[i].Option != nil {
+			if parameters[j].Option != nil {
+				return parameters[j].Option.Sort > parameters[i].Option.Sort
+			}
+			return true
+		}
+		return false
+	})
+	product.Parameters = parameters
 	// Customization
 	if err := json.Unmarshal([]byte(product.Customization), &customization); err == nil {
 		images := product.Images

@@ -57,6 +57,7 @@ type Config struct {
 		Crt string
 		Key string
 	}
+	Preview string
 	//
 	Database struct {
 		Dialer string // "mysql" or "sqlite"

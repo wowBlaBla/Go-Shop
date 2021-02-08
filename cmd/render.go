@@ -13,6 +13,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"image"
 	"image/jpeg"
 	"io/ioutil"
 	"os"
@@ -41,6 +42,11 @@ var renderCmd = &cobra.Command{
 			output = flagOutput
 		}
 		logger.Infof("output: %v", output)
+		remove := false
+		if flagRemove := cmd.Flag("remove").Value.String(); flagRemove == "true" {
+			remove = true
+		}
+		logger.Infof("remove: %v", remove)
 		var err error
 		// Database
 		var dialer gorm.Dialector
@@ -142,8 +148,22 @@ var renderCmd = &cobra.Command{
 		// Categories
 		if categories, err := models.GetCategories(common.Database); err == nil {
 			// Clear existing "products" folder
-			if err := os.RemoveAll(path.Join(output, "products")); err != nil {
-				logger.Infof("%v", err)
+			if remove {
+				if err := os.RemoveAll(path.Join(output, "products")); err != nil {
+					logger.Infof("%v", err)
+				}
+			}else{
+				re := regexp.MustCompile(`\.html$`)
+				filepath.Walk(path.Join(output, "products"), func(p string, fi os.FileInfo, _ error) error {
+					if !fi.IsDir() {
+						if re.MatchString(fi.Name()) {
+							if err = os.Remove(p); err != nil {
+								logger.Warningf("%+v", err)
+							}
+						}
+					}
+					return nil
+				})
 			}
 			logger.Infof("Categories found: %v", len(categories))
 			for i, category := range categories {
@@ -640,7 +660,6 @@ var renderCmd = &cobra.Command{
 												}
 											}
 											if p1 := path.Join(dir, "storage", image.Path); len(p1) > 0 {
-												logger.Infof("p1: %+v", p1)
 												if fi, err := os.Stat(p1); err == nil {
 													filename := fmt.Sprintf("image-%d-%d%v", i+1, fi.ModTime().Unix(), path.Ext(p1))
 													p2 := path.Join(p0, filename)
@@ -691,6 +710,8 @@ var renderCmd = &cobra.Command{
 												Title: parameter.Value.Title,
 												//Thumbnail: "",
 												Value: parameter.Value.Value,
+												Availability: parameter.Value.Availability,
+												Sending: parameter.Value.Sending,
 											}
 										} else {
 											parameterView.CustomValue = parameter.CustomValue
@@ -790,9 +811,13 @@ var renderCmd = &cobra.Command{
 													Title:   price.Value.Title,
 													//Thumbnail: price.Value.Thumbnail,
 													Value: price.Value.Value,
+													Availability: price.Value.Availability,
+													Sending: price.Value.Sending,
 													Price: common.PricePF{
 														Id:    price.ID,
 														Price: price.Price,
+														Availability: price.Availability,
+														Sending: price.Sending,
 													},
 													Selected: h == 0,
 												}
@@ -907,8 +932,10 @@ var renderCmd = &cobra.Command{
 		//
 		// Options
 		if options, err := models.GetOptions(common.Database); err == nil {
-			if err := os.RemoveAll(path.Join(output, "options")); err != nil {
-				logger.Infof("%v", err)
+			if remove {
+				if err := os.RemoveAll(path.Join(output, "options")); err != nil {
+					logger.Infof("%v", err)
+				}
 			}
 			// Payload
 			for _, option := range options {
@@ -1000,6 +1027,7 @@ var renderCmd = &cobra.Command{
 func init() {
 	RootCmd.AddCommand(renderCmd)
 	renderCmd.Flags().StringP("products", "p", "products", "products output folder")
+	renderCmd.Flags().BoolP("remove", "r", false, "remove all files during rendering")
 }
 
 /**/
@@ -1082,15 +1110,11 @@ type Image struct {
 
 func imageResize(src, sizes string) ([]Image, error) {
 	var images []Image
-	file, err := os.Open(src)
+	fi1, err := os.Stat(src)
 	if err != nil {
 		return images, err
 	}
-	img, err := jpeg.Decode(file)
-	if err != nil {
-		return images, err
-	}
-	file.Close()
+	var img image.Image
 	if p := path.Join(path.Dir(src), "resize"); len(p) > 0 {
 		if _, err := os.Stat(p); err != nil {
 			if err = os.MkdirAll(p, 0755); err != nil {
@@ -1108,19 +1132,33 @@ func imageResize(src, sizes string) ([]Image, error) {
 		if height, err = strconv.Atoi(pair[1]); err != nil {
 			return images, err
 		}
-		m := resize.Resize(uint(width), uint(height), img, resize.Lanczos3)
 		filename := path.Base(src)
 		filename = filename[:len(filename) - len(filepath.Ext(filename))]
 		filename = fmt.Sprintf("%s_%dx%d%s", filename, width, height, filepath.Ext(src))
+		if fi2, err := os.Stat(path.Join(path.Dir(src), "resize", filename)); err != nil || !fi1.ModTime().Equal(fi2.ModTime()) {
+			if img == nil {
+				file, err := os.Open(src)
+				if err != nil {
+					return images, err
+				}
+				img, err = jpeg.Decode(file)
+				if err != nil {
+					return images, err
+				}
+				file.Close()
+			}
+			m := resize.Resize(uint(width), uint(height), img, resize.Lanczos3)
+			out, err := os.Create(path.Join(path.Dir(src), "resize", filename))
+			if err != nil {
+				return images, err
+			}
+			if err = jpeg.Encode(out, m, &jpeg.Options{Quality: common.Config.Resize.Quality}); err != nil {
+				return images, err
+			}
+			out.Close()
+			os.Chtimes(path.Join(path.Dir(src), "resize", filename), fi1.ModTime(), fi1.ModTime())
+		}
 		images = append(images, Image{Filename: filename, Size: fmt.Sprintf("%dw", width)})
-		out, err := os.Create(path.Join(path.Dir(src), "resize", filename))
-		if err != nil {
-			return images, err
-		}
-		defer out.Close()
-		if err = jpeg.Encode(out, m, &jpeg.Options{Quality: common.Config.Resize.Quality}); err != nil {
-			return images, err
-		}
 	}
 	return images, nil
 }

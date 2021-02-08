@@ -11,6 +11,8 @@ type Price struct {
 	//
 	Enabled bool
 	Price float64
+	Availability string
+	Sending string
 	Sku string
 }
 

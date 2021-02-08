@@ -89,7 +89,7 @@ func initConfig() {
 		common.Config.Hugo.Theme = "multikart"
 		common.Config.Hugo.Minify = true
 		if os.Getenv("DOCKER") == "true" {
-			common.Config.Wrangler.Bin = "/usr/bin/docker run --rm -v %DIR%/hugo/public:/hugo/public goshop_wrangler"
+			common.Config.Wrangler.Bin = "/usr/bin/docker run --rm -v %DIR%/hugo/public:/hugo/public -v %DIR%/worker/workers-site:/worker/workers-site -v %DIR%/worker/wrangler.toml:/worker/wrangler.toml goshop_wrangler"
 		}
 		common.Config.Products = "Products"
 		common.Config.Resize.Quality = 75

@@ -89,7 +89,7 @@ type AuthMultipleConfig struct {
 	UseForm                      bool // use html form to login
 }
 
-func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...interface{}) (*fiber.App, func (c *fiber.Ctx) error) {
+func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...interface{}) (*fiber.App, func (c *fiber.Ctx) error, func (c *fiber.Ctx) error) {
 	if config.PasswordMinLength == 0 {
 		config.PasswordMinLength = 6
 	}
@@ -496,6 +496,103 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 		}
 		c.SendString("Unauthenticated")
 		return nil
+	}, func (c *fiber.Ctx) error {
+		req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(c.Request().Header.Header())))
+		if err != nil {
+			return err
+		}
+		var auth bool
+		if authorization := req.Header.Get("Authorization"); authorization != "" {
+			if strings.Index(strings.ToLower(authorization), "basic ") == 0 {
+				const prefix = "Basic "
+				if bts, err := base64.StdEncoding.DecodeString(authorization[len(prefix):]); err == nil {
+					cs := string(bts)
+					if s := strings.IndexByte(cs, ':'); s > -1 {
+						var emailOrLogin = cs[:s]
+						var password = cs[s+1:]
+						if user, err := models.GetUserByEmailOrLoginAndPassword(common.Database, emailOrLogin, models.MakeUserPassword(password)); err == nil {
+							if user.Enabled {
+								if config.Log {
+									logger.Infof("Auth Basic #%v %v %v OK", user.ID, user.Login, user.Email)
+								}
+								c.Locals("auth", true)
+								c.Locals("authorization", "basic")
+								c.Locals("user", user)
+								auth = true
+							}else{
+								err = fmt.Errorf("user %v is not enabled", user.Login)
+								logger.Errorf("%v", err)
+								c.Locals("auth_error", err.Error())
+							}
+						}else{
+							logger.Errorf("%v", err)
+							c.Locals("auth_error", err.Error())
+						}
+					}
+				}
+			}else if strings.Index(strings.ToLower(authorization), "bearer ") == 0 {
+				const prefix= "Bearer "
+				claims := &JWTClaims{}
+				logger.Infof("authorization[len(prefix):]: %+v", authorization[len(prefix):])
+				if token, err := jwt.ParseWithClaims(authorization[len(prefix):], claims, func(token *jwt.Token) (interface{}, error) {
+					return JWTSecret, nil
+				}); err == nil {
+					if token.Valid {
+						if time.Now().Before(time.Unix(claims.ExpiresAt, 0)) {
+							if user, err := models.GetUserByLoginAndPassword(common.Database, claims.Login, claims.Password); err == nil {
+								if config.Log {
+									logger.Infof("Auth Bearer #%v %v %v up to %v OK", user.ID, user.Login, user.Email, time.Unix(claims.ExpiresAt, 0).Format(time.RFC3339))
+								}
+								c.Locals("auth", true)
+								c.Locals("authorization", "jwt")
+								c.Locals("expiration", claims.ExpiresAt)
+								c.Locals("user", user)
+								auth = true
+							} else {
+								logger.Errorf("%v", err)
+								c.Locals("auth_error", err.Error())
+							}
+						}else{
+							err = fmt.Errorf("expired token")
+							logger.Errorf("%v", err)
+							c.Locals("auth_error", err.Error())
+						}
+					}else{
+						err = fmt.Errorf("invalid token")
+						logger.Errorf("%v", err)
+						c.Locals("auth_error", err.Error())
+					}
+				}else{
+					logger.Errorf("%v", err)
+					c.Locals("auth_error", err.Error())
+				}
+			}
+		}
+		if !auth {
+			if value := c.Cookies(COOKIE_NAME); len(value) > 0 {
+				m := make(map[string]string)
+				if err := cookieHandler.Decode(COOKIE_NAME, value, &m); err == nil {
+					var login = m["login"]
+					var password = m["password"]
+					if user, err := models.GetUserByLoginAndPassword(common.Database, login, models.MakeUserPassword(password)); err == nil {
+						c.Locals("auth", true)
+						if config.Log {
+							logger.Infof("Auth Cookie #%v %v %v OK", user.ID, user.Login, user.Email)
+						}
+						c.Locals("authorization", "cookie")
+						c.Locals("user", user)
+						auth = true
+					} else {
+						logger.Errorf("%v", err)
+						c.Locals("auth_error", err.Error())
+					}
+				}
+			}
+		}
+		if !auth {
+			c.Locals("auth", false)
+		}
+		return c.Next()
 	}
 }
 

@@ -10,12 +10,13 @@ type Option struct {
 	Title string
 	Description string
 	Values []*Value `gorm:"foreignKey:OptionId"`
+	Sort int
 }
 
 func GetOptionsFull(connector *gorm.DB) ([]*Option, error) {
 	db := connector
 	var options []*Option
-	db.Debug().Preload("Values").Find(&options)
+	db.Debug().Preload("Values").Find(&options).Order("Weight desc, ID asc")
 	if err := db.Error; err != nil {
 		return nil, err
 	}

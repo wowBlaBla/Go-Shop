@@ -15,12 +15,13 @@ import (
 const (
 	DEFAULT_PASSWORD = "goshoppass"
 	PRODUCTS_NAME    = "products"
+	SECRET = "goshop"
 )
 
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210203150440"
+	COMPILED = "20210205190702"
 	//
 	Started          time.Time
 	Config           *config.Config
@@ -197,6 +198,8 @@ type ValuePPF struct {
 	Title string
 	Thumbnail string `json:",omitempty"`
 	Value string
+	Availability string `json:",omitempty"`
+	Sending string `json:",omitempty"`
 }
 
 type VariationPF struct {
@@ -229,6 +232,8 @@ type ValuePF struct {
 	Title string
 	Thumbnail string `json:",omitempty"`
 	Value string
+	Availability string `json:",omitempty"`
+	Sending string `json:",omitempty"`
 	Price PricePF
 	Selected bool
 }
@@ -236,6 +241,8 @@ type ValuePF struct {
 type PricePF struct {
 	Id uint
 	Price float64
+	Availability string `json:",omitempty"`
+	Sending string `json:",omitempty"`
 }
 
 func (p *ProductFile) MarshalJSON() ([]byte, error) {
@@ -469,6 +476,16 @@ func WriteValueFile(p string, valueFile *ValueFile) error {
 /**/
 
 func Copy(src, dst string) error {
+	fi1, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if fi2, err := os.Stat(dst); err == nil {
+		if fi1.ModTime().Equal(fi2.ModTime()) && fi1.Size() == fi2.Size() {
+			//logger.Infof("ModTime and Size are the same, skip")
+			return nil
+		}
+	}
 	in, err := os.Open(src)
 	if err != nil {
 		return err
@@ -485,5 +502,9 @@ func Copy(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	return out.Close()
+	err = out.Close()
+	if err != nil {
+		return err
+	}
+	return os.Chtimes(dst, fi1.ModTime(), fi1.ModTime())
 }
