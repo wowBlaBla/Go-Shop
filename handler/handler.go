@@ -392,6 +392,7 @@ func getPreviewHandler (c *fiber.Ctx) error {
 			logger.Infof("v: %+v", v)
 			if vv, ok := v.(bool); ok && vv {
 				if u, err := url.Parse(c.Request().URI().String()); err == nil {
+					u.Scheme = "https"
 					u.Host = common.Config.Preview
 					query := u.Query()
 					query.Set("step", "2")
