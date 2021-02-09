@@ -3,11 +3,19 @@ package common
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"github.com/google/logger"
+	"github.com/nfnt/resize"
 	"github.com/yonnic/goshop/config"
 	"gorm.io/gorm"
+	"image"
+	"image/jpeg"
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -21,7 +29,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210208141938"
+	COMPILED = "20210209121905"
 	//
 	Started          time.Time
 	Config           *config.Config
@@ -507,4 +515,64 @@ func Copy(src, dst string) error {
 		return err
 	}
 	return os.Chtimes(dst, fi1.ModTime(), fi1.ModTime())
+}
+
+type Image struct {
+	Filename string
+	Size string
+}
+
+func ImageResize(src, sizes string) ([]Image, error) {
+	var images []Image
+	fi1, err := os.Stat(src)
+	if err != nil {
+		return images, err
+	}
+	var img image.Image
+	if p := path.Join(path.Dir(src), "resize"); len(p) > 0 {
+		if _, err := os.Stat(p); err != nil {
+			if err = os.MkdirAll(p, 0755); err != nil {
+				logger.Warningf("%v", err)
+			}
+		}
+	}
+	for _, size := range strings.Split(sizes, ",") {
+		pair := strings.Split(size, "x")
+		var width int
+		if width, err = strconv.Atoi(pair[0]); err != nil {
+			return images, err
+		}
+		var height int
+		if height, err = strconv.Atoi(pair[1]); err != nil {
+			return images, err
+		}
+		filename := path.Base(src)
+		filename = filename[:len(filename) - len(filepath.Ext(filename))]
+		filename = fmt.Sprintf("%s_%dx%d%s", filename, width, height, filepath.Ext(src))
+		if fi2, err := os.Stat(path.Join(path.Dir(src), "resize", filename)); err != nil || !fi1.ModTime().Equal(fi2.ModTime()) {
+			if img == nil {
+				file, err := os.Open(src)
+				if err != nil {
+					return images, err
+				}
+				img, err = jpeg.Decode(file)
+				if err != nil {
+					return images, err
+				}
+				file.Close()
+			}
+			m := resize.Resize(uint(width), uint(height), img, resize.Lanczos3)
+			out, err := os.Create(path.Join(path.Dir(src), "resize", filename))
+			if err != nil {
+				return images, err
+			}
+			if err = jpeg.Encode(out, m, &jpeg.Options{Quality: Config.Resize.Quality}); err != nil {
+				return images, err
+			}
+			out.Close()
+			os.Chtimes(path.Join(path.Dir(src), "resize", filename), fi1.ModTime(), fi1.ModTime())
+		}
+		images = append(images, Image{Filename: filename, Size: fmt.Sprintf("%dw", width)})
+	}
+	return images, nil
 }

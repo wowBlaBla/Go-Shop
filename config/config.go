@@ -47,9 +47,10 @@ func NewConfig(file string) *Config {
 type Config struct {
 	path string
 	//
-	Base string
-	Host string
-	Port int
+	Base  string
+	Host  string
+	Port  int
+	Debug bool
 	Https struct {
 		Enabled bool
 		Host string

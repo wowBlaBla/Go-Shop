@@ -104,7 +104,7 @@ func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	if err := json.Unmarshal([]byte(product.Customization), &customization); err == nil {
 		images := product.Images
 		sort.SliceStable(images, func(i, j int) bool {
-			var x, y int
+			var x, y = -1, -1
 			for k, id := range customization.Images.Order {
 				if id == images[i].ID {
 					x = k
@@ -113,7 +113,11 @@ func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 					y = k
 				}
 			}
-			return x < y
+			if x == -1 || y == -1 {
+				return images[i].ID < images[j].ID
+			}else{
+				return x < y
+			}
 		})
 		product.Images = images
 	}

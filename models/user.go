@@ -138,7 +138,7 @@ func CreateUser(connector *gorm.DB, user *User) (uint, error) {
 /*func UpdateUser(connector *gorm.DB, id int, patch map[string]string) error {
 	db := connector
 	var user *User
-	db.Debug().First(&user, id)
+	db.Preview().First(&user, id)
 	if db.Error != nil || user.ID == 0 {
 		return fmt.Errorf("user not found")
 	}
@@ -147,7 +147,7 @@ func CreateUser(connector *gorm.DB, user *User) (uint, error) {
 		user.Password = v
 	}
 	//
-	db.Debug().Save(&user)
+	db.Preview().Save(&user)
 	return db.Error
 }*/
 

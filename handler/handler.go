@@ -477,6 +477,8 @@ func getPreviewHandler (c *fiber.Ctx) error {
 type InfoView struct {
 	Application string
 	Started string
+	Debug bool `json:",omitempty"`
+	Preview string `json:",omitempty"`
 	Authorization string `json:",omitempty"`
 	ExpirationAt string `json:",omitempty"`
 	HasChanges struct {
@@ -500,6 +502,8 @@ func getInfoHandler(c *fiber.Ctx) error {
 	var view InfoView
 	view.Application = fmt.Sprintf("%v v%v, build: %v", common.APPLICATION, common.VERSION, common.COMPILED)
 	view.Started = common.Started.Format(time.RFC3339)
+	view.Debug = common.Config.Debug
+	view.Preview = common.Config.Preview
 	if v := c.Locals("authorization"); v != nil {
 		view.Application = v.(string)
 	}
@@ -622,8 +626,10 @@ func getDashboardHandler(c *fiber.Ctx) error {
 }
 
 type BasicSettingsView struct {
-	Payment config.PaymentConfig
-	Resize config.ResizeConfig
+	Debug bool
+	Preview      string
+	Payment      config.PaymentConfig
+	Resize       config.ResizeConfig
 	Notification config.NotificationConfig
 }
 
@@ -638,6 +644,8 @@ type BasicSettingsView struct {
 // @Tags settings
 func getBasicSettingsHandler(c *fiber.Ctx) error {
 	var conf BasicSettingsView
+	conf.Debug = common.Config.Debug
+	conf.Preview = common.Config.Preview
 	conf.Payment = common.Config.Payment
 	conf.Resize = common.Config.Resize
 	conf.Notification = common.Config.Notification
@@ -661,6 +669,8 @@ func putBasicSettingsHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
+	common.Config.Debug = request.Debug
+	common.Config.Preview = request.Preview
 	// Payment
 	common.Config.Payment = request.Payment
 	// Resize
@@ -4075,7 +4085,7 @@ func postPricesListHandler(c *fiber.Ctx) error {
 		rows.Close()
 	}
 	/*if len(keys1) > 0 {
-		common.Database.Debug().Model(&models.Price{}).Count(&response.Total)
+		common.Database.Preview().Model(&models.Price{}).Count(&response.Total)
 	}else{
 		response.Total = response.Filtered
 	}*/
@@ -6091,11 +6101,11 @@ func postImageHandler(c *fiber.Ctx) error {
 									c.Status(http.StatusInternalServerError)
 									return c.JSON(HTTPError{err.Error()})
 								}
-								defer out.Close()
 								if _, err := io.Copy(out, in); err != nil {
 									c.Status(http.StatusInternalServerError)
 									return c.JSON(HTTPError{err.Error()})
 								}
+								out.Close()
 								img.Url = common.Config.Base + "/" + path.Join("images", filename)
 								img.Path = "/" + path.Join("images", filename)
 								if reader, err := os.Open(p); err == nil {
@@ -6113,9 +6123,42 @@ func postImageHandler(c *fiber.Ctx) error {
 								}
 								if v := c.Query("pid"); len(v) > 0 {
 									if id, err := strconv.Atoi(v); err == nil {
-										if product, err := models.GetProduct(common.Database, id); err == nil {
+										if product, err := models.GetProductFull(common.Database, id); err == nil {
 											if err = models.AddImageToProduct(common.Database, product, img); err != nil {
 												logger.Errorf("%v", err.Error())
+											}
+											// Images processing
+											if len(product.Images) > 0 {
+												for _, image := range product.Images {
+													if image.Path != "" {
+														if p1 := path.Join(dir, "storage", image.Path); len(p1) > 0 {
+															if fi, err := os.Stat(p1); err == nil {
+																filename := fmt.Sprintf("%d-image-%d%v", image.ID, fi.ModTime().Unix(), path.Ext(p1))
+																p2 := path.Join(dir, "hugo", "static", "images", "products", filename)
+																logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+																if _, err := os.Stat(path.Dir(p2)); err != nil {
+																	if err = os.MkdirAll(path.Dir(p2), 0755); err != nil {
+																		logger.Warningf("%v", err)
+																	}
+																}
+																if err = common.Copy(p1, p2); err == nil {
+																	images2 := []string{fmt.Sprintf("/%s/%s", strings.Join([]string{"images", "products"}, "/"), filename)}
+																	if common.Config.Resize.Enabled && common.Config.Resize.Image.Enabled {
+																		if images, err := common.ImageResize(p2, common.Config.Resize.Image.Size); err == nil {
+																			for _, image := range images {
+																				images2 = append(images2, fmt.Sprintf("/%s/resize/%s %s", strings.Join([]string{"images", "products"}, "/"), image.Filename, image.Size))
+																			}
+																		} else {
+																			logger.Warningf("%v", err)
+																		}
+																	}
+																} else {
+																	logger.Warningf("%v", err)
+																}
+															}
+														}
+													}
+												}
 											}
 										}else{
 											logger.Errorf("%v", err.Error())
@@ -6482,9 +6525,20 @@ func delImageHandler(c *fiber.Ctx) error {
 	if v := c.Params("id"); v != "" {
 		oid, _ = strconv.Atoi(v)
 		if image, err := models.GetImage(common.Database, oid); err == nil {
-			if err = os.Remove(path.Join(dir, image.Path, "storage")); err != nil {
+			if err = os.Remove(path.Join(dir, "storage", image.Path)); err != nil {
 				logger.Errorf("%v", err.Error())
 			}
+			name := fmt.Sprintf("%d-", image.ID)
+			filepath.Walk(path.Join(dir, "hugo", "static", "images", "products"), func(p string, fi os.FileInfo, _ error) error {
+				if !fi.IsDir() {
+					if strings.Index(fi.Name(), name) == 0 {
+						if err = os.Remove(p); err != nil {
+							logger.Warningf("%+v", err)
+						}
+					}
+				}
+				return nil
+			})
 			if err = models.DeleteImage(common.Database, image); err == nil {
 				return c.JSON(HTTPMessage{MESSAGE: "OK"})
 			}else{
@@ -8762,6 +8816,7 @@ type NewCommand struct {
 
 type CommandView struct {
 	Output string
+	Error string `json:"ERROR,omitempty"`
 	Status string
 }
 
@@ -8790,9 +8845,11 @@ func postPrepareHandler(c *fiber.Ctx) error {
 			cmd.Stdout = buff
 			err := cmd.Run()
 			if err != nil {
-				logger.Errorf("%v", err.Error())
+				view.Output = buff.String()
+				view.Error = err.Error()
+				logger.Errorf("%v\n%v", view.Output, view.Error)
 				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
+				return c.JSON(view)
 			}
 			view.Output = buff.String()
 			view.Status = "OK"
@@ -8847,10 +8904,11 @@ func postRenderHandler(c *fiber.Ctx) error {
 			cmd.Stdout = buff
 			err := cmd.Run()
 			if err != nil {
-				logger.Infof("Output: %+v", buff.String())
-				logger.Errorf("%v", err.Error())
+				view.Output = buff.String()
+				view.Error = err.Error()
+				logger.Errorf("%v\n%v", view.Output, view.Error)
 				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
+				return c.JSON(view)
 			}
 			view.Output = buff.String()
 			view.Status = "OK"
@@ -8916,7 +8974,7 @@ func postPublishHandler(c *fiber.Ctx) error {
 				arguments = append(arguments, common.Config.Wrangler.ApiToken)
 			}
 			//
-			logger.Infof("Run: %v %+v", bin[0], arguments)
+			logger.Infof("Run: %v %+v", bin[0], strings.Join(arguments, " "))
 			cmd := exec.Command(bin[0], arguments...)
 			buff := &bytes.Buffer{}
 			cmd.Stdout = buff
