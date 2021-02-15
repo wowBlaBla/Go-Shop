@@ -19,6 +19,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -89,7 +90,7 @@ type AuthMultipleConfig struct {
 	UseForm                      bool // use html form to login
 }
 
-func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...interface{}) (*fiber.App, func (c *fiber.Ctx) error, func (c *fiber.Ctx) error) {
+func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...interface{}) (*fiber.App, func (c *fiber.Ctx) error, func (c *fiber.Ctx) error, func (c *fiber.Ctx) error) {
 	if config.PasswordMinLength == 0 {
 		config.PasswordMinLength = 6
 	}
@@ -258,37 +259,59 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 			user.EmailConfirmed = true
 		}
 		if _, err := models.CreateUser(common.Database, &user); err == nil {
-			value := map[string]string{
-				"email": user.Email,
-				"login": user.Login,
-				"password": request.Password,
-			}
-			if encoded, err := cookieHandler.Encode(COOKIE_NAME, value); err == nil {
-				expires := time.Time{}
-				if config.CookieDuration > 0 {
-					expires = time.Now().Add(config.CookieDuration)
+			if v := req.Header.Get("Accept"); strings.EqualFold(v, "application/jwt") {
+				expiration := time.Now().Add(JWTLoginDuration)
+				claims := &JWTClaims{
+					Login: user.Login,
+					Password: user.Password,
+					StandardClaims: jwt.StandardClaims{
+						ExpiresAt: expiration.Unix(),
+					},
 				}
-				cookie := &fiber.Cookie{
-					Name:  COOKIE_NAME,
-					Value: encoded,
-					Path:  "/",
-					Expires: expires,
-					SameSite: config.SameSite,
-				}
-				c.Cookie(cookie)
-				if v := req.Header.Get("Content-Type"); v != "" {
-					for _, chunk := range strings.Split(v, ";") {
-						if strings.EqualFold(chunk, "application/json") {
-							return c.JSON(fiber.Map{"MESSAGE": "OK"})
-						}
-					}
-				}
-				if err = c.Redirect("/", http.StatusFound); err != nil {
-					logger.Warningf("%+v", err)
+				token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+				if str, err := token.SignedString(JWTSecret); err == nil {
+					c.JSON(fiber.Map{
+						"MESSAGE": "OK",
+						"Token": str,
+						"Expiration": expiration,
+					})
+				}else{
+					c.Status(http.StatusInternalServerError)
+					c.JSON(fiber.Map{"ERROR": err.Error()})
 				}
 			}else{
-				c.Status(http.StatusInternalServerError)
-				c.JSON(fiber.Map{"ERROR": err.Error()})
+				value := map[string]string{
+					"email": user.Email,
+					"login": user.Login,
+					"password": request.Password,
+				}
+				if encoded, err := cookieHandler.Encode(COOKIE_NAME, value); err == nil {
+					expires := time.Time{}
+					if config.CookieDuration > 0 {
+						expires = time.Now().Add(config.CookieDuration)
+					}
+					cookie := &fiber.Cookie{
+						Name:  COOKIE_NAME,
+						Value: encoded,
+						Path:  "/",
+						Expires: expires,
+						SameSite: config.SameSite,
+					}
+					c.Cookie(cookie)
+					if v := req.Header.Get("Content-Type"); v != "" {
+						for _, chunk := range strings.Split(v, ";") {
+							if strings.EqualFold(chunk, "application/json") {
+								return c.JSON(fiber.Map{"MESSAGE": "OK"})
+							}
+						}
+					}
+					if err = c.Redirect("/", http.StatusFound); err != nil {
+						logger.Warningf("%+v", err)
+					}
+				}else{
+					c.Status(http.StatusInternalServerError)
+					c.JSON(fiber.Map{"ERROR": err.Error()})
+				}
 			}
 		}else{
 			c.Status(http.StatusInternalServerError)
@@ -305,7 +328,6 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 				if strings.Index(strings.ToLower(authorization), "bearer ") == 0 {
 					const prefix = "Bearer "
 					claims := &JWTClaims{}
-					logger.Infof("authorization[len(prefix):]: %+v", authorization[len(prefix):])
 					if token, err := jwt.ParseWithClaims(authorization[len(prefix):], claims, func(token *jwt.Token) (interface{}, error) {
 						return JWTSecret, nil
 					}); err == nil {
@@ -371,9 +393,11 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 		}
 		return nil
 	})
+	app.Get("/api/v1/csrf", getCSRFHandler)
 	app.Get("/api/v1/logout", getLogoutHandler)
 	app.Get("/logout", getLogoutHandler)
 	return app, func (c *fiber.Ctx) error {
+		// Auth Required
 		var auth bool
 		req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(c.Request().Header.Header())))
 		if err != nil {
@@ -406,7 +430,6 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 			}else if strings.Index(strings.ToLower(authorization), "bearer ") == 0 {
 				const prefix= "Bearer "
 				claims := &JWTClaims{}
-				logger.Infof("authorization[len(prefix):]: %+v", authorization[len(prefix):])
 				if token, err := jwt.ParseWithClaims(authorization[len(prefix):], claims, func(token *jwt.Token) (interface{}, error) {
 					return JWTSecret, nil
 				}); err == nil {
@@ -497,6 +520,7 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 		c.SendString("Unauthenticated")
 		return nil
 	}, func (c *fiber.Ctx) error {
+		// Auth Optional
 		req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(c.Request().Header.Header())))
 		if err != nil {
 			return err
@@ -533,12 +557,12 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 			}else if strings.Index(strings.ToLower(authorization), "bearer ") == 0 {
 				const prefix= "Bearer "
 				claims := &JWTClaims{}
-				logger.Infof("authorization[len(prefix):]: %+v", authorization[len(prefix):])
 				if token, err := jwt.ParseWithClaims(authorization[len(prefix):], claims, func(token *jwt.Token) (interface{}, error) {
 					return JWTSecret, nil
 				}); err == nil {
 					if token.Valid {
 						if time.Now().Before(time.Unix(claims.ExpiresAt, 0)) {
+							c.Locals("valid", true)
 							if user, err := models.GetUserByLoginAndPassword(common.Database, claims.Login, claims.Password); err == nil {
 								if config.Log {
 									logger.Infof("Auth Bearer #%v %v %v up to %v OK", user.ID, user.Login, user.Email, time.Unix(claims.ExpiresAt, 0).Format(time.RFC3339))
@@ -593,6 +617,103 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 			c.Locals("auth", false)
 		}
 		return c.Next()
+	}, func (c *fiber.Ctx) error {
+		// CSRF
+		req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(c.Request().Header.Header())))
+		if err != nil {
+			return err
+		}
+		var accept string
+		if v := req.Header.Get("Accept"); v != "" {
+			accept = strings.ToLower(v)
+		}
+		if v := c.Query("csrf", ""); v != "" {
+			if err := isValid(v); err != nil {
+				return error1(c, accept, err)
+			}
+			return c.Next()
+		}
+		if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+			if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
+				var request struct {
+					CSRF string
+				}
+				if err = c.BodyParser(&request); err != nil {
+					return error1(c, "application/json", err)
+				}
+				request.CSRF = strings.TrimSpace(request.CSRF)
+				if v := request.CSRF; len(v) > 0 {
+					if err := isValid(v); err != nil {
+						return error1(c, "application/json", err)
+					}
+					return c.Next()
+				}else{
+					err := fmt.Errorf("CSRF is not set")
+					return error1(c, "application/json", err)
+				}
+			}else if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
+				data, err := c.Request().MultipartForm()
+				if err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+				var csrf string
+				for key, values := range data.Value {
+					if strings.ToLower(key) == "csrf" {
+						csrf = strings.TrimSpace(values[0])
+					}
+				}
+				if csrf != "" {
+					if err := isValid(csrf); err != nil {
+						return error1(c, accept, err)
+					}
+					return c.Next()
+				}else{
+					err := fmt.Errorf("CSRF is not set")
+					return error1(c, accept, err)
+				}
+			}else{
+				err := fmt.Errorf("unknown content type")
+				return error1(c, accept, err)
+			}
+		}else{
+			err := fmt.Errorf("unknown content not set")
+			return error1(c, accept, err)
+		}
+		//
+	}
+}
+
+func isValid(code string) error {
+	if token, err := base64.RawURLEncoding.DecodeString(code); err == nil {
+		if bts, err := decrypt([]byte(common.SECRET), token); err == nil {
+			if v, err := strconv.Atoi(string(bts)); err == nil {
+				t := time.Unix(int64(v), 0)
+				if time.Now().Sub(t).Seconds() <= 30 {
+					return nil
+				} else {
+					err := fmt.Errorf("csrf expired")
+					logger.Warningf("%+v", err)
+					return err
+				}
+			} else {
+				return err
+			}
+		} else {
+			return err
+		}
+	}else{
+		return err
+	}
+}
+
+func error1(c *fiber.Ctx, accept string, err error) error {
+	if accept == "application/json" || accept == "application/jwt" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	} else {
+		c.Status(http.StatusInternalServerError)
+		return c.SendString(err.Error())
 	}
 }
 
@@ -707,6 +828,32 @@ func postLoginHandler(c *fiber.Ctx) error {
 		}
 	}
 	return nil
+}
+
+type HTTPCsrf struct {
+	CSFR string
+}
+
+// @security BasicAuth
+// Get CSRF token godoc
+// @Summary get csrf token
+// @Description get string
+// @Accept json
+// @Produce json
+// @Success 200 {object} HTTPCsrf
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/csrf [get]
+// @Tags auth
+// @Tags frontend
+func getCSRFHandler (c *fiber.Ctx) error {
+	enc, err := encrypt([]byte(common.SECRET), []byte(fmt.Sprintf("%d", time.Now().Unix())))
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{ERROR: err.Error()})
+	}
+	c.Status(http.StatusOK)
+	return c.JSON(HTTPCsrf{CSFR: base64.RawURLEncoding.EncodeToString(enc)})
 }
 
 // @security BasicAuth

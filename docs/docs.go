@@ -32,53 +32,6 @@ var doc = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/v/render": {
-            "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "summary": "Make render",
-                "parameters": [
-                    {
-                        "description": "body",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.NewCommand"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.CommandView"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/account": {
             "get": {
                 "security": [
@@ -166,6 +119,50 @@ var doc = `{
                         }
                     }
                 }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account",
+                    "frontend"
+                ],
+                "summary": "Create account",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "profile",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.NewAccount"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.Account2View"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
             }
         },
         "/api/v1/account/orders": {
@@ -221,7 +218,7 @@ var doc = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.NewOrder"
+                            "$ref": "#/definitions/handler.CheckoutRequest"
                         }
                     }
                 ],
@@ -786,6 +783,48 @@ var doc = `{
             }
         },
         "/api/v1/account/profiles": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "get account profiles",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account",
+                    "frontend"
+                ],
+                "summary": "Get account profiles",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handler.ProfileView"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -799,7 +838,8 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "profile"
+                    "profile",
+                    "frontend"
                 ],
                 "summary": "Create profile in existing account",
                 "parameters": [
@@ -818,45 +858,6 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handler.ProfileView"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/calculate": {
-            "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "frontend"
-                ],
-                "summary": "Calculate shipping cost",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.TariffsView"
                         }
                     },
                     "404": {
@@ -1232,6 +1233,51 @@ var doc = `{
                 }
             }
         },
+        "/api/v1/checkout": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "frontend"
+                ],
+                "summary": "Get checkout information",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "category",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CheckoutRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.OrdersView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/contents": {
             "get": {
                 "security": [
@@ -1409,6 +1455,333 @@ var doc = `{
                 }
             }
         },
+        "/api/v1/coupons": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "coupon"
+                ],
+                "summary": "Get coupons",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.CouponsFullView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "option"
+                ],
+                "summary": "Create coupon",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "option",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.NewCoupon"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.CouponView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/coupons/list": {
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "coupon"
+                ],
+                "summary": "Search coupons",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.ListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.CouponsListResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/coupons/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "option"
+                ],
+                "summary": "Get coupon",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Coupon ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.CouponView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "coupon"
+                ],
+                "summary": "update coupon",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "option",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CouponShortView"
+                        }
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Coupon ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.CouponShortView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "coupon"
+                ],
+                "summary": "Delete coupon",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Coupon ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/csrf": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "get string",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth",
+                    "frontend"
+                ],
+                "summary": "get csrf token",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPCsrf"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/dashboard": {
             "get": {
                 "consumes": [
@@ -1423,6 +1796,57 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handler.DashboardView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/delivery": {
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "my description",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "frontend"
+                ],
+                "summary": "Calculate shipping cost",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.DeliveryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.DeliveriesCosts"
                         }
                     },
                     "404": {
@@ -1708,7 +2132,7 @@ var doc = `{
                 "summary": "Filter products",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Category RelPath",
                         "name": "relPath",
                         "in": "query",
@@ -3180,6 +3604,46 @@ var doc = `{
                 }
             }
         },
+        "/api/v1/preview": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "run preview",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "frontend"
+                ],
+                "summary": "preview",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/prices": {
             "get": {
                 "security": [
@@ -3771,69 +4235,10 @@ var doc = `{
                         }
                     }
                 }
-            },
-            "patch": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "product"
-                ],
-                "summary": "Patch product",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Products id",
-                        "name": "id",
-                        "in": "query"
-                    },
-                    {
-                        "description": "body",
-                        "name": "product",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.ProductPatch"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPMessage"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
             }
         },
         "/api/v1/profiles": {
             "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -3843,7 +4248,7 @@ var doc = `{
                 "tags": [
                     "profile"
                 ],
-                "summary": "Create profile without having account",
+                "summary": "(DEPRECATED) Create profile without having account",
                 "parameters": [
                     {
                         "description": "body",
@@ -4096,6 +4501,53 @@ var doc = `{
                     "application/json"
                 ],
                 "summary": "Make publish",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.NewCommand"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.CommandView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/render": {
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Make render",
                 "parameters": [
                     {
                         "description": "body",
@@ -4725,7 +5177,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.TariffsView"
+                            "$ref": "#/definitions/handler.DeliveriesView"
                         }
                     },
                     "404": {
@@ -6559,6 +7011,47 @@ var doc = `{
                 }
             }
         },
+        "handler.Account2View": {
+            "type": "object",
+            "properties": {
+                "admin": {
+                    "type": "boolean"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "emailConfirmed": {
+                    "type": "boolean"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "expiration": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "login": {
+                    "type": "string"
+                },
+                "notification": {
+                    "type": "boolean"
+                },
+                "profiles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.ProfileView"
+                    }
+                },
+                "role": {
+                    "type": "integer"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.AccountView": {
             "type": "object",
             "properties": {
@@ -6608,6 +7101,9 @@ var doc = `{
         "handler.BasicSettingsView": {
             "type": "object",
             "properties": {
+                "debug": {
+                    "type": "boolean"
+                },
                 "notification": {
                     "type": "object",
                     "$ref": "#/definitions/config.NotificationConfig"
@@ -6615,6 +7111,9 @@ var doc = `{
                 "payment": {
                     "type": "object",
                     "$ref": "#/definitions/config.PaymentConfig"
+                },
+                "preview": {
+                    "type": "string"
                 },
                 "resize": {
                     "type": "object",
@@ -6759,9 +7258,38 @@ var doc = `{
                 }
             }
         },
+        "handler.CheckoutRequest": {
+            "type": "object",
+            "properties": {
+                "comment": {
+                    "type": "string"
+                },
+                "coupons": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.NewItem"
+                    }
+                },
+                "profileId": {
+                    "type": "integer"
+                },
+                "transportId": {
+                    "type": "integer"
+                }
+            }
+        },
         "handler.CommandView": {
             "type": "object",
             "properties": {
+                "ERROR": {
+                    "type": "string"
+                },
                 "output": {
                     "type": "string"
                 },
@@ -6790,6 +7318,166 @@ var doc = `{
                 }
             }
         },
+        "handler.CouponFullView": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "discounts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.DiscountView"
+                    }
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.CouponListItem": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "applyTo": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "discounts": {
+                    "type": "integer"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "minimum": {
+                    "type": "number"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.CouponShortView": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.CouponView": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "applyTo": {
+                    "type": "string"
+                },
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.CategoryView"
+                    }
+                },
+                "code": {
+                    "type": "string"
+                },
+                "count": {
+                    "type": "integer"
+                },
+                "cumulative": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "end": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "minimum": {
+                    "type": "number"
+                },
+                "products": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.ProductShortView"
+                    }
+                },
+                "shipping": {
+                    "type": "boolean"
+                },
+                "start": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.CouponsFullView": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/handler.CouponFullView"
+            }
+        },
+        "handler.CouponsListResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.CouponListItem"
+                    }
+                },
+                "filtered": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "handler.DashboardView": {
             "type": "object",
             "properties": {
@@ -6814,6 +7502,121 @@ var doc = `{
                 "transfers": {
                     "type": "object",
                     "$ref": "#/definitions/handler.TransferView"
+                }
+            }
+        },
+        "handler.DeliveriesCosts": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/handler.DeliveryCost"
+            }
+        },
+        "handler.DeliveriesView": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/handler.DeliveryView"
+            }
+        },
+        "handler.DeliveryCost": {
+            "type": "object",
+            "properties": {
+                "by": {
+                    "type": "string"
+                },
+                "byVolume": {
+                    "type": "number"
+                },
+                "byWeight": {
+                    "type": "number"
+                },
+                "cost": {
+                    "type": "string"
+                },
+                "fees": {
+                    "type": "number"
+                },
+                "id": {
+                    "description": "transport ID",
+                    "type": "integer"
+                },
+                "itemFee": {
+                    "type": "string"
+                },
+                "orderFee": {
+                    "type": "string"
+                },
+                "special": {
+                    "description": "in case of ZIP match",
+                    "type": "boolean"
+                },
+                "sum": {
+                    "type": "number"
+                },
+                "thumbnail": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
+                },
+                "volume": {
+                    "type": "number"
+                },
+                "weight": {
+                    "type": "number"
+                }
+            }
+        },
+        "handler.DeliveryRequest": {
+            "type": "object",
+            "properties": {
+                "country": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.NewItem"
+                    }
+                },
+                "zip": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.DeliveryView": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "item": {
+                    "type": "string"
+                },
+                "kg": {
+                    "type": "number"
+                },
+                "m3": {
+                    "type": "number"
+                },
+                "order": {
+                    "type": "string"
+                },
+                "transportId": {
+                    "type": "integer"
+                },
+                "zoneId": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.DiscountView": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
                 }
             }
         },
@@ -7020,6 +7823,14 @@ var doc = `{
         "handler.FilterRequest": {
             "$ref": "#/definitions/handler.ListRequest"
         },
+        "handler.HTTPCsrf": {
+            "type": "object",
+            "properties": {
+                "csfr": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.HTTPError": {
             "type": "object",
             "properties": {
@@ -7148,13 +7959,13 @@ var doc = `{
                 "name": {
                     "type": "string"
                 },
+                "path": {
+                    "type": "string"
+                },
                 "size": {
                     "type": "integer"
                 },
                 "updated": {
-                    "type": "string"
-                },
-                "url": {
                     "type": "string"
                 },
                 "width": {
@@ -7188,6 +7999,9 @@ var doc = `{
                 "authorization": {
                     "type": "string"
                 },
+                "debug": {
+                    "type": "boolean"
+                },
                 "expirationAt": {
                     "type": "string"
                 },
@@ -7205,6 +8019,9 @@ var doc = `{
                         }
                     }
                 },
+                "preview": {
+                    "type": "string"
+                },
                 "started": {
                     "type": "string"
                 },
@@ -7217,6 +8034,9 @@ var doc = `{
         "handler.ItemShortView": {
             "type": "object",
             "properties": {
+                "discount": {
+                    "type": "number"
+                },
                 "path": {
                     "type": "string"
                 },
@@ -7395,6 +8215,17 @@ var doc = `{
                 }
             }
         },
+        "handler.NewAccount": {
+            "type": "object",
+            "properties": {
+                "csrf": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.NewCategory": {
             "type": "object",
             "properties": {
@@ -7414,6 +8245,29 @@ var doc = `{
         },
         "handler.NewCommand": {
             "type": "object"
+        },
+        "handler.NewCoupon": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
         },
         "handler.NewEmailTemplate": {
             "type": "object",
@@ -7477,31 +8331,11 @@ var doc = `{
                 "name": {
                     "type": "string"
                 },
+                "sort": {
+                    "type": "integer"
+                },
                 "title": {
                     "type": "string"
-                }
-            }
-        },
-        "handler.NewOrder": {
-            "type": "object",
-            "properties": {
-                "comment": {
-                    "type": "string"
-                },
-                "created": {
-                    "type": "string"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handler.NewItem"
-                    }
-                },
-                "profileId": {
-                    "type": "integer"
-                },
-                "transportId": {
-                    "type": "integer"
                 }
             }
         },
@@ -7531,6 +8365,9 @@ var doc = `{
         "handler.NewPrice": {
             "type": "object",
             "properties": {
+                "availability": {
+                    "type": "string"
+                },
                 "enabled": {
                     "type": "boolean"
                 },
@@ -7539,6 +8376,9 @@ var doc = `{
                 },
                 "propertyId": {
                     "type": "integer"
+                },
+                "sending": {
+                    "type": "string"
                 },
                 "sku": {
                     "type": "string"
@@ -7789,6 +8629,9 @@ var doc = `{
                 "name": {
                     "type": "string"
                 },
+                "sort": {
+                    "type": "integer"
+                },
                 "title": {
                     "type": "string"
                 },
@@ -7797,6 +8640,14 @@ var doc = `{
                     "items": {
                         "$ref": "#/definitions/handler.ValueView"
                     }
+                }
+            }
+        },
+        "handler.OptionPatchRequest": {
+            "type": "object",
+            "properties": {
+                "sort": {
+                    "type": "integer"
                 }
             }
         },
@@ -7811,6 +8662,9 @@ var doc = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
                 },
                 "title": {
                     "type": "string"
@@ -7828,6 +8682,9 @@ var doc = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
                 },
                 "title": {
                     "type": "string"
@@ -7857,6 +8714,9 @@ var doc = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
                 },
                 "title": {
                     "type": "string"
@@ -7890,6 +8750,12 @@ var doc = `{
                     "type": "string"
                 },
                 "delivery": {
+                    "type": "number"
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "discount2": {
                     "type": "number"
                 },
                 "items": {
@@ -8025,6 +8891,9 @@ var doc = `{
                         },
                         "title": {
                             "type": "string"
+                        },
+                        "weight": {
+                            "type": "integer"
                         }
                     }
                 },
@@ -8109,6 +8978,9 @@ var doc = `{
         "handler.PriceView": {
             "type": "object",
             "properties": {
+                "availability": {
+                    "type": "string"
+                },
                 "enabled": {
                     "type": "boolean"
                 },
@@ -8120,6 +8992,9 @@ var doc = `{
                 },
                 "propertyId": {
                     "type": "integer"
+                },
+                "sending": {
+                    "type": "string"
                 },
                 "sku": {
                     "type": "string"
@@ -8178,17 +9053,6 @@ var doc = `{
                 },
                 "total": {
                     "type": "integer"
-                }
-            }
-        },
-        "handler.ProductPatch": {
-            "type": "object",
-            "properties": {
-                "images": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -8572,38 +9436,6 @@ var doc = `{
                 "$ref": "#/definitions/handler.TagView"
             }
         },
-        "handler.TariffView": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "integer"
-                },
-                "item": {
-                    "type": "string"
-                },
-                "kg": {
-                    "type": "number"
-                },
-                "m3": {
-                    "type": "number"
-                },
-                "order": {
-                    "type": "string"
-                },
-                "transportId": {
-                    "type": "integer"
-                },
-                "zoneId": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handler.TariffsView": {
-            "type": "array",
-            "items": {
-                "$ref": "#/definitions/handler.TariffView"
-            }
-        },
         "handler.TransactionView": {
             "type": "object",
             "properties": {
@@ -8887,11 +9719,17 @@ var doc = `{
         "handler.ValueView": {
             "type": "object",
             "properties": {
+                "availability": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
                 "id": {
                     "type": "integer"
+                },
+                "sending": {
+                    "type": "string"
                 },
                 "thumbnail": {
                     "type": "string"
@@ -9018,6 +9856,9 @@ var doc = `{
                                 "items": {
                                     "type": "object",
                                     "properties": {
+                                        "availability": {
+                                            "type": "string"
+                                        },
                                         "enabled": {
                                             "type": "boolean"
                                         },
@@ -9027,11 +9868,20 @@ var doc = `{
                                         "price": {
                                             "type": "number"
                                         },
+                                        "sending": {
+                                            "type": "string"
+                                        },
                                         "value": {
                                             "type": "object",
                                             "properties": {
+                                                "availability": {
+                                                    "type": "string"
+                                                },
                                                 "id": {
                                                     "type": "integer"
+                                                },
+                                                "sending": {
+                                                    "type": "string"
                                                 },
                                                 "thumbnail": {
                                                     "type": "string"
@@ -9233,11 +10083,11 @@ type swaggerInfo struct {
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = swaggerInfo{
 	Version:     "1.0",
-	Host:        "localhost:18092",
+	Host:        "",
 	BasePath:    "/",
 	Schemes:     []string{},
 	Title:       "GoShop API",
-	Description: "GoShop full featured api",
+	Description: "GoShop full featured api, see documentation https://docs.google.com/document/d/1VlkAYTqZG9oGvZxnSNDpcuafU-msOb2Qm2FevMJkA7w/edit",
 }
 
 type s struct{}

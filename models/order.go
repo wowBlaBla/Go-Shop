@@ -17,16 +17,20 @@ const (
 type Order struct {
 	gorm.Model
 	//
-	Description string
+	Description string // put here coupons too
 	Items []*Item `gorm:"foreignKey:OrderId"`
+	Quantity int
 	Sum  float64 `sql:"type:decimal(8,2);"`
+	Discount float64 `sql:"type:decimal(8,2);"`
 	Delivery float64 `sql:"type:decimal(8,2);"`
+	Discount2 float64 `sql:"type:decimal(8,2);"`
 	Total float64 `sql:"type:decimal(8,2);"`
 	Status string
 	Comment string
 	Volume float64 `sql:"type:decimal(8,3);"`
 	Weight float64 `sql:"type:decimal(8,3);"`
 	//
+	Discounts []*Discount `gorm:"foreignKey:OrderId"`
 	User *User `gorm:"foreignKey:UserId"`
 	UserId uint
 	Profile *Profile `gorm:"foreignKey:ProfileId"`

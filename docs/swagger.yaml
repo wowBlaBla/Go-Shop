@@ -93,6 +93,33 @@ definitions:
       enabled:
         type: boolean
     type: object
+  handler.Account2View:
+    properties:
+      admin:
+        type: boolean
+      email:
+        type: string
+      emailConfirmed:
+        type: boolean
+      enabled:
+        type: boolean
+      expiration:
+        type: string
+      id:
+        type: integer
+      login:
+        type: string
+      notification:
+        type: boolean
+      profiles:
+        items:
+          $ref: '#/definitions/handler.ProfileView'
+        type: array
+      role:
+        type: integer
+      token:
+        type: string
+    type: object
   handler.AccountView:
     properties:
       admin:
@@ -125,12 +152,16 @@ definitions:
     type: object
   handler.BasicSettingsView:
     properties:
+      debug:
+        type: boolean
       notification:
         $ref: '#/definitions/config.NotificationConfig'
         type: object
       payment:
         $ref: '#/definitions/config.PaymentConfig'
         type: object
+      preview:
+        type: string
       resize:
         $ref: '#/definitions/config.ResizeConfig'
         type: object
@@ -225,8 +256,27 @@ definitions:
         description: '"category", "product"'
         type: string
     type: object
+  handler.CheckoutRequest:
+    properties:
+      comment:
+        type: string
+      coupons:
+        items:
+          type: string
+        type: array
+      items:
+        items:
+          $ref: '#/definitions/handler.NewItem'
+        type: array
+      profileId:
+        type: integer
+      transportId:
+        type: integer
+    type: object
   handler.CommandView:
     properties:
+      ERROR:
+        type: string
       output:
         type: string
       status:
@@ -246,6 +296,111 @@ definitions:
         description: folder, file
         type: string
     type: object
+  handler.CouponFullView:
+    properties:
+      description:
+        type: string
+      discounts:
+        items:
+          $ref: '#/definitions/handler.DiscountView'
+        type: array
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      title:
+        type: string
+    type: object
+  handler.CouponListItem:
+    properties:
+      amount:
+        type: string
+      applyTo:
+        type: string
+      code:
+        type: string
+      description:
+        type: string
+      discounts:
+        type: integer
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      minimum:
+        type: number
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  handler.CouponShortView:
+    properties:
+      description:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      title:
+        type: string
+    type: object
+  handler.CouponView:
+    properties:
+      amount:
+        type: string
+      applyTo:
+        type: string
+      categories:
+        items:
+          $ref: '#/definitions/handler.CategoryView'
+        type: array
+      code:
+        type: string
+      count:
+        type: integer
+      cumulative:
+        type: boolean
+      description:
+        type: string
+      enabled:
+        type: boolean
+      end:
+        type: string
+      id:
+        type: integer
+      limit:
+        type: integer
+      minimum:
+        type: number
+      products:
+        items:
+          $ref: '#/definitions/handler.ProductShortView'
+        type: array
+      shipping:
+        type: boolean
+      start:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  handler.CouponsFullView:
+    items:
+      $ref: '#/definitions/handler.CouponFullView'
+    type: array
+  handler.CouponsListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.CouponListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
   handler.DashboardView:
     properties:
       earnings:
@@ -263,6 +418,82 @@ definitions:
       transfers:
         $ref: '#/definitions/handler.TransferView'
         type: object
+    type: object
+  handler.DeliveriesCosts:
+    items:
+      $ref: '#/definitions/handler.DeliveryCost'
+    type: array
+  handler.DeliveriesView:
+    items:
+      $ref: '#/definitions/handler.DeliveryView'
+    type: array
+  handler.DeliveryCost:
+    properties:
+      by:
+        type: string
+      byVolume:
+        type: number
+      byWeight:
+        type: number
+      cost:
+        type: string
+      fees:
+        type: number
+      id:
+        description: transport ID
+        type: integer
+      itemFee:
+        type: string
+      orderFee:
+        type: string
+      special:
+        description: in case of ZIP match
+        type: boolean
+      sum:
+        type: number
+      thumbnail:
+        type: string
+      title:
+        type: string
+      value:
+        type: number
+      volume:
+        type: number
+      weight:
+        type: number
+    type: object
+  handler.DeliveryRequest:
+    properties:
+      country:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/handler.NewItem'
+        type: array
+      zip:
+        type: string
+    type: object
+  handler.DeliveryView:
+    properties:
+      id:
+        type: integer
+      item:
+        type: string
+      kg:
+        type: number
+      m3:
+        type: number
+      order:
+        type: string
+      transportId:
+        type: integer
+      zoneId:
+        type: integer
+    type: object
+  handler.DiscountView:
+    properties:
+      id:
+        type: integer
     type: object
   handler.EmailTemplateView:
     properties:
@@ -396,6 +627,11 @@ definitions:
     type: object
   handler.FilterRequest:
     $ref: '#/definitions/handler.ListRequest'
+  handler.HTTPCsrf:
+    properties:
+      csfr:
+        type: string
+    type: object
   handler.HTTPError:
     properties:
       error:
@@ -479,11 +715,11 @@ definitions:
         type: integer
       name:
         type: string
+      path:
+        type: string
       size:
         type: integer
       updated:
-        type: string
-      url:
         type: string
       width:
         type: integer
@@ -505,6 +741,8 @@ definitions:
         type: string
       authorization:
         type: string
+      debug:
+        type: boolean
       expirationAt:
         type: string
       hasChanges:
@@ -516,6 +754,8 @@ definitions:
           updated:
             type: string
         type: object
+      preview:
+        type: string
       started:
         type: string
       user:
@@ -524,6 +764,8 @@ definitions:
     type: object
   handler.ItemShortView:
     properties:
+      discount:
+        type: number
       path:
         type: string
       price:
@@ -643,6 +885,13 @@ definitions:
       profileId:
         type: string
     type: object
+  handler.NewAccount:
+    properties:
+      csrf:
+        type: string
+      email:
+        type: string
+    type: object
   handler.NewCategory:
     properties:
       description:
@@ -655,6 +904,21 @@ definitions:
         type: string
     type: object
   handler.NewCommand:
+    type: object
+  handler.NewCoupon:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      enabled:
+        type: boolean
+      limit:
+        type: integer
+      title:
+        type: string
+      type:
+        type: string
     type: object
   handler.NewEmailTemplate:
     properties:
@@ -696,23 +960,10 @@ definitions:
         type: string
       name:
         type: string
+      sort:
+        type: integer
       title:
         type: string
-    type: object
-  handler.NewOrder:
-    properties:
-      comment:
-        type: string
-      created:
-        type: string
-      items:
-        items:
-          $ref: '#/definitions/handler.NewItem'
-        type: array
-      profileId:
-        type: integer
-      transportId:
-        type: integer
     type: object
   handler.NewParameter:
     properties:
@@ -731,12 +982,16 @@ definitions:
     type: object
   handler.NewPrice:
     properties:
+      availability:
+        type: string
       enabled:
         type: boolean
       price:
         type: number
       propertyId:
         type: integer
+      sending:
+        type: string
       sku:
         type: string
       valueId:
@@ -899,12 +1154,19 @@ definitions:
         type: integer
       name:
         type: string
+      sort:
+        type: integer
       title:
         type: string
       values:
         items:
           $ref: '#/definitions/handler.ValueView'
         type: array
+    type: object
+  handler.OptionPatchRequest:
+    properties:
+      sort:
+        type: integer
     type: object
   handler.OptionShortView:
     properties:
@@ -914,6 +1176,8 @@ definitions:
         type: integer
       name:
         type: string
+      sort:
+        type: integer
       title:
         type: string
     type: object
@@ -925,6 +1189,8 @@ definitions:
         type: integer
       name:
         type: string
+      sort:
+        type: integer
       title:
         type: string
       values:
@@ -944,6 +1210,8 @@ definitions:
         type: integer
       name:
         type: string
+      sort:
+        type: integer
       title:
         type: string
       valuesValues:
@@ -965,6 +1233,10 @@ definitions:
       comment:
         type: string
       delivery:
+        type: number
+      discount:
+        type: number
+      discount2:
         type: number
       items:
         items:
@@ -1054,6 +1326,8 @@ definitions:
             type: string
           title:
             type: string
+          weight:
+            type: integer
         type: object
       optionId:
         type: integer
@@ -1107,6 +1381,8 @@ definitions:
     type: object
   handler.PriceView:
     properties:
+      availability:
+        type: string
       enabled:
         type: boolean
       id:
@@ -1115,6 +1391,8 @@ definitions:
         type: number
       propertyId:
         type: integer
+      sending:
+        type: string
       sku:
         type: string
       valueId:
@@ -1153,13 +1431,6 @@ definitions:
         type: integer
       total:
         type: integer
-    type: object
-  handler.ProductPatch:
-    properties:
-      images:
-        items:
-          type: integer
-        type: array
     type: object
   handler.ProductShortView:
     properties:
@@ -1410,27 +1681,6 @@ definitions:
     items:
       $ref: '#/definitions/handler.TagView'
     type: array
-  handler.TariffView:
-    properties:
-      id:
-        type: integer
-      item:
-        type: string
-      kg:
-        type: number
-      m3:
-        type: number
-      order:
-        type: string
-      transportId:
-        type: integer
-      zoneId:
-        type: integer
-    type: object
-  handler.TariffsView:
-    items:
-      $ref: '#/definitions/handler.TariffView'
-    type: array
   handler.TransactionView:
     properties:
       amount:
@@ -1616,10 +1866,14 @@ definitions:
     type: array
   handler.ValueView:
     properties:
+      availability:
+        type: string
       description:
         type: string
       id:
         type: integer
+      sending:
+        type: string
       thumbnail:
         type: string
       title:
@@ -1701,16 +1955,24 @@ definitions:
             prices:
               items:
                 properties:
+                  availability:
+                    type: string
                   enabled:
                     type: boolean
                   id:
                     type: integer
                   price:
                     type: number
+                  sending:
+                    type: string
                   value:
                     properties:
+                      availability:
+                        type: string
                       id:
                         type: integer
+                      sending:
+                        type: string
                       thumbnail:
                         type: string
                       title:
@@ -1828,12 +2090,11 @@ definitions:
     items:
       $ref: '#/definitions/handler.ZoneView'
     type: array
-host: localhost:18092
 info:
   contact:
     email: fiber@swagger.io
     name: API Support
-  description: GoShop full featured api
+  description: GoShop full featured api, see documentation https://docs.google.com/document/d/1VlkAYTqZG9oGvZxnSNDpcuafU-msOb2Qm2FevMJkA7w/edit
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
@@ -1841,35 +2102,6 @@ info:
   title: GoShop API
   version: "1.0"
 paths:
-  /api/v/render:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: body
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handler.NewCommand'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.CommandView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Make render
   /api/v1/account:
     get:
       consumes:
@@ -1893,6 +2125,35 @@ paths:
       security:
       - BasicAuth: []
       summary: Get account
+      tags:
+      - account
+      - frontend
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: profile
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewAccount'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.Account2View'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Create account
       tags:
       - account
       - frontend
@@ -1958,7 +2219,7 @@ paths:
         name: cart
         required: true
         schema:
-          $ref: '#/definitions/handler.NewOrder'
+          $ref: '#/definitions/handler.CheckoutRequest'
       produces:
       - application/json
       responses:
@@ -2330,6 +2591,33 @@ paths:
       tags:
       - account
   /api/v1/account/profiles:
+    get:
+      consumes:
+      - application/json
+      description: get account profiles
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.ProfileView'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get account profiles
+      tags:
+      - account
+      - frontend
     post:
       consumes:
       - application/json
@@ -2360,29 +2648,6 @@ paths:
       summary: Create profile in existing account
       tags:
       - profile
-  /api/v1/calculate:
-    post:
-      consumes:
-      - application/json
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.TariffsView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Calculate shipping cost
-      tags:
       - frontend
   /api/v1/categories:
     get:
@@ -2608,6 +2873,35 @@ paths:
       summary: Delete category
       tags:
       - category
+  /api/v1/checkout:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CheckoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.OrdersView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get checkout information
+      tags:
+      - frontend
   /api/v1/contents:
     get:
       consumes:
@@ -2718,6 +3012,211 @@ paths:
       summary: Put content
       tags:
       - content
+  /api/v1/coupons:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CouponsFullView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get coupons
+      tags:
+      - coupon
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewCoupon'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CouponView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create coupon
+      tags:
+      - option
+  /api/v1/coupons/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Coupon ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete coupon
+      tags:
+      - coupon
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Coupon ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CouponView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get coupon
+      tags:
+      - option
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CouponShortView'
+      - description: Coupon ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CouponShortView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update coupon
+      tags:
+      - coupon
+  /api/v1/coupons/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CouponsListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search coupons
+      tags:
+      - coupon
+  /api/v1/csrf:
+    get:
+      consumes:
+      - application/json
+      description: get string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPCsrf'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: get csrf token
+      tags:
+      - auth
+      - frontend
   /api/v1/dashboard:
     get:
       consumes:
@@ -2738,6 +3237,38 @@ paths:
           schema:
             $ref: '#/definitions/handler.HTTPError'
       summary: Get dashboard
+  /api/v1/delivery:
+    post:
+      consumes:
+      - application/json
+      description: my description
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.DeliveryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.DeliveriesCosts'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Calculate shipping cost
+      tags:
+      - frontend
   /api/v1/files:
     post:
       consumes:
@@ -2903,7 +3434,7 @@ paths:
         in: query
         name: relPath
         required: true
-        type: integer
+        type: string
       - description: body
         in: body
         name: category
@@ -3832,6 +4363,31 @@ paths:
       security:
       - BasicAuth: []
       summary: Make prepare
+  /api/v1/preview:
+    get:
+      consumes:
+      - application/json
+      description: run preview
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: preview
+      tags:
+      - frontend
   /api/v1/prices:
     get:
       consumes:
@@ -4135,40 +4691,6 @@ paths:
       summary: Get product
       tags:
       - product
-    patch:
-      consumes:
-      - application/json
-      parameters:
-      - description: Products id
-        in: query
-        name: id
-        type: integer
-      - description: body
-        in: body
-        name: product
-        required: true
-        schema:
-          $ref: '#/definitions/handler.ProductPatch'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.HTTPMessage'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Patch product
-      tags:
-      - product
     put:
       consumes:
       - multipart/form-data
@@ -4264,9 +4786,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Create profile without having account
+      summary: (DEPRECATED) Create profile without having account
       tags:
       - profile
   /api/v1/properties/{id}:
@@ -4427,6 +4947,35 @@ paths:
       security:
       - BasicAuth: []
       summary: Make publish
+  /api/v1/render:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewCommand'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CommandView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Make render
   /api/v1/reset:
     post:
       consumes:
@@ -4802,7 +5351,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.TariffsView'
+            $ref: '#/definitions/handler.DeliveriesView'
         "404":
           description: Not Found
           schema:

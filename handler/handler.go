@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"github.com/BurntSushi/toml"
 	swagger "github.com/arsmn/fiber-swagger/v2"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -58,11 +59,12 @@ var (
 	reCSV = regexp.MustCompile(`,\s*`)
 	reNotAbc = regexp.MustCompile("(?i)[^a-z0-9]+")
 	reVolume = regexp.MustCompile(`^(\d+)\s*x\s*(\d+)\s*x\s*(\d+)\s*$`)
+	rePercent = regexp.MustCompile(`^(\d+(:?\.\d{1,3})?)%$`)
 )
 
 
 func GetFiber() *fiber.App {
-	app, authRequired, authOptional := CreateFiberAppWithAuthMultiple(AuthMultipleConfig{
+	app, authRequired, authOptional, csrf := CreateFiberAppWithAuthMultiple(AuthMultipleConfig{
 			CookieDuration: time.Duration(365 * 24) * time.Hour,
 			Log: true,
 			//UseForm: true,
@@ -184,7 +186,7 @@ func GetFiber() *fiber.App {
 	v1.Get("/tags/:id", authRequired, getTagHandler)
 	v1.Put("/tags/:id", authRequired, changed("tag updated"), putTagHandler)
 	v1.Delete("/tags/:id", authRequired, changed("tag deleted"), delTagHandler)
-	//
+	// Options
 	v1.Get("/options", authRequired, getOptionsHandler)
 	v1.Post("/options", authRequired, changed("option created"), postOptionHandler)
 	v1.Post("/options/list", authRequired, postOptionsListHandler)
@@ -192,14 +194,14 @@ func GetFiber() *fiber.App {
 	v1.Patch("/options/:id", authRequired, changed("option updated"), patchOptionHandler)
 	v1.Put("/options/:id", authRequired, changed("option updated"), putOptionHandler)
 	v1.Delete("/options/:id", authRequired, changed("option deleted"), delOptionHandler)
-	//
+	// Values
 	v1.Get("/values", authRequired, getValuesHandler)
 	v1.Post("/values", authRequired, changed("value created"), postValueHandler)
 	v1.Post("/values/list", authRequired, postValuesListHandler)
 	v1.Get("/values/:id", authRequired, getValueHandler)
 	v1.Put("/values/:id", authRequired, changed("value updated"), putValueHandler)
 	v1.Delete("/values/:id", authRequired, changed("value deleted"), delValueHandler)
-	// File
+	// Files
 	v1.Post("/files", authRequired, changed("file created"), postFileHandler)
 	v1.Post("/files/list", authRequired, postFilesListHandler)
 	v1.Get("/files/:id", authRequired, getFileHandler)
@@ -211,7 +213,21 @@ func GetFiber() *fiber.App {
 	v1.Get("/images/:id", authRequired, getImageHandler)
 	v1.Put("/images/:id", authRequired, changed("image updated"), putImageHandler)
 	v1.Delete("/images/:id", authRequired, changed("image deleted"), delImageHandler)
-	//
+	// Coupons
+	v1.Get("/coupons", authRequired, getCouponsHandler)
+	v1.Post("/coupons", authRequired, changed("coupon created"), postCouponHandler)
+	v1.Post("/coupons/list", authRequired, postCouponsListHandler)
+	v1.Get("/coupons/:id", authRequired, getCouponHandler)
+	v1.Put("/coupons/:id", authRequired, changed("coupon updated"), putCouponHandler)
+	v1.Delete("/options/:id", authRequired, changed("option deleted"), delCouponHandler)
+	// Discounts
+	v1.Get("/values", authRequired, getValuesHandler)
+	v1.Post("/values", authRequired, changed("value created"), postValueHandler)
+	v1.Post("/values/list", authRequired, postValuesListHandler)
+	v1.Get("/values/:id", authRequired, getValueHandler)
+	v1.Put("/values/:id", authRequired, changed("value updated"), putValueHandler)
+	v1.Delete("/values/:id", authRequired, changed("value deleted"), delValueHandler)
+	// Orders
 	v1.Post("/orders/list", authRequired, postOrdersListHandler)
 	v1.Get("/orders/:id", authRequired, getOrderHandler)
 	v1.Put("/orders/:id", authRequired, putOrderHandler)
@@ -224,7 +240,9 @@ func GetFiber() *fiber.App {
 	//
 	v1.Get("/me", authRequired, getMeHandler)
 	//
-	v1.Post("/calculate", postCalculateHandler)
+	v1.Post("/calculate", postDeliveryHandler) // DEPRECATED
+	v1.Post("/delivery", postDeliveryHandler)
+	//v1.Post("/discount", postDiscountHandler)
 	//
 	v1.Get("/tariffs", authRequired, getTariffsHandler)
 	//
@@ -259,7 +277,9 @@ func GetFiber() *fiber.App {
 	v1.Post("/publish", authRequired, postPublishHandler)
 	//
 	v1.Get("/account", authRequired, getAccountHandler)
+	v1.Post("/account", csrf, postAccountHandler)
 	v1.Put("/account", authRequired, putAccountHandler)
+	v1.Get("/account/profiles", authRequired, getAccountProfilesHandler)
 	v1.Post("/account/profiles", authRequired, postAccountProfileHandler)
 	//
 	v1.Get("/account/orders", authRequired, getAccountOrdersHandler)
@@ -284,6 +304,8 @@ func GetFiber() *fiber.App {
 	v1.Get("/payment_methods", authRequired, getPaymentMethodsHandler)
 	//
 	v1.Post("/profiles", postProfileHandler)
+	v1.Get("/test", getTestHandler)
+	v1.Post("/checkout", postCheckoutHandler)
 	//
 	v1.Post("/filter", postFilterHandler)
 	//
@@ -4895,7 +4917,6 @@ type OptionFullView struct {
 	Values []ValueView `json:",omitempty"`
 }
 
-
 // @security BasicAuth
 // GetOptions godoc
 // @Summary Get options
@@ -6555,6 +6576,432 @@ func delImageHandler(c *fiber.Ctx) error {
 	}
 }
 
+type CouponsFullView []CouponFullView
+
+type CouponFullView struct {
+	CouponShortView
+	Discounts []DiscountView `json:",omitempty"`
+}
+
+// @security BasicAuth
+// GetCoupons godoc
+// @Summary Get coupons
+// @Accept json
+// @Produce json
+// @Success 200 {object} CouponsFullView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/coupons [get]
+// @Tags coupon
+func getCouponsHandler(c *fiber.Ctx) error {
+	if options, err := models.GetCouponsFull(common.Database); err == nil {
+		var view CouponsFullView
+		if bts, err := json.MarshalIndent(options, "", "   "); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+type CouponsShortView []CouponShortView
+
+type CouponShortView struct {
+	ID uint
+	Enabled bool
+	Title string `json:",omitempty"`
+	Description string `json:",omitempty"`
+}
+
+type NewCoupon struct {
+	Enabled bool
+	Title string
+	Code string
+	Type string
+	Limit int
+	Description string
+}
+
+// @security BasicAuth
+// CreateCoupon godoc
+// @Summary Create coupon
+// @Accept json
+// @Produce json
+// @Param option body NewCoupon true "body"
+// @Success 200 {object} CouponView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/coupons [post]
+// @Tags option
+func postCouponHandler(c *fiber.Ctx) error {
+	var view CouponView
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
+			var request NewCoupon
+			if err := c.BodyParser(&request); err != nil {
+				return err
+			}
+			request.Title = strings.TrimSpace(request.Title)
+			if request.Title == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(fiber.Map{"ERROR": "Title is not defined"})
+			}
+			request.Code = strings.TrimSpace(request.Code)
+			if request.Code == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(fiber.Map{"ERROR": "Code is not defined"})
+			}
+			if len(request.Description) > 256 {
+				request.Description = request.Description[0:255]
+			}
+			if coupons, err := models.GetCouponsByTitle(common.Database, request.Title); err == nil && len(coupons) > 0 {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Coupon exists"})
+			}
+			if coupons, err := models.GetCouponsByCode(common.Database, request.Code); err == nil && len(coupons) > 0 {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Coupon exists"})
+			}
+			now := time.Now()
+			year, month, day := now.Date()
+			midnight := time.Date(year, month, day, 0, 0, 0, 0, now.Location())
+			coupon := &models.Coupon {
+				Enabled: request.Enabled,
+				Title: request.Title,
+				Code: request.Code,
+				Description: request.Description,
+				Type: request.Type,
+				Limit: request.Limit,
+				Start: midnight,
+				End: midnight.AddDate(1, 0, 0).Add(-1 * time.Second),
+			}
+			if _, err := models.CreateCoupon(common.Database, coupon); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			if bts, err := json.Marshal(coupon); err == nil {
+				if err = json.Unmarshal(bts, &view); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+			return c.JSON(view)
+		} else {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Unsupported Content-Type"})
+		}
+	}
+	return c.JSON(view)
+}
+
+type CouponsListResponse struct {
+	Data []CouponListItem
+	Filtered int64
+	Total int64
+}
+
+type CouponListItem struct {
+	ID uint
+	Enabled bool
+	Title string
+	Code string
+	Description string
+	Type string
+	Amount string
+	Minimum float64
+	ApplyTo string
+	Discounts int
+}
+
+// @security BasicAuth
+// SearchCoupons godoc
+// @Summary Search coupons
+// @Accept json
+// @Produce json
+// @Param request body ListRequest true "body"
+// @Success 200 {object} CouponsListResponse
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/coupons/list [post]
+// @Tags coupon
+func postCouponsListHandler(c *fiber.Ctx) error {
+	var response CouponsListResponse
+	var request ListRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	if len(request.Sort) == 0 {
+		request.Sort["ID"] = "desc"
+	}
+	if request.Length == 0 {
+		request.Length = 10
+	}
+	// Filter
+	var keys1 []string
+	var values1 []interface{}
+	if len(request.Filter) > 0 {
+		for key, value := range request.Filter {
+			if key != "" && len(strings.TrimSpace(value)) > 0 {
+				switch key {
+				default:
+					keys1 = append(keys1, fmt.Sprintf("coupons.%v like ?", key))
+					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
+				}
+			}
+		}
+	}
+	// Sort
+	var order string
+	if len(request.Sort) > 0 {
+		var orders []string
+		for key, value := range request.Sort {
+			if key != "" && value != "" {
+				switch key {
+				default:
+					orders = append(orders, fmt.Sprintf("coupons.%v %v", key, value))
+				}
+			}
+		}
+		order = strings.Join(orders, ", ")
+	}
+	//
+	rows, err := common.Database.Debug().Model(&models.Coupon{}).Select("coupons.ID, coupons.Enabled, coupons.Title, coupons.Code, coupons.Type, coupons.Amount, coupons.Minimum, coupons.Apply_To as ApplyTo, coupons.Description, count(`discounts`.ID) as Discounts").Joins("left join `discounts` on `discounts`.coupon_id = coupons.id").Group("coupons.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	if err == nil {
+		if err == nil {
+			for rows.Next() {
+				var item CouponListItem
+				if err = common.Database.ScanRows(rows, &item); err == nil {
+					response.Data = append(response.Data, item)
+				} else {
+					logger.Errorf("%v", err)
+				}
+			}
+		}else{
+			logger.Errorf("%v", err)
+		}
+		rows.Close()
+	}
+	rows, err = common.Database.Debug().Model(&models.Coupon{}).Select("coupons.ID, coupons.Enabled, coupons.Title, coupons.Code, coupons.Type, coupons.Amount, coupons.Minimum, coupons.Apply_To as ApplyTo, coupons.Description, count(`discounts`.ID) as Discounts").Joins("left join `discounts` on `discounts`.coupon_id = coupons.id").Group("coupons.id").Where(strings.Join(keys1, " and "), values1...).Rows()
+	if err == nil {
+		for rows.Next() {
+			response.Filtered ++
+		}
+		rows.Close()
+	}
+	if len(keys1) > 0 {
+		common.Database.Debug().Model(&models.Coupon{}).Count(&response.Total)
+	}else{
+		response.Total = response.Filtered
+	}
+	c.Status(http.StatusOK)
+	return c.JSON(response)
+}
+
+type CouponView struct {
+	ID uint
+	Enabled bool
+	Title string `json:",omitempty"`
+	Code string `json:",omitempty"`
+	Description string `json:",omitempty"`
+	Type string
+	Start time.Time
+	End time.Time
+	Amount string
+	Minimum float64
+	Count int `json:",omitempty"`
+	Limit int `json:",omitempty"`
+	Cumulative bool `json:",omitempty"`
+	Shipping bool `json:",omitempty"`
+	ApplyTo string `json:",omitempty"`
+	Categories []CategoryView `json:",omitempty"`
+	Products []ProductShortView `json:",omitempty"`
+}
+
+type DiscountsView []DiscountView
+
+type DiscountView struct {
+	ID uint
+	/*Title string `json:",omitempty"`
+	Description string `json:",omitempty"`
+	Thumbnail string `json:",omitempty"`
+	Value string `json:",omitempty"`
+	Availability string `json:",omitempty"`
+	Sending string `json:",omitempty"`*/
+}
+
+// @security BasicAuth
+// GetCoupon godoc
+// @Summary Get coupon
+// @Accept json
+// @Produce json
+// @Param id path int true "Coupon ID"
+// @Success 200 {object} CouponView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/coupons/{id} [get]
+// @Tags option
+func getCouponHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	if coupon, err := models.GetCoupon(common.Database, id); err == nil {
+		var view CouponView
+		if bts, err := json.MarshalIndent(coupon, "", "   "); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+type CouponRequest struct {
+	CouponView
+	Categories string
+	Products string
+}
+
+// @security BasicAuth
+// UpdateCoupon godoc
+// @Summary update coupon
+// @Accept json
+// @Produce json
+// @Param option body CouponShortView true "body"
+// @Param id path int true "Coupon ID"
+// @Success 200 {object} CouponShortView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/coupons/{id} [put]
+// @Tags coupon
+func putCouponHandler(c *fiber.Ctx) error {
+	var request CouponRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
+	}
+	var coupon *models.Coupon
+	var err error
+	if coupon, err = models.GetCoupon(common.Database, int(id)); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	coupon.Enabled = request.Enabled
+	request.Title = strings.TrimSpace(request.Title)
+	if request.Title == "" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "Title is not defined"})
+	}
+	if len(request.Description) > 256 {
+		request.Description = request.Description[0:255]
+	}
+	coupon.Title = request.Title
+	coupon.Description = request.Description
+	coupon.Start = request.Start
+	coupon.End = request.End
+	coupon.Type = request.Type
+	coupon.Amount = request.Amount
+	coupon.Minimum = request.Minimum
+	coupon.Limit = request.Limit
+	coupon.Count = request.Count
+	coupon.Cumulative = request.Cumulative
+	coupon.Shipping = request.Shipping
+	coupon.ApplyTo = request.ApplyTo
+	for _, v := range strings.Split(request.Categories, ",") {
+		if id, err := strconv.Atoi(v); err == nil {
+			if category, err := models.GetCategory(common.Database, id); err == nil {
+				if err = models.AddCategoryToCoupon(common.Database, coupon, category); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+		}
+	}
+	for _, v := range strings.Split(request.Products, ",") {
+		if id, err := strconv.Atoi(v); err == nil {
+			if product, err := models.GetProduct(common.Database, id); err == nil {
+				if err = models.AddProductToCoupon(common.Database, coupon, product); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+		}
+	}
+	if err := models.UpdateCoupon(common.Database, coupon); err == nil {
+		var view CouponView
+		if bts, err := json.MarshalIndent(coupon, "", "   "); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+// @security BasicAuth
+// DelCoupon godoc
+// @Summary Delete coupon
+// @Accept json
+// @Produce json
+// @Param id path int true "Coupon ID"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/coupons/{id} [delete]
+// @Tags coupon
+func delCouponHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	if coupon, err := models.GetCoupon(common.Database, id); err == nil {
+		for _, discount := range coupon.Discounts {
+			if err = models.DeleteDiscount(common.Database, discount); err != nil {
+				logger.Errorf("%v", err)
+			}
+		}
+		if err = models.DeleteCoupon(common.Database, coupon); err == nil {
+			return c.JSON(HTTPMessage{MESSAGE: "OK"})
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
 
 type OrdersListResponse struct {
 	Data []OrdersListItem
@@ -7121,26 +7568,29 @@ func getMeHandler(c *fiber.Ctx) error {
 	return c.JSON(HTTPError{"Something went wrong"})
 }
 
-// Calculate
+// Delivery
+type DeliveryRequest struct {
+	Items []NewItem
+	Country string
+	Zip string
+}
 
 // @security BasicAuth
-// PostCalculate godoc
+// PostDelivery godoc
+// @Description my description
 // @Summary Calculate shipping cost
 // @Accept json
 // @Produce json
-// @Success 200 {object} TariffsView
+// @Param request body DeliveryRequest true "body"
+// @Success 200 {object} DeliveriesCosts
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
-// @Router /api/v1/calculate [post]
+// @Router /api/v1/delivery [post]
 // @Tags frontend
-func postCalculateHandler(c *fiber.Ctx) error {
+func postDeliveryHandler(c *fiber.Ctx) error {
 	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
 		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
-			var request struct {
-				Items []NewItem
-				Country string
-				Zip string
-			}
+			var request DeliveryRequest
 			if err := c.BodyParser(&request); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
@@ -7158,7 +7608,7 @@ func postCalculateHandler(c *fiber.Ctx) error {
 						}
 						// 3 Get Tariff by Transport and Zone
 						tariff, _ := models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
-						if cost, err := Calculate(transport, tariff, request.Items); err == nil {
+						if cost, err := Delivery(transport, tariff, request.Items); err == nil {
 							costs = append(costs, cost)
 						}
 					}
@@ -7182,10 +7632,62 @@ func postCalculateHandler(c *fiber.Ctx) error {
 }
 
 
-// Tariffs
-type TariffsView []TariffView
+// Discount
+type DiscountRequest struct {
+	Items []NewItem
+	Coupons []string
+	Country string
+	Zip string
+	TransportId int
+}
 
-type TariffView struct{
+type Discounts2View []*DiscountCost
+
+// @security BasicAuth
+// PostDiscount godoc
+// @Summary Calculate discount cost
+// @Accept json
+// @Produce json
+// @Param request body DiscountRequest true "body"
+// @Success 200 {object} Discounts2View
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/discount [post]
+// @Tags frontend
+/*func postDiscountHandler(c *fiber.Ctx) error {
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
+			var request DiscountRequest
+			if err := c.BodyParser(&request); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			// 1 Get delivery cost
+			// 2 Coupons
+			var coupons []*models.Coupon
+			for _, code := range request.Coupons {
+				if coupon, err := models.GetCouponByCode(common.Database, code); err == nil {
+					coupons = append(coupons, coupon)
+				}else{
+					logger.Warningf("%+v", err)
+				}
+			}
+			Discount(coupons, request.Items)
+			//
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Unsupported Content-Type"})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{"Content-Type not set"})
+	}
+}*/
+
+// Tariffs
+type DeliveriesView []DeliveryView
+
+type DeliveryView struct{
 	ID          uint
 	TransportId uint
 	ZoneId      uint
@@ -7200,7 +7702,7 @@ type TariffView struct{
 // @Summary Get tariffs
 // @Accept json
 // @Produce json
-// @Success 200 {object} TariffsView
+// @Success 200 {object} DeliveriesView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/tariffs [get]
@@ -7217,7 +7719,7 @@ func getTariffsHandler(c *fiber.Ctx) error {
 		return c.JSON(HTTPError{"zoneId required"})
 	}
 	if tariffs, err := models.GetTariffsByZoneId(common.Database, zoneId); err == nil {
-		var view TariffsView
+		var view []DeliveryView
 		if bts, err := json.Marshal(tariffs); err == nil {
 			if err = json.Unmarshal(bts, &view); err == nil {
 				return c.JSON(view)
@@ -8872,7 +9374,7 @@ func postPrepareHandler(c *fiber.Ctx) error {
 // @Success 200 {object} CommandView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
-// @Router /api/v/render [post]
+// @Router /api/v1/render [post]
 func postRenderHandler(c *fiber.Ctx) error {
 	var view CommandView
 	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
@@ -9047,6 +9549,151 @@ func getAccountHandler(c *fiber.Ctx) error {
 	return c.JSON(HTTPError{"Something went wrong"})
 }
 
+type NewAccount struct {
+	Email string
+	CSRF string
+}
+
+type Account2View struct {
+	AccountView
+	Token string `json:",omitempty"`
+	Expiration *time.Time `json:",omitempty"`
+}
+
+// CreateAccout godoc
+// @Summary Create account
+// @Accept json
+// @Produce json
+// @Param profile body NewAccount true "body"
+// @Success 200 {object} Account2View
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account [post]
+// @Tags account
+// @Tags frontend
+func postAccountHandler(c *fiber.Ctx) error {
+	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(c.Request().Header.Header())))
+	if err != nil {
+		logger.Errorf("%+v", err)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	//
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		var email string
+		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
+			var request NewAccount
+			if err := c.BodyParser(&request); err != nil {
+				return err
+			}
+			email = strings.TrimSpace(request.Email)
+			if email == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Email is empty"})
+			}
+		} else if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
+			data, err := c.Request().MultipartForm()
+			if err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			for key, values := range data.Value {
+				if strings.ToLower(key) == "email" {
+					email = strings.TrimSpace(values[0])
+				}
+			}
+			if email == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Email is empty"})
+			}
+		}else {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Unsupported Content-Type"})
+		}
+		//
+		if _, err := models.GetUserByEmail(common.Database, email); err == nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Account already exists"})
+		}
+		//
+		var login string
+		if res := regexp.MustCompile(`^([^@]+)@`).FindAllStringSubmatch(email, 1); len(res) > 0 && len(res[0]) > 1 {
+			login = fmt.Sprintf("%v-%d", res[0][1], rand.New(rand.NewSource(time.Now().UnixNano())).Intn(8999) + 1000)
+		}
+		password := NewPassword(12)
+		logger.Infof("Create new user %v %v by email %v", login, password, email)
+		user := &models.User{
+			Enabled: true,
+			Email: email,
+			EmailConfirmed: true,
+			Login: login,
+			Password: models.MakeUserPassword(password),
+			Role: models.ROLE_USER,
+			Notification: true,
+		}
+		id, err := models.CreateUser(common.Database, user)
+		if err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+		user.ID = id
+		var view AccountView
+		if bts, err := json.Marshal(user); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				view.Admin = user.Role < models.ROLE_USER
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+		//
+		if v := req.Header.Get("Accept"); strings.EqualFold(v, "application/jwt") {
+			expiration := time.Now().AddDate(1, 0, 0)
+			claims := &JWTClaims{
+				Login: user.Login,
+				Password: user.Password,
+				StandardClaims: jwt.StandardClaims{
+					ExpiresAt: expiration.Unix(),
+				},
+			}
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+			if str, err := token.SignedString(JWTSecret); err == nil {
+				c.Status(http.StatusOK)
+				return c.JSON(Account2View{
+					AccountView: view,
+					Token: str,
+					Expiration: &expiration,
+				})
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			credentials := map[string]string{
+				"email": email,
+				"login": login,
+				"password": password,
+			}
+			if encoded, err := cookieHandler.Encode(COOKIE_NAME, credentials); err == nil {
+				cookie := &fiber.Cookie{
+					Name:  COOKIE_NAME,
+					Value: encoded,
+					Path:  "/",
+					Expires: time.Now().AddDate(1, 0, 0),
+					SameSite: authMultipleConfig.SameSite,
+				}
+				c.Cookie(cookie)
+			}
+			c.Status(http.StatusOK)
+			return c.JSON(view)
+		}
+	}else{
+		return c.JSON(HTTPError{"Unsupported Content-Type"})
+	}
+}
+
 type User2View struct {
 	OldPassword string
 	NewPassword string
@@ -9110,6 +9757,42 @@ func putAccountHandler(c *fiber.Ctx) error {
 	return c.JSON(HTTPError{"Something went wrong"})
 }
 
+// @security BasicAuth
+// @Summary Get account profiles
+// @Description get account profiles
+// @Accept json
+// @Produce json
+// @Success 200 {object} []ProfileView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/profiles [get]
+// @Tags account
+// @Tags frontend
+func getAccountProfilesHandler(c *fiber.Ctx) error {
+	if v := c.Locals("user"); v != nil {
+		if user, ok := v.(*models.User); ok {
+			if profiles, err := models.GetProfilesByUser(common.Database, user.ID); err == nil {
+				var views []ProfileView
+				if bts, err := json.Marshal(profiles); err == nil {
+					if err = json.Unmarshal(bts, &views); err == nil {
+						return c.JSON(views)
+					}else{
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}
+	}
+	return c.JSON(HTTPError{"Something went wrong"})
+}
+
 type NewProfile struct {
 	Email string
 	Name string
@@ -9133,6 +9816,7 @@ type NewProfile struct {
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/account/profiles [post]
 // @Tags profile
+// @Tags frontend
 func postAccountProfileHandler(c *fiber.Ctx) error {
 	var view ProfileView
 	//
@@ -9247,9 +9931,8 @@ type ItemProperty struct {
 	PriceId int
 }
 
-// @security BasicAuth
-// CreateProfile godoc
-// @Summary Create profile without having account
+// (DEPRECATED) CreateProfile godoc
+// @Summary (DEPRECATED) Create profile without having account
 // @Accept json
 // @Produce json
 // @Param profile body NewProfile true "body"
@@ -9390,6 +10073,12 @@ func postProfileHandler(c *fiber.Ctx) error {
 	return c.JSON(view)
 }
 
+func getTestHandler(c *fiber.Ctx) error {
+	logger.Infof("getTestHandler")
+	time.Sleep(3 * time.Second)
+	return return1(c, http.StatusOK, map[string]interface{}{"MESSAGE": "OK", "Status": "paid"})
+}
+
 type FilterRequest ListRequest
 
 type ProductsFilterResponse struct {
@@ -9416,7 +10105,7 @@ type ProductsFilterItem struct {
 // @Summary Filter products
 // @Accept json
 // @Produce json
-// @Param relPath query int true "Category RelPath"
+// @Param relPath query string true "Category RelPath"
 // @Param category body FilterRequest true "body"
 // @Success 200 {object} ProductsFilterResponse
 // @Failure 404 {object} HTTPError
@@ -9622,12 +10311,44 @@ func getAccountOrdersHandler(c *fiber.Ctx) error {
 	}
 }
 
+type CheckoutRequest struct {
+	Items []NewItem
+	Comment string
+	ProfileId uint
+	TransportId uint
+	Coupons []string
+}
+
+// GetOrders godoc
+// @Summary Get checkout information
+// @Accept json
+// @Produce json
+// @Param category body CheckoutRequest true "body"
+// @Success 200 {object} OrdersView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/checkout [post]
+// @Tags frontend
+func postCheckoutHandler(c *fiber.Ctx) error {
+	var request CheckoutRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	_, view, err := Checkout(request)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	return c.JSON(view)
+}
+
 type NewOrder struct {
 	Created time.Time
 	Items []NewItem
 	Comment string
 	ProfileId uint
 	TransportId uint
+	Coupons []string
 }
 
 type NewItem struct {
@@ -9642,7 +10363,9 @@ type OrderShortView struct{
 	Items []ItemShortView `json:",omitempty"`
 	Quantity int
 	Sum float64
+	Discount float64
 	Delivery float64
+	Discount2 float64
 	Total float64
 	Volume float64
 	Weight float64
@@ -9657,6 +10380,7 @@ type ItemShortView struct {
 	Variation VariationShortView	`json:",omitempty"`
 	Properties []PropertyShortView `json:",omitempty"`
 	Price float64                  `json:",omitempty"`
+	Discount float64                  `json:",omitempty"`
 	Quantity int                   `json:",omitempty"`
 	Total      float64             `json:",omitempty"`
 	Volume float64 `json:",omitempty"`
@@ -9679,7 +10403,7 @@ type PropertyShortView struct {
 // @Summary Post account order
 // @Accept json
 // @Produce json
-// @Param cart body NewOrder true "body"
+// @Param cart body CheckoutRequest true "body"
 // @Success 200 {object} OrderView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
@@ -9687,6 +10411,39 @@ type PropertyShortView struct {
 // @Tags account
 // @Tags frontend
 func postAccountOrdersHandler(c *fiber.Ctx) error {
+	var request CheckoutRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	order, _, err := Checkout(request)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	if v := c.Locals("user"); v != nil {
+		if user, ok := v.(*models.User); ok {
+			order.UserId = user.ID
+		}
+	}
+	if _, err := models.CreateOrder(common.Database, order); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	return c.JSON(order)
+}
+
+// CreateOrder godoc
+// @Summary Post account order
+// @Accept json
+// @Produce json
+// @Param cart body NewOrder true "body"
+// @Success 200 {object} OrderView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/orders2 [post]
+// @Tags account
+// @Tags frontend
+/*func postAccountOrdersHandler2(c *fiber.Ctx) error {
 	var request NewOrder
 	if err := c.BodyParser(&request); err != nil {
 		return err
@@ -9722,7 +10479,7 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 		}
 		// 3 Get Tariff by Transport and Zone
 		tariff, _ := models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
-		if cost, err := Calculate(transport, tariff, request.Items); err == nil {
+		if cost, err := Delivery(transport, tariff, request.Items); err == nil {
 			order.Delivery = cost.Value
 		}else{
 			c.Status(http.StatusInternalServerError)
@@ -9730,20 +10487,20 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 		}
 	}
 	// //
-	/*if v := c.Locals("user"); v != nil {
-		if user, ok := v.(*models.User); ok {
-			order.User = user
-			//
-			if orders, err := models.GetOrdersByUserId(common.Database, user.ID); err == nil {
-				for _, order := range orders {
-					if order.Status == models.ORDER_STATUS_NEW || order.Status == models.ORDER_STATUS_WAITING_FROM_PAYMENT {
-						c.Status(http.StatusInternalServerError)
-						return c.JSON(HTTPError{"Some orders wait for your payment, please finish it before continuing"})
-					}
-				}
-			}
-		}
-	}*/
+	//if v := c.Locals("user"); v != nil {
+	//	if user, ok := v.(*models.User); ok {
+	//		order.User = user
+	//		//
+	//		if orders, err := models.GetOrdersByUserId(common.Database, user.ID); err == nil {
+	//			for _, order := range orders {
+	//				if order.Status == models.ORDER_STATUS_NEW || order.Status == models.ORDER_STATUS_WAITING_FROM_PAYMENT {
+	//					c.Status(http.StatusInternalServerError)
+	//					return c.JSON(HTTPError{"Some orders wait for your payment, please finish it before continuing"})
+	//				}
+	//			}
+	//		}
+	//	}
+	//}
 	var orderShortView OrderShortView
 	for _, item := range request.Items {
 		var arr []int
@@ -9885,6 +10642,394 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 		return c.JSON(HTTPError{err.Error()})
 	}
 	return c.JSON(order)
+}*/
+
+func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
+	order := &models.Order{Status: models.ORDER_STATUS_NEW}
+	now := time.Now()
+	// Delivery
+	var orderFixed, orderPercent, itemFixed, itemPercent, kg, m3 float64
+	var orderIsPercent, itemIsPercent bool
+	if request.ProfileId > 0 {
+		order.ProfileId = request.ProfileId
+		profile, err := models.GetProfile(common.Database, request.ProfileId)
+		if err != nil {
+			return nil, nil, err
+		}
+		// Transport is set
+		if request.TransportId > 0 {
+			order.TransportId = request.TransportId
+			// 1 Get selected transport company
+			transport, err := models.GetTransport(common.Database, int(request.TransportId))
+			if err != nil {
+				return nil, nil, err
+			}
+			// 2 Get Zone by Country and Zip
+			var zoneId uint
+			zone, err := models.GetZoneByCountryAndZIP(common.Database, profile.Country, profile.Zip)
+			if err == nil {
+				zoneId = zone.ID
+			}
+			// 3 Get Tariff by Transport and Zone
+			tariff, _ := models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
+			//
+			if tariff == nil {
+				if res := rePercent.FindAllStringSubmatch(transport.Order, 1); len(res) > 0 && len(res[0]) > 1 {
+					if v, err := strconv.ParseFloat(res[0][1], 10); err == nil {
+						orderPercent = v
+						orderIsPercent = true
+					}
+				}else{
+					if v, err := strconv.ParseFloat(transport.Order, 10); err == nil {
+						orderFixed = v
+					}
+				}
+			}else{
+				if res := rePercent.FindAllStringSubmatch(tariff.Order, 1); len(res) > 0 && len(res[0]) > 1 {
+					if v, err := strconv.ParseFloat(res[0][1], 10); err == nil {
+						orderPercent = v
+						orderIsPercent = true
+					}
+				}else{
+					if v, err := strconv.ParseFloat(tariff.Order, 10); err == nil {
+						orderFixed = v
+					}
+				}
+			}
+
+			// Item
+			if tariff == nil {
+				if res := rePercent.FindAllStringSubmatch(transport.Item, 1); len(res) > 0 && len(res[0]) > 1 {
+					if v, err := strconv.ParseFloat(res[0][1], 10); err == nil {
+						itemPercent = v
+						itemIsPercent = true
+					}
+				}else{
+					if v, err := strconv.ParseFloat(transport.Item, 10); err == nil {
+						itemFixed = v
+					}
+				}
+			}else{
+				if res := rePercent.FindAllStringSubmatch(tariff.Item, 1); len(res) > 0 && len(res[0]) > 1 {
+					if v, err := strconv.ParseFloat(res[0][1], 10); err == nil {
+						orderPercent = v
+						itemIsPercent = true
+					}
+				}else{
+					if v, err := strconv.ParseFloat(tariff.Item, 10); err == nil {
+						orderFixed = v
+					}
+				}
+			}
+			// Kg
+			if tariff == nil {
+				kg = transport.Kg
+			}else{
+				kg = tariff.Kg
+			}
+			// M3
+			if tariff == nil {
+				m3 = transport.M3
+			}else{
+				m3 = tariff.M3
+			}
+		}
+	}
+	// Coupons
+	var coupons []*models.Coupon
+	for _, code := range request.Coupons {
+		allowed := true
+		for _, coupon := range coupons {
+			if !coupon.Cumulative || coupon.Code == code {
+				allowed = false
+				break
+			}
+		}
+		if allowed {
+			if coupon, err := models.GetCouponByCode(common.Database, code); err == nil {
+				coupons = append(coupons, coupon)
+			}
+		}
+	}
+	//
+	//var view OrderShortView
+	var itemsShortView []ItemShortView
+	for _, rItem := range request.Items {
+		var arr []int
+		if err := json.Unmarshal([]byte(rItem.UUID), &arr); err == nil && len(arr) >= 2{
+			//
+			productId := arr[0]
+			var product *models.Product
+			if product, err = models.GetProduct(common.Database, productId); err != nil {
+				return nil, nil, err
+			}
+			variationId := arr[1]
+			var variation *models.Variation
+			if variation, err = models.GetVariation(common.Database, variationId); err != nil {
+				return nil, nil, err
+			}
+			if product.ID != variation.ProductId {
+				err = fmt.Errorf("Products and Variation mismatch")
+				return nil, nil, err
+			}
+
+			categoryId := rItem.CategoryId
+
+			item := &models.Item{
+				Uuid:     rItem.UUID,
+				CategoryId: rItem.CategoryId,
+				Title:    product.Title,
+				Price:    variation.BasePrice,
+				Quantity: rItem.Quantity,
+			}
+			if res := reVolume.FindAllStringSubmatch(variation.Dimensions, 1); len(res) > 0 && len(res[0]) > 1 {
+				var width float64
+				if v, err := strconv.ParseFloat(res[0][1], 10); err == nil {
+					width = v
+				}
+				var height float64
+				if v, err := strconv.ParseFloat(res[0][2], 10); err == nil {
+					height = v
+				}
+				var depth float64
+				if v, err := strconv.ParseFloat(res[0][3], 10); err == nil {
+					depth = v
+				}
+				item.Volume = width * height * depth / 1000000.0
+			}
+			item.Weight = variation.Weight
+			//
+			if breadcrumbs := models.GetBreadcrumbs(common.Database, categoryId); len(breadcrumbs) > 0 {
+				var chunks []string
+				for _, crumb := range breadcrumbs {
+					chunks = append(chunks, crumb.Name)
+				}
+				item.Path = "/" + path.Join(append(chunks, product.Name)...)
+			}
+
+			if cache, err := models.GetCacheProductByProductId(common.Database, product.ID); err == nil {
+				item.Thumbnail = cache.Thumbnail
+			}else{
+				logger.Warningf("%v", err.Error())
+			}
+
+			if cache, err := models.GetCacheVariationByVariationId(common.Database, variation.ID); err == nil {
+				if item.Thumbnail == "" {
+					item.Thumbnail = cache.Thumbnail
+				}
+			} else {
+				logger.Warningf("%v", err.Error())
+			}
+
+			var propertiesShortView []PropertyShortView
+			if len(arr) > 2 {
+				//
+				for _, id := range arr[2:] {
+					if price, err := models.GetPrice(common.Database, id); err == nil {
+						propertyShortView := PropertyShortView{}
+						propertyShortView.Title = price.Property.Title
+						//
+						if cache, err := models.GetCacheValueByValueId(common.Database, price.Value.ID); err == nil {
+							propertyShortView.Thumbnail = cache.Thumbnail
+						}
+						//
+						propertyShortView.Value = price.Value.Value
+						if price.Price > 0 {
+							propertyShortView.Price = price.Price
+						}
+						item.Price += price.Price
+						propertiesShortView = append(propertiesShortView, propertyShortView)
+					} else {
+						return nil, nil, err
+					}
+				}
+			}
+			// Delivery: fixed
+			var fixed float64
+			if itemIsPercent {
+				fixed = (item.Price * itemPercent / 100.0) * float64(item.Quantity)
+			}else{
+				fixed = itemFixed * float64(item.Quantity)
+			}
+			// Delivery: dynamic
+			d1 := fixed + item.Volume * m3 * float64(item.Quantity)
+			d2 := fixed + item.Weight * kg * float64(item.Quantity)
+			if d1 > d2 {
+				item.Delivery = d1
+			} else {
+				item.Delivery = d2
+			}
+			// Coupons
+			for _, coupon := range coupons {
+				if coupon.Enabled && coupon.Start.Before(now) && coupon.End.After(now) {
+					allowed := coupon.Type == "item"
+					if allowed {
+						if coupon.ApplyTo == "all" {
+							allowed = true
+						} else if coupon.ApplyTo == "categories" {
+							allowed = false
+							for _, category := range coupon.Categories{
+								if category.ID == item.CategoryId {
+									allowed = true
+									break
+								}
+							}
+						} else if coupon.ApplyTo == "products" {
+							allowed = false
+							for _, product := range coupon.Products{
+								if int(product.ID) == productId {
+									allowed = true
+									break
+								}
+							}
+						} else {
+							allowed = false
+						}
+					}
+					if allowed {
+						if res := rePercent.FindAllStringSubmatch(coupon.Amount, 1); len(res) > 0 && len(res[0]) > 1 {
+							// percent
+							if p, err := strconv.ParseFloat(res[0][1], 10); err == nil {
+								item.Discount = item.Price * p / 100.0
+							}
+						}else{
+							if n, err := strconv.ParseFloat(coupon.Amount, 10); err == nil {
+								item.Discount = n
+							}
+						}
+						if item.Discount > item.Price {
+							item.Discount = item.Price
+						}
+						item.Discount = math.Round(item.Discount * 100) / 100
+					}
+				}
+			}
+			// /Coupons
+			item.Total = (item.Price - item.Discount) * float64(item.Quantity)
+			// [Item Description]
+			var itemShortView ItemShortView
+			if bts, err := json.Marshal(item); err == nil {
+				if err = json.Unmarshal(bts, &itemShortView); err != nil {
+					logger.Warningf("%v", err.Error())
+				}
+			}else{
+				logger.Warningf("%v", err.Error())
+			}
+			itemShortView.Variation = VariationShortView{
+				Title: variation.Title,
+			}
+			itemShortView.Properties = propertiesShortView
+			if bts, err := json.Marshal(itemShortView); err == nil {
+				item.Description = string(bts)
+			}
+			// [/Item Description]
+			itemsShortView = append(itemsShortView, itemShortView)
+
+			order.Items = append(order.Items, item)
+			order.Quantity += item.Quantity
+			order.Volume += item.Volume
+			order.Weight += item.Weight
+			order.Sum += item.Total
+			//
+			//itemShortView.Path = item.Path
+			//itemShortView.Thumbnail = item.Thumbnail
+			//itemShortView.Price = item.Price
+			//itemShortView.Discount = item.Discount
+			//itemShortView.Quantity = item.Quantity
+			//itemShortView.Total = item.Total
+			////
+			//view.Quantity += itemShortView.Quantity
+			//view.Items = append(view.Items, itemShortView)
+			//
+			//view.Volume += itemShortView.Volume * float64(itemShortView.Quantity)
+			//view.Weight += itemShortView.Weight * float64(itemShortView.Quantity)
+		}
+	}
+	//
+	//order.Volume = view.Volume
+	//order.Weight = view.Weight
+	// Delivery: fixed
+	var fixed float64
+	if orderIsPercent {
+		fixed = order.Sum * orderPercent / 100.0
+	}else{
+		fixed = orderFixed
+	}
+	// Delivery: dynamic
+	d1 := fixed + order.Volume * m3
+	d2 := fixed + order.Weight * kg
+	if d1 > d2 {
+		order.Delivery = d1
+	} else {
+		order.Delivery = d2
+	}
+	//
+	// Coupons
+	for _, coupon := range coupons {
+		if coupon.Enabled && coupon.Start.Before(now) && coupon.End.After(now) {
+			if coupon.Type == "order" {
+				if res := rePercent.FindAllStringSubmatch(coupon.Amount, 1); len(res) > 0 && len(res[0]) > 1 {
+					// percent
+					if p, err := strconv.ParseFloat(res[0][1], 10); err == nil {
+						order.Discount = order.Sum * p / 100.0
+					}
+				} else {
+					if n, err := strconv.ParseFloat(coupon.Amount, 10); err == nil {
+						order.Discount = n
+					}
+				}
+				if order.Discount > order.Sum {
+					order.Discount = order.Sum
+				}
+				order.Discount = math.Round(order.Discount * 100) / 100
+			}else if coupon.Type == "shipment" {
+				allowed := true
+				if coupon.ApplyTo == "all" {
+					allowed = true
+				} else if coupon.ApplyTo == "categories" {
+					// TODO: Categories filter
+				} else if coupon.ApplyTo == "products" {
+					// TODO: Categories products
+				} else {
+					allowed = false
+				}
+				if allowed {
+					if res := rePercent.FindAllStringSubmatch(coupon.Amount, 1); len(res) > 0 && len(res[0]) > 1 {
+						// percent
+						if p, err := strconv.ParseFloat(res[0][1], 10); err == nil {
+							order.Discount2 = order.Delivery * p / 100.0
+						}
+					} else {
+						if n, err := strconv.ParseFloat(coupon.Amount, 10); err == nil {
+							order.Discount2 = n
+						}
+					}
+					if order.Discount2 > order.Delivery {
+						order.Discount2 = order.Delivery
+					}
+					order.Discount2 = math.Round(order.Discount2 * 100) / 100
+				}
+			}
+		}
+	}
+	//
+	order.Total = (order.Sum - order.Discount) + (order.Delivery - order.Discount2)
+	// [Order Description]
+	var view *OrderShortView
+	if bts, err := json.Marshal(order); err == nil {
+		if err = json.Unmarshal(bts, &view); err == nil {
+			view.Items = itemsShortView
+		} else {
+			logger.Warningf("%v", err.Error())
+		}
+	}else{
+		logger.Warningf("%v", err.Error())
+	}
+	if bts, err := json.Marshal(view); err == nil {
+		order.Description = string(bts)
+	}
+	// [/Order Description]
+	return order, view, nil
 }
 
 // GetOrder godoc
@@ -10819,6 +11964,11 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 				u.RawQuery = ""
 				base = u.String()
 				u.Path = fmt.Sprintf("/api/v1/account/orders/%v/mollie/success", order.ID)
+				values := url.Values{}
+				if v := c.Query("method", ""); v != "" {
+					values.Set("method", v)
+					u.RawQuery = values.Encode()
+				}
 				redirectUrl = u.String()
 			}
 		}
@@ -10830,10 +11980,11 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 		if err := c.BodyParser(&request); err != nil {
 			return err
 		}
-
+		//
 		o := &mollie.Order{
 			OrderNumber: fmt.Sprintf("%d", order.ID),
 		}
+		//
 		// Lines
 		var orderShortView OrderShortView
 		if err := json.Unmarshal([]byte(order.Description), &orderShortView); err == nil {
@@ -10849,12 +12000,22 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 					ProductUrl:     base + item.Path,
 					Metadata:       meta,
 					Quantity:       item.Quantity,
-					VatRate:        fmt.Sprintf("%.2f", common.Config.Payment.VAT),
 					UnitPrice:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Price),
-					TotalAmount:    mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Total),
-					DiscountAmount: mollie.NewAmount(strings.ToUpper(common.Config.Currency), 0),
-					VatAmount:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Total * (common.Config.Payment.VAT / 100.0) / ((100.0 + common.Config.Payment.VAT) / 100.0)),
+					VatRate:        fmt.Sprintf("%.2f", common.Config.Payment.VAT),
 				}
+				total := item.Total
+				if item.Discount > 0 {
+					total = item.Total
+					line.DiscountAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Discount * float64(item.Quantity))
+				}else if order.Discount > 0 {
+					discount := 1 - (order.Discount / order.Sum)
+					total = (item.Price * discount) * float64(item.Quantity)
+					line.DiscountAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Price * (1 - discount) * float64(item.Quantity))
+				}else{
+					line.DiscountAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), 0)
+				}
+				line.TotalAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), total)
+				line.VatAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), total * (common.Config.Payment.VAT / 100.0) / ((100.0 + common.Config.Payment.VAT) / 100.0))
 				if item.Thumbnail != "" {
 					line.ImageUrl = base + strings.Split(item.Thumbnail, ",")[0]
 				}
@@ -10868,14 +12029,16 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 				Quantity:       1,
 				VatRate:        fmt.Sprintf("%.2f", common.Config.Payment.VAT),
 				UnitPrice:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), order.Delivery),
-				TotalAmount:    mollie.NewAmount(strings.ToUpper(common.Config.Currency), order.Delivery),
-				DiscountAmount: mollie.NewAmount(strings.ToUpper(common.Config.Currency), 0),
-				VatAmount:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), order.Delivery * (common.Config.Payment.VAT / 100.0) / ((100.0 + common.Config.Payment.VAT) / 100.0)),
+				TotalAmount:    mollie.NewAmount(strings.ToUpper(common.Config.Currency), order.Delivery - order.Discount2),
+				DiscountAmount: mollie.NewAmount(strings.ToUpper(common.Config.Currency), order.Discount2),
+				VatAmount:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), (order.Delivery - order.Discount2) * (common.Config.Payment.VAT / 100.0) / ((100.0 + common.Config.Payment.VAT) / 100.0)),
 			})
 		}
 		//
 		o.Amount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), order.Total)
 		o.RedirectUrl = redirectUrl
+		bts, _ := json.Marshal(o)
+		logger.Infof("Bts: %+v", string(bts))
 		// Address
 		address := mollie.Address{
 			Email: user.Email,
@@ -11019,35 +12182,52 @@ func getAccountOrderMollieSuccessHandler(c *fiber.Ctx) error {
 										}
 									}
 								}
-								c.Status(http.StatusOK)
-								return c.SendString("OK<script>window.close()</script>")
+								return return1(c, http.StatusOK, map[string]interface{}{"MESSAGE": "OK", "Status": o.Status})
+							}else{
+								return return1(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": "Unknown status: " + o.Status, "Status": o.Status})
 							}
 						}else{
 							logger.Errorf("%+v", err)
-							c.Status(http.StatusInternalServerError)
-							return c.SendString("<b>ERROR:</b> " + err.Error())
+							return return1(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": err.Error()})
 						}
 					}
 				}else{
 					logger.Errorf("%+v", err)
-					c.Status(http.StatusInternalServerError)
-					return c.SendString("<b>ERROR:</b> " + err.Error())
+					return return1(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": err.Error()})
 				}
 			}
 		}else{
 			logger.Errorf("%+v", err)
-			c.Status(http.StatusInternalServerError)
-			return c.SendString("<b>ERROR:</b> " + err.Error())
+			return return1(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": err.Error()})
 		}
 	}else{
 		logger.Errorf("%+v", err)
-		c.Status(http.StatusInternalServerError)
-		return c.SendString("<b>ERROR:</b> " + err.Error())
+		return return1(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": err.Error()})
 	}
 	err := fmt.Errorf("something wrong")
 	logger.Errorf("%+v", err)
-	c.Status(http.StatusInternalServerError)
-	return c.SendString("<b>ERROR:</b> " + err.Error())
+	return return1(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": err.Error()})
+}
+
+func return1(c *fiber.Ctx, status int, raw map[string]interface{}) error {
+	c.Set(fiber.HeaderContentType, fiber.MIMETextHTML)
+	switch c.Query("method", "") {
+	case "postMessage":
+		if bts, err := json.Marshal(raw); err == nil {
+			c.Status(status)
+			return c.SendString("<script>window.opener.postMessage(JSON.stringify(" + string(bts) + "),'*');</script>")
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.SendString("<b>ERROR:</b> " + err.Error())
+		}
+	default:
+		c.Status(status)
+		if status == http.StatusOK {
+			return c.SendString(fmt.Sprintf("%+v<script>window.close()</script>", raw["MESSAGE"]))
+		}else{
+			return c.SendString(fmt.Sprintf("<b>ERROR:</b> %+v", raw["ERROR"]))
+		}
+	}
 }
 
 /* *** */
@@ -11204,8 +12384,10 @@ func NewPassword(length int) string {
 }
 
 /**/
+type DeliveriesCosts []DeliveryCost
+
 type DeliveryCost struct {
-	ID uint
+	ID uint // transport ID
 	Title string
 	Thumbnail string
 	By string
@@ -11223,7 +12405,7 @@ type DeliveryCost struct {
 	Special bool // in case of ZIP match
 }
 
-func Calculate(transport *models.Transport, tariff *models.Tariff, items []NewItem) (*DeliveryCost, error) {
+func Delivery(transport *models.Transport, tariff *models.Tariff, items []NewItem) (*DeliveryCost, error) {
 	result := &DeliveryCost{
 		ID: transport.ID,
 		Title: transport.Title,
@@ -11231,7 +12413,6 @@ func Calculate(transport *models.Transport, tariff *models.Tariff, items []NewIt
 		Special: tariff != nil,
 	}
 	//
-	rePercent := regexp.MustCompile(`^(\d+(?:\.\d+)?)%$`)
 	// Order
 	var orderFixed, orderPercent float64
 	var orderIsPercent bool
@@ -11385,6 +12566,80 @@ func Calculate(transport *models.Transport, tariff *models.Tariff, items []NewIt
 	result.Cost = fmt.Sprintf("%.2f", result.Value)
 	return result, nil
 }
+
+type DiscountCost struct {
+	Coupons []struct{
+		ID uint // coupon id
+		Code string
+		Sum float64
+		Delivery float64
+	}
+	Sum float64 // affect to sum price
+	Delivery float64 // affect to delivery price
+}
+
+/*func Discount(coupons []*models.Coupon, items []NewItem) (*DiscountCost, error) {
+	// 1
+	for _, item := range items {
+		var arr []int
+		if err := json.Unmarshal([]byte(item.UUID), &arr); err == nil && len(arr) >= 2 {
+			productId := arr[0]
+			var product *models.Product
+			if product, err = models.GetProduct(common.Database, productId); err != nil {
+				return nil, err
+			}
+			//
+			variationId := arr[1]
+			var variation *models.Variation
+			if variation, err = models.GetVariation(common.Database, variationId); err != nil {
+				return nil, err
+			}
+			if product.ID != variation.ProductId {
+				err = fmt.Errorf("Products and Variation mismatch")
+				return nil, err
+			}
+			// Sum
+			sum := variation.BasePrice
+			for _, id := range arr[2:] {
+				if price, err := models.GetPrice(common.Database, id); err == nil {
+					sum += price.Price
+				}
+			}
+			result.Sum += sum
+			// Fee
+			var fee float64
+			if itemIsPercent {
+				fee += sum * itemPercent / 100.0
+			}else{
+				fee = itemFixed
+			}
+			// Volume
+			if res := reVolume.FindAllStringSubmatch(variation.Dimensions, 1); len(res) > 0 && len(res[0]) > 1 {
+				var width float64
+				if v, err := strconv.ParseFloat(res[0][1], 10); err == nil {
+					width = v
+				}
+				var height float64
+				if v, err := strconv.ParseFloat(res[0][2], 10); err == nil {
+					height = v
+				}
+				var depth float64
+				if v, err := strconv.ParseFloat(res[0][3], 10); err == nil {
+					depth = v
+				}
+				volume := width * height * depth / 1000000.0
+				result.Volume += volume
+				result.ByVolume += volume * m3 + fee
+			}
+			// Weight
+			weight := variation.Weight
+			result.Weight += variation.Weight
+			result.ByWeight += weight * kg + fee
+			// Calculate
+		}
+	}
+	return nil, nil
+}*/
 
 func SendOrderPaidEmail(to *mail.Email, orderId int, template *models.EmailTemplate) error {
 	vars := &common.NotificationTemplateVariables{ }

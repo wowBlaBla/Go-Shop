@@ -27,6 +27,15 @@ type ProfilePaymentStripe struct {
 	CustomerId string
 }
 
+func GetProfilesByUser(connector *gorm.DB, userId uint) ([]*Profile, error) {
+	db := connector
+	var profiles []*Profile
+	if err := db.Debug().Where("user_id = ?", userId).Find(&profiles).Error; err != nil {
+		return nil, err
+	}
+	return profiles, nil
+}
+
 func GetProfile(connector *gorm.DB, id uint) (*Profile, error) {
 	db := connector
 	var profile Profile

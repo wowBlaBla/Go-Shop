@@ -245,6 +245,12 @@ var RootCmd = &cobra.Command{
 		if err := common.Database.AutoMigrate(&models.Price{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
+		if err := common.Database.AutoMigrate(&models.Coupon{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Discount{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
 		if err := common.Database.AutoMigrate(&models.Order{}); err != nil {
 			logger.Warningf("%+v", err)
 		}

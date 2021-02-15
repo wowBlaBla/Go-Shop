@@ -11,13 +11,12 @@ import (
 
 // @title GoShop API
 // @version 1.0
-// @description GoShop full featured api
+// @description GoShop full featured api, see documentation https://docs.google.com/document/d/1VlkAYTqZG9oGvZxnSNDpcuafU-msOb2Qm2FevMJkA7w/edit
 // @termsOfService http://swagger.io/terms/
 // @contact.name API Support
 // @contact.email fiber@swagger.io
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
-// @host localhost:18092
 // @BasePath /
 // @securityDefinitions.basic BasicAuth
 func main() {
