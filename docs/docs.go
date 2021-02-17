@@ -7276,6 +7276,9 @@ var doc = `{
                         "$ref": "#/definitions/handler.NewItem"
                     }
                 },
+                "paymentMethod": {
+                    "type": "string"
+                },
                 "profileId": {
                     "type": "integer"
                 },

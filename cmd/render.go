@@ -43,6 +43,7 @@ var renderCmd = &cobra.Command{
 			remove = true
 		}
 		logger.Infof("remove: %v", remove)
+		now := time.Now()
 		var err error
 		// Database
 		var dialer gorm.Dialector
@@ -266,8 +267,8 @@ var renderCmd = &cobra.Command{
 										if category.Thumbnail == "" {
 											if len(*breadcrumbs) > 0 {
 												category.Thumbnail = (*breadcrumbs)[0].Thumbnail
-											} else if product.Thumbnail != "" {
-												category.Thumbnail = product.Thumbnail
+											} else if product.Image != nil {
+												category.Thumbnail = product.Image.Url
 											}
 										}
 										*breadcrumbs = append([]*models.Category{category}, *breadcrumbs...)
@@ -325,7 +326,7 @@ var renderCmd = &cobra.Command{
 													}
 													// Products parameters
 													for _, parameter := range product.Parameters {
-														if parameter.ID > 0 && parameter.Filtering {
+														if parameter.ID > 0 && parameter.Filtering && parameter.Option != nil {
 															var found bool
 															for _, opt := range categoryFile.Options {
 																if opt.ID == parameter.Option.ID {
@@ -602,8 +603,8 @@ var renderCmd = &cobra.Command{
 								}
 								// Process thumbnail
 								var thumbnails []string
-								if product.Thumbnail != "" {
-									if p1 := path.Join(dir, "storage", product.Thumbnail); len(p1) > 0 {
+								if product.Image != nil {
+									if p1 := path.Join(dir, "storage", product.Image.Path); len(p1) > 0 {
 										if fi, err := os.Stat(p1); err == nil {
 											filename := fmt.Sprintf("%d-thumbnail-%d%v", product.ID, fi.ModTime().Unix(), path.Ext(p1))
 											//p2 := path.Join(p0, filename)
@@ -698,24 +699,24 @@ var renderCmd = &cobra.Command{
 											parameterView.CustomValue = parameter.CustomValue
 										}
 										productView.Parameters = append(productView.Parameters, parameterView)
-										productView.CustomParameters = []common.CustomParameterPF{}
-										if product.CustomParameters != "" {
-											for _, line := range strings.Split(strings.TrimSpace(product.CustomParameters), "\n"){
-												if res := reKV.FindAllStringSubmatch(strings.TrimSpace(line), -1); len(res) > 0 && len(res[0]) > 1 {
-													parameter := common.CustomParameterPF{
-														Key:   res[0][1],
-													}
-													if len(res[0]) > 2 {
-														parameter.Value = res[0][2]
-													}
-													productView.CustomParameters = append(productView.CustomParameters, parameter)
-												}
-											}
-										}
 										productView.Dimensions = product.Dimensions
 										productView.Weight = product.Weight
 										productView.Availability = product.Availability
 										productView.Sending = product.Sending
+									}
+								}
+								productView.CustomParameters = []common.CustomParameterPF{}
+								if product.CustomParameters != "" {
+									for _, line := range strings.Split(strings.TrimSpace(product.CustomParameters), "\n"){
+										if res := reKV.FindAllStringSubmatch(strings.TrimSpace(line), -1); len(res) > 0 && len(res[0]) > 1 {
+											parameter := common.CustomParameterPF{
+												Key:   res[0][1],
+											}
+											if len(res[0]) > 2 {
+												parameter.Value = res[0][2]
+											}
+											productView.CustomParameters = append(productView.CustomParameters, parameter)
+										}
 									}
 								}
 								if p := path.Join(p1, product.Name); p != "" {
@@ -729,6 +730,11 @@ var renderCmd = &cobra.Command{
 								var variations []string
 								if len(product.Variations) > 0 {
 									view.BasePrice = fmt.Sprintf("%.2f", product.Variations[0].BasePrice)
+									if product.Variations[0].SalePrice > 0 && product.Variations[0].Start.Before(now) && product.Variations[0].End.After(now){
+										view.SalePrice = fmt.Sprintf("%.2f", product.Variations[0].SalePrice)
+										view.Start = &product.Variations[0].Start
+										view.End = &product.Variations[0].End
+									}
 									for i, variation := range product.Variations {
 										variationView := common.VariationPF{
 											Id:    variation.ID,
@@ -743,6 +749,13 @@ var renderCmd = &cobra.Command{
 											Sending: variation.Sending,
 											Selected:    i == 0,
 										}
+
+										if variation.SalePrice > 0 && variation.Start.Before(now) && variation.End.After(now){
+											variationView.SalePrice = variation.SalePrice
+											variationView.Start = &variation.Start
+											variationView.End = &variation.End
+										}
+
 										if basePriceMin > variation.BasePrice || basePriceMin == 0 {
 											basePriceMin = variation.BasePrice
 										}

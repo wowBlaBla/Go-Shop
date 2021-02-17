@@ -9,7 +9,10 @@ type Option struct {
 	Name string
 	Title string
 	Description string
+	Value    *Value `gorm:"foreignKey:value_id;"`
+	ValueId  uint
 	Values []*Value `gorm:"foreignKey:OptionId"`
+	Standard bool
 	Sort int
 }
 
@@ -42,6 +45,15 @@ func GetOptionsByName(connector *gorm.DB, name string) ([]*Option, error) {
 	return options, nil
 }
 
+func GetOptionsByStandard(connector *gorm.DB, standard bool) ([]*Option, error) {
+	db := connector
+	var options []*Option
+	if err := db.Debug().Preload("Value").Where("standard = ?", standard).Find(&options).Error; err != nil {
+		return nil, err
+	}
+	return options, nil
+}
+
 func CreateOption(connector *gorm.DB, option *Option) (uint, error) {
 	db := connector
 	db.Debug().Create(&option)
@@ -54,7 +66,7 @@ func CreateOption(connector *gorm.DB, option *Option) (uint, error) {
 func GetOption(connector *gorm.DB, id int) (*Option, error) {
 	db := connector
 	var option Option
-	if err := db.Debug().Preload("Values").Where("id = ?", id).First(&option).Error; err != nil {
+	if err := db.Debug().Preload("Value").Preload("Values").Where("id = ?", id).First(&option).Error; err != nil {
 		return nil, err
 	}
 	return &option, nil

@@ -2080,19 +2080,29 @@ type ProductShortView struct {
 // @Router /api/v1/products [get]
 // @Tags product
 func getProductsHandler(c *fiber.Ctx) error {
-	if products, err := models.GetProducts(common.Database); err == nil {
-		var view ProductsShortView
-		if bts, err := json.MarshalIndent(products, "", "   "); err == nil {
-			if err = json.Unmarshal(bts, &view); err == nil {
-				return c.JSON(view)
+	if products, err := models.GetProductsWithImages(common.Database); err == nil {
+		var views ProductsShortView
+		for _, product := range products {
+			var view ProductShortView
+			if bts, err := json.MarshalIndent(product, "", "   "); err == nil {
+				if err = json.Unmarshal(bts, &view); err == nil {
+					if product.Image != nil {
+						view.Thumbnail = product.Image.Url
+					}else if len(product.Images) > 0{
+						view.Thumbnail = product.Images[0].Url
+					}
+					views = append(views, view)
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
 			}else{
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
 		}
+		c.Status(http.StatusOK)
+		return c.JSON(views)
 	}else{
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
@@ -2153,6 +2163,24 @@ func postProductsHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Description"]; found && len(v) > 0 {
 				description = strings.TrimSpace(v[0])
 			}
+			var parameters []*models.Parameter
+			if options, err := models.GetOptionsByStandard(common.Database, true); err == nil {
+				for _, option := range options {
+					parameter := &models.Parameter{
+						Name: option.Name,
+						Title: option.Title,
+						Option: option,
+					}
+					if option.Value != nil {
+						parameter.Value = option.Value
+					}
+					parameters = append(parameters, parameter)
+				}
+			}
+			logger.Infof("Parameters: %+v", len(parameters))
+			for _, parameter := range parameters {
+				logger.Infof("Parameter: %+v", parameter)
+			}
 			var customParameters string
 			if v, found := data.Value["CustomParameters"]; found && len(v) > 0 {
 				customParameters = strings.TrimSpace(v[0])
@@ -2193,8 +2221,8 @@ func postProductsHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Customization"]; found && len(v) > 0 {
 				customization = strings.TrimSpace(v[0])
 			}
-			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, CustomParameters: customParameters, BasePrice: basePrice, Dimensions: dimensions, Weight: weight, Availability: availability, Sending: sending, Sku: sku, Content: content, Customization: customization}
-			if id, err := models.CreateProduct(common.Database, product); err == nil {
+			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Parameters: parameters, CustomParameters: customParameters, BasePrice: basePrice, Dimensions: dimensions, Weight: weight, Availability: availability, Sending: sending, Sku: sku, Content: content, Customization: customization}
+			if _, err := models.CreateProduct(common.Database, product); err == nil {
 				// Create new product automatically
 				if name == "" {
 					product.Name = fmt.Sprintf("new-product-%d", product.ID)
@@ -2211,30 +2239,8 @@ func postProductsHandler(c *fiber.Ctx) error {
 							logger.Errorf("%v", err)
 						}
 					}
-					// Thumbnail
-					var p1 string
-					filename := fmt.Sprintf("%d-%s-thumbnail%s", id, product.Name, path.Ext(v[0].Filename))
-					if p := path.Join(p, filename); len(p) > 0 {
-						p1 = p
-						if in, err := v[0].Open(); err == nil {
-							out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
-							if err != nil {
-								c.Status(http.StatusInternalServerError)
-								return c.JSON(HTTPError{err.Error()})
-							}
-							defer out.Close()
-							if _, err := io.Copy(out, in); err != nil {
-								c.Status(http.StatusInternalServerError)
-								return c.JSON(HTTPError{err.Error()})
-							}
-							product.Thumbnail = "/" + path.Join("products", filename)
-							if err = models.UpdateProduct(common.Database, product); err != nil {
-								c.Status(http.StatusInternalServerError)
-								return c.JSON(HTTPError{err.Error()})
-							}
-						}
-					}
 					// Image
+					var p1 string
 					img := &models.Image{Name: name, Size: v[0].Size}
 					//filename = fmt.Sprintf("%d-%s%s", id, img.Name, path.Ext(v[0].Filename))
 					if id, err := models.CreateImage(common.Database, img); err == nil {
@@ -2325,6 +2331,7 @@ type ProductsListItem struct {
 	Title string
 	Thumbnail string
 	Description string
+	Sku string
 	VariationsIds string
 	VariationsTitles string
 	CategoryId uint `json:",omitempty"`
@@ -2431,7 +2438,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles, category_id as CategoryId").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, products.Sku, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -2449,7 +2456,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles, category_id as CategoryId").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, products.Sku, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -2458,7 +2465,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	}
 	//
 	if len(keys1) > 0 || len(keys2) > 0 {
-		common.Database.Debug().Model(&models.Product{}).Joins("left join categories_products on categories_products.product_id = products.id").Where("category_id = ?", id).Count(&response.Total)
+		common.Database.Debug().Model(&models.Product{}).Where("category_id = ?", id).Count(&response.Total)
 	}else{
 		response.Total = response.Filtered
 	}
@@ -2627,39 +2634,6 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.ImageId = imageId
 			product.Content = content
 			product.Customization = customization
-			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
-				// To delete existing
-				if product.Thumbnail != "" {
-					if err = os.Remove(path.Join(dir, product.Thumbnail)); err != nil {
-						logger.Errorf("%v", err)
-					}
-					product.Thumbnail = ""
-				}
-			}else if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
-				// New file
-				p := path.Join(dir, "storage", "products")
-				if _, err := os.Stat(p); err != nil {
-					if err = os.MkdirAll(p, 0755); err != nil {
-						logger.Errorf("%v", err)
-					}
-				}
-				filename := fmt.Sprintf("%d-%s-thumbnail%s", id, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(product.Name, "-"), path.Ext(v[0].Filename))
-				if p := path.Join(p, filename); len(p) > 0 {
-					if in, err := v[0].Open(); err == nil {
-						out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
-						if err != nil {
-							c.Status(http.StatusInternalServerError)
-							return c.JSON(HTTPError{err.Error()})
-						}
-						defer out.Close()
-						if _, err := io.Copy(out, in); err != nil {
-							c.Status(http.StatusInternalServerError)
-							return c.JSON(HTTPError{err.Error()})
-						}
-						product.Thumbnail = "/" + path.Join("products", filename)
-					}
-				}
-			}
 			if variations, err := models.GetProductVariations(common.Database, int(product.ID)); err == nil {
 				for _, variation := range variations {
 					if variation.Name == "default" {
@@ -2789,14 +2763,6 @@ func delProductHandler(c *fiber.Ctx) error {
 			}
 		}
 		//
-		if product.Thumbnail != "" {
-			p := path.Join(dir, "hugo", product.Thumbnail)
-			if _, err := os.Stat(p); err == nil {
-				if err = os.Remove(p); err != nil {
-					logger.Errorf("%v", err.Error())
-				}
-			}
-		}
 		if err = models.DeleteProduct(common.Database, product); err != nil {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
@@ -3271,6 +3237,10 @@ func postVariationHandler(c *fiber.Ctx) error {
 					return c.JSON(HTTPError{"Invalid base price"})
 				}
 			}
+			var salePrice float64
+			if v, found := data.Value["SalePrice"]; found && len(v) > 0 {
+				salePrice, _ = strconv.ParseFloat(v[0], 10)
+			}
 			var dimensions string
 			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
 				dimensions = strings.TrimSpace(v[0])
@@ -3293,7 +3263,7 @@ func postVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Sku"]; found && len(v) > 0 {
 				sku = strings.TrimSpace(v[0])
 			}
-			variation := &models.Variation{Name: name, Title: title, Description: description, BasePrice: basePrice, ProductId: product.ID, Dimensions: dimensions, Weight: weight, Availability: availability, Sending: sending, Sku: sku}
+			variation := &models.Variation{Name: name, Title: title, Description: description, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Dimensions: dimensions, Weight: weight, Availability: availability, Sending: sending, Sku: sku}
 			if id, err := models.CreateVariation(common.Database, variation); err == nil {
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
 					p := path.Join(dir, "storage", "variations")
@@ -3395,6 +3365,18 @@ func putVariationHandler(c *fiber.Ctx) error {
 					return c.JSON(HTTPError{"Invalid base price"})
 				}
 			}
+			var salePrice float64
+			if v, found := data.Value["SalePrice"]; found && len(v) > 0 {
+				salePrice, _ = strconv.ParseFloat(v[0], 10)
+			}
+			var start time.Time
+			if v, found := data.Value["Start"]; found && len(v) > 0 {
+				start, _ = time.Parse(time.RFC3339, v[0])
+			}
+			var end time.Time
+			if v, found := data.Value["End"]; found && len(v) > 0 {
+				end, _ = time.Parse(time.RFC3339, v[0])
+			}
 			var dimensions string
 			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
 				dimensions = strings.TrimSpace(v[0])
@@ -3420,6 +3402,9 @@ func putVariationHandler(c *fiber.Ctx) error {
 			variation.Title = title
 			variation.Description = description
 			variation.BasePrice = basePrice
+			variation.SalePrice = salePrice
+			variation.Start = start
+			variation.End = end
 			variation.Dimensions = dimensions
 			variation.Weight = weight
 			variation.Availability = availability
@@ -4700,6 +4685,8 @@ type OptionShortView struct {
 	Name string `json:",omitempty"`
 	Title string `json:",omitempty"`
 	Description string `json:",omitempty"`
+	ValueId uint
+	Standard bool
 	Sort int `json:",omitempty"`
 }
 
@@ -4707,6 +4694,8 @@ type NewOption struct {
 	Name string
 	Title string
 	Description string
+	ValueId uint
+	Standard bool
 	Sort int
 }
 
@@ -4749,6 +4738,8 @@ func postOptionHandler(c *fiber.Ctx) error {
 				Name: request.Name,
 				Title: request.Title,
 				Description: request.Description,
+				Standard: request.Standard,
+				ValueId: request.ValueId,
 				Sort: request.Sort,
 			}
 			if _, err := models.CreateOption(common.Database, option); err != nil {
@@ -4781,7 +4772,9 @@ type OptionsListItem struct {
 	Name string
 	Title string
 	Description string
+	ValueValue string
 	ValuesValues string
+	Standard bool
 	Sort int
 }
 
@@ -4877,7 +4870,7 @@ func postOptionsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Option{}).Select("options.ID, options.Name, options.Title, options.Description, options.Sort, group_concat(`values`.Value, ', ') as ValuesValues").Joins("left join `values` on `values`.option_id = options.id").Group("options.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Option{}).Select("options.ID, options.Name, options.Title, options.Description, options.Standard, options.Sort, group_concat(`values`.Value, ', ') as ValuesValues").Joins("left join `values` on `values`.option_id = options.id").Group("options.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -4894,7 +4887,7 @@ func postOptionsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Option{}).Select("options.ID, options.Name, options.Title, options.Description, options.Sort, group_concat(`values`.Value, ', ') as ValuesValues").Joins("left join `values` on `values`.option_id = options.id").Group("options.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Option{}).Select("options.ID, options.Name, options.Title, options.Description, options.Standard, options.Sort, group_concat(`values`.Value, ', ') as ValuesValues").Joins("left join `values` on `values`.option_id = options.id").Group("options.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -4952,7 +4945,9 @@ type OptionView struct {
 	Name string `json:",omitempty"`
 	Title string `json:",omitempty"`
 	Description string `json:",omitempty"`
+	Value ValueView `json:",omitempty"`
 	Values []ValueView
+	Standard bool `json:",omitempty"`
 	Sort int
 }
 
@@ -5091,6 +5086,8 @@ func putOptionHandler(c *fiber.Ctx) error {
 	option.Name = request.Name
 	option.Title = request.Title
 	option.Description = request.Description
+	option.ValueId = request.ValueId
+	option.Standard = request.Standard
 	option.Sort = request.Sort
 	if err := models.UpdateOption(common.Database, option); err == nil {
 		return c.JSON(OptionShortView{ID: option.ID, Name: option.Name, Title: option.Title, Description: option.Description, Sort: option.Sort})
@@ -6819,8 +6816,6 @@ type CouponView struct {
 	Minimum float64
 	Count int `json:",omitempty"`
 	Limit int `json:",omitempty"`
-	Cumulative bool `json:",omitempty"`
-	Shipping bool `json:",omitempty"`
 	ApplyTo string `json:",omitempty"`
 	Categories []CategoryView `json:",omitempty"`
 	Products []ProductShortView `json:",omitempty"`
@@ -6927,8 +6922,6 @@ func putCouponHandler(c *fiber.Ctx) error {
 	coupon.Minimum = request.Minimum
 	coupon.Limit = request.Limit
 	coupon.Count = request.Count
-	coupon.Cumulative = request.Cumulative
-	coupon.Shipping = request.Shipping
 	coupon.ApplyTo = request.ApplyTo
 	for _, v := range strings.Split(request.Categories, ",") {
 		if id, err := strconv.Atoi(v); err == nil {
@@ -10316,6 +10309,7 @@ type CheckoutRequest struct {
 	Comment string
 	ProfileId uint
 	TransportId uint
+	PaymentMethod string
 	Coupons []string
 }
 
@@ -10740,7 +10734,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 	for _, code := range request.Coupons {
 		allowed := true
 		for _, coupon := range coupons {
-			if !coupon.Cumulative || coupon.Code == code {
+			if coupon.Code == code {
 				allowed = false
 				break
 			}
@@ -10779,8 +10773,14 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 				Uuid:     rItem.UUID,
 				CategoryId: rItem.CategoryId,
 				Title:    product.Title,
-				Price:    variation.BasePrice,
+				BasePrice: variation.BasePrice,
 				Quantity: rItem.Quantity,
+			}
+			if variation.SalePrice > 0 && variation.Start.Before(now) && variation.End.After(now) {
+				item.Price = variation.SalePrice
+				item.SalePrice = variation.SalePrice
+			}else{
+				item.Price = variation.BasePrice
 			}
 			if res := reVolume.FindAllStringSubmatch(variation.Dimensions, 1); len(res) > 0 && len(res[0]) > 1 {
 				var width float64
@@ -10862,8 +10862,8 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 			// Coupons
 			for _, coupon := range coupons {
 				if coupon.Enabled && coupon.Start.Before(now) && coupon.End.After(now) {
-					allowed := coupon.Type == "item"
-					if allowed {
+					var allowed bool
+					if coupon.Type == "item" {
 						if coupon.ApplyTo == "all" {
 							allowed = true
 						} else if coupon.ApplyTo == "categories" {
@@ -10885,6 +10885,8 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 						} else {
 							allowed = false
 						}
+					}else if coupon.Type == "order" {
+						allowed = true
 					}
 					if allowed {
 						if res := rePercent.FindAllStringSubmatch(coupon.Amount, 1); len(res) > 0 && len(res[0]) > 1 {
@@ -10930,6 +10932,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 			order.Volume += item.Volume
 			order.Weight += item.Weight
 			order.Sum += item.Total
+			order.Discount += item.Discount
 			//
 			//itemShortView.Path = item.Path
 			//itemShortView.Thumbnail = item.Thumbnail
@@ -10967,48 +10970,21 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 	// Coupons
 	for _, coupon := range coupons {
 		if coupon.Enabled && coupon.Start.Before(now) && coupon.End.After(now) {
-			if coupon.Type == "order" {
+			if coupon.Type == "shipment" {
 				if res := rePercent.FindAllStringSubmatch(coupon.Amount, 1); len(res) > 0 && len(res[0]) > 1 {
 					// percent
 					if p, err := strconv.ParseFloat(res[0][1], 10); err == nil {
-						order.Discount = order.Sum * p / 100.0
+						order.Discount2 = order.Delivery * p / 100.0
 					}
 				} else {
 					if n, err := strconv.ParseFloat(coupon.Amount, 10); err == nil {
-						order.Discount = n
+						order.Discount2 = n
 					}
 				}
-				if order.Discount > order.Sum {
-					order.Discount = order.Sum
+				if order.Discount2 > order.Delivery {
+					order.Discount2 = order.Delivery
 				}
-				order.Discount = math.Round(order.Discount * 100) / 100
-			}else if coupon.Type == "shipment" {
-				allowed := true
-				if coupon.ApplyTo == "all" {
-					allowed = true
-				} else if coupon.ApplyTo == "categories" {
-					// TODO: Categories filter
-				} else if coupon.ApplyTo == "products" {
-					// TODO: Categories products
-				} else {
-					allowed = false
-				}
-				if allowed {
-					if res := rePercent.FindAllStringSubmatch(coupon.Amount, 1); len(res) > 0 && len(res[0]) > 1 {
-						// percent
-						if p, err := strconv.ParseFloat(res[0][1], 10); err == nil {
-							order.Discount2 = order.Delivery * p / 100.0
-						}
-					} else {
-						if n, err := strconv.ParseFloat(coupon.Amount, 10); err == nil {
-							order.Discount2 = n
-						}
-					}
-					if order.Discount2 > order.Delivery {
-						order.Discount2 = order.Delivery
-					}
-					order.Discount2 = math.Round(order.Discount2 * 100) / 100
-				}
+				order.Discount2 = math.Round(order.Discount2 * 100) / 100
 			}
 		}
 	}
@@ -12001,9 +11977,12 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 					Metadata:       meta,
 					Quantity:       item.Quantity,
 					UnitPrice:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Price),
+					DiscountAmount: mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Discount * float64(item.Quantity)),
+					TotalAmount:    mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Total),
+					VatAmount:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Total * (common.Config.Payment.VAT / 100.0) / ((100.0 + common.Config.Payment.VAT) / 100.0)),
 					VatRate:        fmt.Sprintf("%.2f", common.Config.Payment.VAT),
 				}
-				total := item.Total
+				/*total := item.Total
 				if item.Discount > 0 {
 					total = item.Total
 					line.DiscountAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Discount * float64(item.Quantity))
@@ -12015,7 +11994,7 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 					line.DiscountAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), 0)
 				}
 				line.TotalAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), total)
-				line.VatAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), total * (common.Config.Payment.VAT / 100.0) / ((100.0 + common.Config.Payment.VAT) / 100.0))
+				line.VatAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), total * (common.Config.Payment.VAT / 100.0) / ((100.0 + common.Config.Payment.VAT) / 100.0))*/
 				if item.Thumbnail != "" {
 					line.ImageUrl = base + strings.Split(item.Thumbnail, ",")[0]
 				}
@@ -12274,7 +12253,11 @@ func getChildrenCategoriesView(connector *gorm.DB, root *CategoryView, depth int
 	if !noProducts {
 		if products, err := models.GetProductsByCategoryId(connector, root.ID); err == nil {
 			for _, product := range products {
-				root.Children = append(root.Children, &CategoryView{ID: product.ID, Name: product.Name, Title: product.Title, Thumbnail: product.Thumbnail, Description: product.Description, Type: "product"})
+				var thumbnail string
+				if product.Image != nil {
+					thumbnail = product.Image.Url
+				}
+				root.Children = append(root.Children, &CategoryView{ID: product.ID, Name: product.Name, Title: product.Title, Thumbnail: thumbnail, Description: product.Description, Type: "product"})
 			}
 		}
 	}
@@ -12331,6 +12314,9 @@ type VariationView struct {
 	Description string `json:",omitempty"`
 	Thumbnail string `json:",omitempty"`
 	BasePrice float64
+	SalePrice float64 `json:",omitempty"`
+	Start time.Time
+	End time.Time
 	Properties []struct {
 		ID uint
 		Name string

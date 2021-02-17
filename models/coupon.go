@@ -18,8 +18,6 @@ type Coupon struct {
 	Minimum float64 // minimum total to by applied
 	Count int // total count
 	Limit int // limit per user
-	Cumulative bool // allow to combine
-	Shipping bool // include shipping cost discount
 	//
 	ApplyTo string
 	Categories  []*Category  `gorm:"many2many:categories_coupons;"`

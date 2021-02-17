@@ -10,10 +10,11 @@ type Item struct {
 	Title       string
 	Description string `json:",omitempty"`
 	Path string
-	Thumbnail  string
+	Thumbnail   string
+	BasePrice   float64          `sql:"type:decimal(8,2);"`
+	SalePrice   float64          `sql:"type:decimal(8,2);"`
 	Price       float64          `sql:"type:decimal(8,2);"`
 	Discount    float64          `sql:"type:decimal(8,2);"`
-	Discount2   float64          `sql:"type:decimal(8,2);"`
 	Quantity    int
 	Delivery    float64          `sql:"type:decimal(8,2);"`
 	Total       float64          `sql:"type:decimal(8,2);"`

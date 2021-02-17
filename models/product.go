@@ -12,7 +12,7 @@ type Product struct {
 	Name        string `gorm:"size:255;index:idx_product_name,unique"`
 	Title       string
 	Description string
-	Thumbnail   string
+	//Thumbnail   string
 	Parameters  []*Parameter `gorm:"foreignKey:ProductId"`
 	CustomParameters 	string
 	Content 	string
@@ -57,10 +57,20 @@ func GetProducts(connector *gorm.DB) ([]*Product, error) {
 	return products, nil
 }
 
+func GetProductsWithImages(connector *gorm.DB) ([]*Product, error) {
+	db := connector
+	var products []*Product
+	db.Debug().Preload("Image").Preload("Images").Find(&products)
+	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return products, nil
+}
+
 func GetProductsByCategoryId(connector *gorm.DB, id uint) ([]*Product, error) {
 	db := connector
 	var products []*Product
-	db.Model(&Product{}).Joins("inner join categories_products on categories_products.product_id = products.id").Where("categories_products.category_id = ?", id).Find(&products)
+	db.Model(&Product{}).Preload("Image").Joins("inner join categories_products on categories_products.product_id = products.id").Where("categories_products.category_id = ?", id).Find(&products)
 	if err :=  db.Error; err != nil {
 		return nil, err
 	}

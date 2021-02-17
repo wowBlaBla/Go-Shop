@@ -2,6 +2,7 @@ package models
 
 import (
 	"gorm.io/gorm"
+	"time"
 )
 
 type Variation struct {
@@ -13,6 +14,9 @@ type Variation struct {
 	Thumbnail string
 	Properties []*Property `gorm:"foreignKey:VariationId"`
 	BasePrice float64          `sql:"type:decimal(8,2);"`
+	SalePrice float64          `sql:"type:decimal(8,2);"`
+	Start time.Time
+	End time.Time
 	Dimensions string // width x height x depth in cm
 	Weight float64 `sql:"type:decimal(8,2);"`
 	Availability string
