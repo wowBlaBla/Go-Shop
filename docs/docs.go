@@ -1260,7 +1260,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.OrdersView"
+                            "$ref": "#/definitions/handler.OrderShortView"
                         }
                     },
                     "404": {
@@ -1830,7 +1830,7 @@ var doc = `{
                 "tags": [
                     "frontend"
                 ],
-                "summary": "Calculate shipping cost",
+                "summary": "(DEPRECATED) Calculate shipping cost",
                 "parameters": [
                     {
                         "description": "body",
@@ -3534,7 +3534,7 @@ var doc = `{
                     "account",
                     "frontend"
                 ],
-                "summary": "Get account payment methods",
+                "summary": "(DEPRECATED) Get account payment methods",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -5177,7 +5177,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.DeliveriesView"
+                            "$ref": "#/definitions/handler.TariffsView"
                         }
                     },
                     "404": {
@@ -6816,6 +6816,7 @@ var doc = `{
                         "BasicAuth": []
                     }
                 ],
+                "description": "Create property binding to product or variation",
                 "consumes": [
                     "application/json"
                 ],
@@ -6829,10 +6830,15 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Variation id",
+                        "description": "Product Id",
+                        "name": "product_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Variation Id",
                         "name": "variation_id",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     },
                     {
                         "description": "body",
@@ -7417,9 +7423,6 @@ var doc = `{
                 "count": {
                     "type": "integer"
                 },
-                "cumulative": {
-                    "type": "boolean"
-                },
                 "description": {
                     "type": "string"
                 },
@@ -7443,9 +7446,6 @@ var doc = `{
                     "items": {
                         "$ref": "#/definitions/handler.ProductShortView"
                     }
-                },
-                "shipping": {
-                    "type": "boolean"
                 },
                 "start": {
                     "type": "string"
@@ -7512,12 +7512,6 @@ var doc = `{
             "type": "array",
             "items": {
                 "$ref": "#/definitions/handler.DeliveryCost"
-            }
-        },
-        "handler.DeliveriesView": {
-            "type": "array",
-            "items": {
-                "$ref": "#/definitions/handler.DeliveryView"
             }
         },
         "handler.DeliveryCost": {
@@ -7592,26 +7586,23 @@ var doc = `{
         "handler.DeliveryView": {
             "type": "object",
             "properties": {
+                "byVolume": {
+                    "type": "number"
+                },
+                "byWeight": {
+                    "type": "number"
+                },
                 "id": {
                     "type": "integer"
                 },
-                "item": {
+                "thumbnail": {
                     "type": "string"
                 },
-                "kg": {
-                    "type": "number"
-                },
-                "m3": {
-                    "type": "number"
-                },
-                "order": {
+                "title": {
                     "type": "string"
                 },
-                "transportId": {
-                    "type": "integer"
-                },
-                "zoneId": {
-                    "type": "integer"
+                "value": {
+                    "type": "number"
                 }
             }
         },
@@ -8337,8 +8328,14 @@ var doc = `{
                 "sort": {
                     "type": "integer"
                 },
+                "standard": {
+                    "type": "boolean"
+                },
                 "title": {
                     "type": "string"
+                },
+                "valueId": {
+                    "type": "integer"
                 }
             }
         },
@@ -8635,8 +8632,14 @@ var doc = `{
                 "sort": {
                     "type": "integer"
                 },
+                "standard": {
+                    "type": "boolean"
+                },
                 "title": {
                     "type": "string"
+                },
+                "valueId": {
+                    "type": "integer"
                 },
                 "values": {
                     "type": "array",
@@ -8669,8 +8672,14 @@ var doc = `{
                 "sort": {
                     "type": "integer"
                 },
+                "standard": {
+                    "type": "boolean"
+                },
                 "title": {
                     "type": "string"
+                },
+                "valueId": {
+                    "type": "integer"
                 }
             }
         },
@@ -8689,8 +8698,15 @@ var doc = `{
                 "sort": {
                     "type": "integer"
                 },
+                "standard": {
+                    "type": "boolean"
+                },
                 "title": {
                     "type": "string"
+                },
+                "value": {
+                    "type": "object",
+                    "$ref": "#/definitions/handler.ValueView"
                 },
                 "values": {
                     "type": "array",
@@ -8721,7 +8737,13 @@ var doc = `{
                 "sort": {
                     "type": "integer"
                 },
+                "standard": {
+                    "type": "boolean"
+                },
                 "title": {
+                    "type": "string"
+                },
+                "valueValue": {
                     "type": "string"
                 },
                 "valuesValues": {
@@ -8752,6 +8774,12 @@ var doc = `{
                 "comment": {
                     "type": "string"
                 },
+                "deliveries": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.DeliveryView"
+                    }
+                },
                 "delivery": {
                     "type": "number"
                 },
@@ -8766,6 +8794,10 @@ var doc = `{
                     "items": {
                         "$ref": "#/definitions/handler.ItemShortView"
                     }
+                },
+                "paymentMethods": {
+                    "type": "object",
+                    "$ref": "#/definitions/handler.PaymentMethodsView"
                 },
                 "quantity": {
                     "type": "integer"
@@ -9112,6 +9144,9 @@ var doc = `{
                 "enabled": {
                     "type": "boolean"
                 },
+                "end": {
+                    "type": "string"
+                },
                 "files": {
                     "type": "array",
                     "items": {
@@ -9139,10 +9174,96 @@ var doc = `{
                         "$ref": "#/definitions/handler.ParameterView"
                     }
                 },
+                "properties": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "filtering": {
+                                "type": "boolean"
+                            },
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "option": {
+                                "type": "object",
+                                "properties": {
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "id": {
+                                        "type": "integer"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "title": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "prices": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "availability": {
+                                            "type": "string"
+                                        },
+                                        "enabled": {
+                                            "type": "boolean"
+                                        },
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "price": {
+                                            "type": "number"
+                                        },
+                                        "sending": {
+                                            "type": "string"
+                                        },
+                                        "value": {
+                                            "type": "object",
+                                            "properties": {
+                                                "availability": {
+                                                    "type": "string"
+                                                },
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "sending": {
+                                                    "type": "string"
+                                                },
+                                                "thumbnail": {
+                                                    "type": "string"
+                                                },
+                                                "title": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "title": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "salePrice": {
+                    "type": "number"
+                },
                 "sending": {
                     "type": "string"
                 },
                 "sku": {
+                    "type": "string"
+                },
+                "start": {
                     "type": "string"
                 },
                 "tags": {
@@ -9236,6 +9357,9 @@ var doc = `{
                     "type": "integer"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "sku": {
                     "type": "string"
                 },
                 "thumbnail": {
@@ -9437,6 +9561,38 @@ var doc = `{
             "type": "array",
             "items": {
                 "$ref": "#/definitions/handler.TagView"
+            }
+        },
+        "handler.TariffView": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "item": {
+                    "type": "string"
+                },
+                "kg": {
+                    "type": "number"
+                },
+                "m3": {
+                    "type": "number"
+                },
+                "order": {
+                    "type": "string"
+                },
+                "transportId": {
+                    "type": "integer"
+                },
+                "zoneId": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.TariffsView": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/handler.TariffView"
             }
         },
         "handler.TransactionView": {
@@ -9814,6 +9970,9 @@ var doc = `{
                 "dimensions": {
                     "type": "string"
                 },
+                "end": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -9903,10 +10062,16 @@ var doc = `{
                         }
                     }
                 },
+                "salePrice": {
+                    "type": "number"
+                },
                 "sending": {
                     "type": "string"
                 },
                 "sku": {
+                    "type": "string"
+                },
+                "start": {
                     "type": "string"
                 },
                 "thumbnail": {

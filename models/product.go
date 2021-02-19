@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"gorm.io/gorm"
 	"sort"
+	"time"
 )
 
 type Product struct {
@@ -12,17 +13,23 @@ type Product struct {
 	Name        string `gorm:"size:255;index:idx_product_name,unique"`
 	Title       string
 	Description string
-	//Thumbnail   string
+	Thumbnail   string
 	Parameters  []*Parameter `gorm:"foreignKey:ProductId"`
 	CustomParameters 	string
 	Content 	string
 	// ONLY TO USE AS DEFAULT VALUE FOR VIRIATIONS
+	Variation string
 	BasePrice float64          `sql:"type:decimal(8,2);"`
+	SalePrice float64          `sql:"type:decimal(8,2);"`
+	Start time.Time
+	End time.Time
 	Dimensions string // width x height x depth in cm
 	Weight float64 `sql:"type:decimal(8,2);"`
 	Availability string
 	Sending string
 	Sku string
+	//
+	Properties []*Property `gorm:"foreignKey:ProductId"`
 	//
 	Categories  []*Category  `gorm:"many2many:categories_products;"`
 	Variations  []*Variation `gorm:"foreignKey:ProductId"`
@@ -90,7 +97,7 @@ func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	db := connector
 	var product Product
-	if err := db.Debug().Preload("Categories").Preload("Parameters").Preload("Parameters.Option").Preload("Parameters.Value").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Preload("Tags").First(&product, id).Error; err != nil {
+	if err := db.Debug().Preload("Categories").Preload("Parameters").Preload("Parameters.Option").Preload("Parameters.Value").Preload("Properties").Preload("Properties.Option").Preload("Properties.Prices").Preload("Properties.Prices.Value").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Preload("Tags").First(&product, id).Error; err != nil {
 		return nil, err
 	}
 	var customization struct {
@@ -169,6 +176,15 @@ func GetCategoriesOfProduct(connector *gorm.DB, product *Product) ([]*Category, 
 		return nil, err
 	}
 	return categories, nil
+}
+
+func GetFilesOfProduct(connector *gorm.DB, product *Product) ([]*File, error) {
+	db := connector
+	var files []*File
+	if err := db.Model(&product).Association("Files").Find(&files); err != nil {
+		return nil, err
+	}
+	return files, nil
 }
 
 func AddFileToProduct(connector *gorm.DB, product *Product, file *File) error {

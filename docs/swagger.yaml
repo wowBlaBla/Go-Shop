@@ -361,8 +361,6 @@ definitions:
         type: string
       count:
         type: integer
-      cumulative:
-        type: boolean
       description:
         type: string
       enabled:
@@ -379,8 +377,6 @@ definitions:
         items:
           $ref: '#/definitions/handler.ProductShortView'
         type: array
-      shipping:
-        type: boolean
       start:
         type: string
       title:
@@ -424,10 +420,6 @@ definitions:
   handler.DeliveriesCosts:
     items:
       $ref: '#/definitions/handler.DeliveryCost'
-    type: array
-  handler.DeliveriesView:
-    items:
-      $ref: '#/definitions/handler.DeliveryView'
     type: array
   handler.DeliveryCost:
     properties:
@@ -477,20 +469,18 @@ definitions:
     type: object
   handler.DeliveryView:
     properties:
+      byVolume:
+        type: number
+      byWeight:
+        type: number
       id:
         type: integer
-      item:
+      thumbnail:
         type: string
-      kg:
-        type: number
-      m3:
-        type: number
-      order:
+      title:
         type: string
-      transportId:
-        type: integer
-      zoneId:
-        type: integer
+      value:
+        type: number
     type: object
   handler.DiscountView:
     properties:
@@ -964,8 +954,12 @@ definitions:
         type: string
       sort:
         type: integer
+      standard:
+        type: boolean
       title:
         type: string
+      valueId:
+        type: integer
     type: object
   handler.NewParameter:
     properties:
@@ -1158,8 +1152,12 @@ definitions:
         type: string
       sort:
         type: integer
+      standard:
+        type: boolean
       title:
         type: string
+      valueId:
+        type: integer
       values:
         items:
           $ref: '#/definitions/handler.ValueView'
@@ -1180,8 +1178,12 @@ definitions:
         type: string
       sort:
         type: integer
+      standard:
+        type: boolean
       title:
         type: string
+      valueId:
+        type: integer
     type: object
   handler.OptionView:
     properties:
@@ -1193,8 +1195,13 @@ definitions:
         type: string
       sort:
         type: integer
+      standard:
+        type: boolean
       title:
         type: string
+      value:
+        $ref: '#/definitions/handler.ValueView'
+        type: object
       values:
         items:
           $ref: '#/definitions/handler.ValueView'
@@ -1214,7 +1221,11 @@ definitions:
         type: string
       sort:
         type: integer
+      standard:
+        type: boolean
       title:
+        type: string
+      valueValue:
         type: string
       valuesValues:
         type: string
@@ -1234,6 +1245,10 @@ definitions:
     properties:
       comment:
         type: string
+      deliveries:
+        items:
+          $ref: '#/definitions/handler.DeliveryView'
+        type: array
       delivery:
         type: number
       discount:
@@ -1244,6 +1259,9 @@ definitions:
         items:
           $ref: '#/definitions/handler.ItemShortView'
         type: array
+      paymentMethods:
+        $ref: '#/definitions/handler.PaymentMethodsView'
+        type: object
       quantity:
         type: integer
       sum:
@@ -1469,6 +1487,8 @@ definitions:
         type: string
       enabled:
         type: boolean
+      end:
+        type: string
       files:
         items:
           $ref: '#/definitions/handler.File2View'
@@ -1487,9 +1507,65 @@ definitions:
         items:
           $ref: '#/definitions/handler.ParameterView'
         type: array
+      properties:
+        items:
+          properties:
+            filtering:
+              type: boolean
+            id:
+              type: integer
+            name:
+              type: string
+            option:
+              properties:
+                description:
+                  type: string
+                id:
+                  type: integer
+                name:
+                  type: string
+                title:
+                  type: string
+              type: object
+            prices:
+              items:
+                properties:
+                  availability:
+                    type: string
+                  enabled:
+                    type: boolean
+                  id:
+                    type: integer
+                  price:
+                    type: number
+                  sending:
+                    type: string
+                  value:
+                    properties:
+                      availability:
+                        type: string
+                      id:
+                        type: integer
+                      sending:
+                        type: string
+                      thumbnail:
+                        type: string
+                      title:
+                        type: string
+                    type: object
+                type: object
+              type: array
+            title:
+              type: string
+          type: object
+        type: array
+      salePrice:
+        type: number
       sending:
         type: string
       sku:
+        type: string
+      start:
         type: string
       tags:
         items:
@@ -1551,6 +1627,8 @@ definitions:
       id:
         type: integer
       name:
+        type: string
+      sku:
         type: string
       thumbnail:
         type: string
@@ -1682,6 +1760,27 @@ definitions:
   handler.TagsView:
     items:
       $ref: '#/definitions/handler.TagView'
+    type: array
+  handler.TariffView:
+    properties:
+      id:
+        type: integer
+      item:
+        type: string
+      kg:
+        type: number
+      m3:
+        type: number
+      order:
+        type: string
+      transportId:
+        type: integer
+      zoneId:
+        type: integer
+    type: object
+  handler.TariffsView:
+    items:
+      $ref: '#/definitions/handler.TariffView'
     type: array
   handler.TransactionView:
     properties:
@@ -1928,6 +2027,8 @@ definitions:
         type: string
       dimensions:
         type: string
+      end:
+        type: string
       id:
         type: integer
       name:
@@ -1986,9 +2087,13 @@ definitions:
               type: string
           type: object
         type: array
+      salePrice:
+        type: number
       sending:
         type: string
       sku:
+        type: string
+      start:
         type: string
       thumbnail:
         type: string
@@ -2892,7 +2997,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.OrdersView'
+            $ref: '#/definitions/handler.OrderShortView'
         "404":
           description: Not Found
           schema:
@@ -3268,7 +3373,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Calculate shipping cost
+      summary: (DEPRECATED) Calculate shipping cost
       tags:
       - frontend
   /api/v1/files:
@@ -4332,7 +4437,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handler.HTTPError'
-      summary: Get account payment methods
+      summary: (DEPRECATED) Get account payment methods
       tags:
       - account
       - frontend
@@ -5353,7 +5458,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.DeliveriesView'
+            $ref: '#/definitions/handler.TariffsView'
         "404":
           description: Not Found
           schema:
@@ -6383,11 +6488,15 @@ paths:
     post:
       consumes:
       - application/json
+      description: Create property binding to product or variation
       parameters:
-      - description: Variation id
+      - description: Product Id
+        in: query
+        name: product_id
+        type: integer
+      - description: Variation Id
         in: query
         name: variation_id
-        required: true
         type: integer
       - description: body
         in: body

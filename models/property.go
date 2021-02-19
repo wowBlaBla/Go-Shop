@@ -9,6 +9,7 @@ type Property struct {
 	Type string // select / radio
 	Name        string
 	Title       string
+	ProductId uint
 	VariationId uint
 	Option      *Option `gorm:"foreignKey:OptionId"`
 	OptionId    uint
@@ -38,6 +39,15 @@ func GetProperty(connector *gorm.DB, id int) (*Property, error) {
 		return nil, err
 	}
 	return &property, nil
+}
+
+func GetPropertiesByProductAndName(connector *gorm.DB, productId int, name string) ([]*Property, error) {
+	db := connector
+	var properties []*Property
+	if err := db.Where("product_id = ? and name = ?", productId, name).Find(&properties).Error; err != nil {
+		return nil, err
+	}
+	return properties, nil
 }
 
 func GetPropertiesByVariationAndName(connector *gorm.DB, variationId int, name string) ([]*Property, error) {
