@@ -11,6 +11,7 @@ type CacheVariation struct {
 	Title       string
 	Description string
 	Thumbnail   string
+	Images string
 	BasePrice   float64 // min value
 }
 

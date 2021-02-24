@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"github.com/google/logger"
 	"gorm.io/gorm"
 	"sort"
 	"time"
@@ -97,7 +98,7 @@ func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	db := connector
 	var product Product
-	if err := db.Debug().Preload("Categories").Preload("Parameters").Preload("Parameters.Option").Preload("Parameters.Value").Preload("Properties").Preload("Properties.Option").Preload("Properties.Prices").Preload("Properties.Prices.Value").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Preload("Tags").First(&product, id).Error; err != nil {
+	if err := db.Debug().Preload("Categories").Preload("Parameters").Preload("Parameters.Option").Preload("Parameters.Value").Preload("Properties").Preload("Properties.Option").Preload("Properties.Prices").Preload("Properties.Prices.Value").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Preload("Variations.Images").Preload("Variations.Files").Preload("Tags").First(&product, id).Error; err != nil {
 		return nil, err
 	}
 	var customization struct {
@@ -137,6 +138,33 @@ func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 			}
 		})
 		product.Images = images
+	}
+	//
+	if len(product.Variations) > 0 {
+		for i, variation := range product.Variations {
+			if err := json.Unmarshal([]byte(variation.Customization), &customization); err == nil {
+				images := variation.Images
+				logger.Infof("images1: %+v", images)
+				sort.SliceStable(images, func(i, j int) bool {
+					var x, y = -1, -1
+					for k, id := range customization.Images.Order {
+						if id == images[i].ID {
+							x = k
+						}
+						if id == images[j].ID {
+							y = k
+						}
+					}
+					if x == -1 || y == -1 {
+						return images[i].ID < images[j].ID
+					} else {
+						return x < y
+					}
+				})
+				logger.Infof("images2: %+v", images)
+				product.Variations[i].Images = images
+			}
+		}
 	}
 	return &product, nil
 }

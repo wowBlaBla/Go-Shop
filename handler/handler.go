@@ -2413,7 +2413,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 		}
 	}
 	if id > 0 {
-		keys1 = append(keys1, "category_id = ?")
+		keys1 = append(keys1, "categories_products.category_id = ?")
 		values1 = append(values1, id)
 	}
 	//logger.Infof("keys1: %+v, values1: %+v", keys1, values1)
@@ -2436,7 +2436,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, products.Sku, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, products.Sku, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -2454,7 +2454,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, products.Sku, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, products.Sku, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -3251,6 +3251,8 @@ func postVariationHandler(c *fiber.Ctx) error {
 	var id int
 	if v := c.Query("product_id"); v != "" {
 		id, _ = strconv.Atoi(v)
+	}else if v := c.Query("pid"); v != "" {
+		id, _ = strconv.Atoi(v)
 	}
 	var err error
 	var product *models.Product
@@ -3269,10 +3271,10 @@ func postVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Name"]; found && len(v) > 0 {
 				name = strings.TrimSpace(v[0])
 			}
-			if name == "" {
+			/*if name == "" {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Invalid name"})
-			}
+			}*/
 			if variations, err := models.GetVariationsByProductAndName(common.Database, product.ID, name); err == nil && len(variations) > 0 {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Name is already in use"})
@@ -3281,10 +3283,10 @@ func postVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Title"]; found && len(v) > 0 {
 				title = strings.TrimSpace(v[0])
 			}
-			if title == "" {
+			/*if title == "" {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Invalid title"})
-			}
+			}*/
 			var description string
 			if v, found := data.Value["Description"]; found && len(v) > 0 {
 				description = strings.TrimSpace(v[0])
@@ -3324,6 +3326,14 @@ func postVariationHandler(c *fiber.Ctx) error {
 			}
 			variation := &models.Variation{Name: name, Title: title, Description: description, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Dimensions: dimensions, Weight: weight, Availability: availability, Sending: sending, Sku: sku}
 			if id, err := models.CreateVariation(common.Database, variation); err == nil {
+				if name == "" {
+					variation.Name = fmt.Sprintf("new-variation-%d", variation.ID)
+					variation.Title = fmt.Sprintf("New Variation %d", variation.ID)
+					if err = models.UpdateVariation(common.Database, variation); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+				}
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
 					p := path.Join(dir, "storage", "variations")
 					if _, err := os.Stat(p); err != nil {
@@ -3405,6 +3415,14 @@ func putVariationHandler(c *fiber.Ctx) error {
 			if err != nil {
 				return err
 			}
+			var name string
+			if v, found := data.Value["Name"]; found && len(v) > 0 {
+				name = strings.TrimSpace(v[0])
+			}
+			if name == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Invalid title"})
+			}
 			var title string
 			if v, found := data.Value["Title"]; found && len(v) > 0 {
 				title = strings.TrimSpace(v[0])
@@ -3458,6 +3476,11 @@ func putVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Sku"]; found && len(v) > 0 {
 				sku = strings.TrimSpace(v[0])
 			}
+			var customization string
+			if v, found := data.Value["Customization"]; found && len(v) > 0 {
+				customization = strings.TrimSpace(v[0])
+			}
+			variation.Name = name
 			variation.Title = title
 			variation.Description = description
 			variation.BasePrice = basePrice
@@ -3469,6 +3492,7 @@ func putVariationHandler(c *fiber.Ctx) error {
 			variation.Availability = availability
 			variation.Sending = sending
 			variation.Sku = sku
+			variation.Customization = customization
 			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
 				// To delete existing
 				if variation.Thumbnail != "" {
@@ -5767,6 +5791,18 @@ func postFileHandler(c *fiber.Ctx) error {
 									}else{
 										logger.Errorf("%v", err.Error())
 									}
+								} else if v := c.Query("vid"); len(v) > 0 {
+									if id, err := strconv.Atoi(v); err == nil {
+										if variation, err := models.GetVariation(common.Database, id); err == nil {
+											if err = models.AddFileToVariation(common.Database, variation, file); err != nil {
+												logger.Errorf("%v", err.Error())
+											}
+										}else{
+											logger.Errorf("%v", err.Error())
+										}
+									}else{
+										logger.Errorf("%v", err.Error())
+									}
 								}
 								c.Status(http.StatusOK)
 								return c.JSON(file)
@@ -6240,6 +6276,51 @@ func postImageHandler(c *fiber.Ctx) error {
 																		if images, err := common.ImageResize(p2, common.Config.Resize.Image.Size); err == nil {
 																			for _, image := range images {
 																				images2 = append(images2, fmt.Sprintf("/%s/resize/%s %s", strings.Join([]string{"images", "products"}, "/"), image.Filename, image.Size))
+																			}
+																		} else {
+																			logger.Warningf("%v", err)
+																		}
+																	}
+																} else {
+																	logger.Warningf("%v", err)
+																}
+															}
+														}
+													}
+												}
+											}
+										}else{
+											logger.Errorf("%v", err.Error())
+										}
+									}else{
+										logger.Errorf("%v", err.Error())
+									}
+								}else if v := c.Query("vid"); len(v) > 0 {
+									if id, err := strconv.Atoi(v); err == nil {
+										if variation, err := models.GetVariation(common.Database, id); err == nil {
+											if err = models.AddImageToVariation(common.Database, variation, img); err != nil {
+												logger.Errorf("%v", err.Error())
+											}
+											// Images processing
+											if len(variation.Images) > 0 {
+												for _, image := range variation.Images {
+													if image.Path != "" {
+														if p1 := path.Join(dir, "storage", image.Path); len(p1) > 0 {
+															if fi, err := os.Stat(p1); err == nil {
+																filename := fmt.Sprintf("%d-image-%d%v", image.ID, fi.ModTime().Unix(), path.Ext(p1))
+																p2 := path.Join(dir, "hugo", "static", "images", "variations", filename)
+																logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
+																if _, err := os.Stat(path.Dir(p2)); err != nil {
+																	if err = os.MkdirAll(path.Dir(p2), 0755); err != nil {
+																		logger.Warningf("%v", err)
+																	}
+																}
+																if err = common.Copy(p1, p2); err == nil {
+																	images2 := []string{fmt.Sprintf("/%s/%s", strings.Join([]string{"images", "variations"}, "/"), filename)}
+																	if common.Config.Resize.Enabled && common.Config.Resize.Image.Enabled {
+																		if images, err := common.ImageResize(p2, common.Config.Resize.Image.Size); err == nil {
+																			for _, image := range images {
+																				images2 = append(images2, fmt.Sprintf("/%s/resize/%s %s", strings.Join([]string{"images", "variations"}, "/"), image.Filename, image.Size))
 																			}
 																		} else {
 																			logger.Warningf("%v", err)
@@ -12547,7 +12628,10 @@ type VariationView struct {
 	Availability string `json:",omitempty"`
 	Sending string `json:",omitempty"`
 	Sku string
+	Files []File2View `json:",omitempty"`
+	Images []ImageView `json:",omitempty"`
 	ProductId uint
+	Customization string
 }
 
 type HTTPMessage struct {

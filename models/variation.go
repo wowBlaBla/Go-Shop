@@ -1,7 +1,9 @@
 package models
 
 import (
+	"encoding/json"
 	"gorm.io/gorm"
+	"sort"
 	"time"
 )
 
@@ -13,8 +15,8 @@ type Variation struct {
 	Description string
 	Thumbnail string
 	Properties []*Property `gorm:"foreignKey:VariationId"`
-	BasePrice float64          `sql:"type:decimal(8,2);"`
-	SalePrice float64          `sql:"type:decimal(8,2);"`
+	BasePrice float64      `sql:"type:decimal(8,2);"`
+	SalePrice float64      `sql:"type:decimal(8,2);"`
 	Start time.Time
 	End time.Time
 	Dimensions string // width x height x depth in cm
@@ -22,6 +24,9 @@ type Variation struct {
 	Availability string
 	Sending string
 	Sku string
+	Images      []*Image   `gorm:"many2many:variations_images;"`
+	Files       []*File    `gorm:"many2many:variations_files;"`
+	Customization string
 	//
 	ProductId uint
 }
@@ -38,9 +43,35 @@ func GetVariationsByProductAndName(connector *gorm.DB, productId uint, name stri
 func GetVariation(connector *gorm.DB, id int) (*Variation, error) {
 	db := connector
 	var variation Variation
-	db.Preload("Properties").Preload("Properties.Option").Preload("Properties.Prices").Preload("Properties.Prices.Value").Find(&variation, id)
+	db.Preload("Properties").Preload("Properties.Option").Preload("Properties.Prices").Preload("Properties.Prices.Value").Preload("Images").Preload("Files").Find(&variation, id)
 	if err := db.Error; err != nil {
 		return nil, err
+	}
+	// Customization
+	var customization struct {
+		Images struct {
+			Order []uint
+		}
+	}
+	if err := json.Unmarshal([]byte(variation.Customization), &customization); err == nil {
+		images := variation.Images
+		sort.SliceStable(images, func(i, j int) bool {
+			var x, y = -1, -1
+			for k, id := range customization.Images.Order {
+				if id == images[i].ID {
+					x = k
+				}
+				if id == images[j].ID {
+					y = k
+				}
+			}
+			if x == -1 || y == -1 {
+				return images[i].ID < images[j].ID
+			}else{
+				return x < y
+			}
+		})
+		variation.Images = images
 	}
 	return &variation, nil
 }
@@ -52,6 +83,16 @@ func CreateVariation(connector *gorm.DB, variation *Variation) (uint, error) {
 		return 0, err
 	}
 	return variation.ID, nil
+}
+
+func AddFileToVariation(connector *gorm.DB, variation *Variation, file *File) error {
+	db := connector
+	return db.Model(&variation).Association("Files").Append(file)
+}
+
+func AddImageToVariation(connector *gorm.DB, variation *Variation, image *Image) error {
+	db := connector
+	return db.Model(&variation).Association("Images").Append(image)
 }
 
 func UpdateVariation(connector *gorm.DB, variation *Variation) error {
