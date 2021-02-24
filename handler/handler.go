@@ -691,25 +691,66 @@ func putBasicSettingsHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
+	restart := true
+	message := "OK"
 	common.Config.Debug = request.Debug
 	common.Config.Preview = request.Preview
 	// Payment
 	common.Config.Payment = request.Payment
 	// Resize
+	if (request.Resize.Enabled && !common.Config.Resize.Enabled) ||
+		(request.Resize.Enabled && common.Config.Resize.Quality != request.Resize.Quality) ||
+		(request.Resize.Enabled && request.Resize.Thumbnail.Enabled && common.Config.Resize.Thumbnail.Size != request.Resize.Thumbnail.Size) ||
+		(request.Resize.Enabled && request.Resize.Image.Enabled && common.Config.Resize.Image.Size != request.Resize.Image.Size) {
+
+		logger.Infof("Render required")
+		
+		bin := strings.Split(common.Config.Hugo.Bin, " ")
+		//
+		var arguments []string
+		if len(bin) > 1 {
+			for _, x := range bin[1:]{
+				x = strings.Replace(x, "%DIR%", dir, -1)
+				arguments = append(arguments, x)
+			}
+		}
+		arguments = append(arguments, "--cleanDestinationDir")
+		if common.Config.Hugo.Minify {
+			arguments = append(arguments, "--minify")
+		}
+		if len(bin) == 1 {
+			arguments = append(arguments, []string{"-s", path.Join(dir, "hugo")}...)
+		}
+		cmd := exec.Command(bin[0], arguments...)
+		buff := &bytes.Buffer{}
+		cmd.Stderr = buff
+		cmd.Stdout = buff
+		err := cmd.Start()
+		if err == nil {
+			message = "Background process run"
+			restart = false
+		} else {
+			stdout := buff.String()
+			stderr := err.Error()
+			logger.Errorf("%v\n%v", stdout, stderr)
+		}
+	}
 	common.Config.Resize = request.Resize
 	// Notification
 	common.Config.Notification = request.Notification
 	// Restart
-	go func() {
-		time.Sleep(1 * time.Second)
-		logger.Infof("Restart application because of settings change")
-		os.Exit(0)
-	}()
+	if restart {
+		go func() {
+			time.Sleep(1 * time.Second)
+			logger.Infof("Restart application because of settings change")
+			os.Exit(0)
+		}()
+	}
 	if err := common.Config.Save(); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
-	return c.JSON(HTTPMessage{"OK"})
+	return c.JSON(HTTPMessage{message})
 }
 
 type HugoSettingsView struct {
