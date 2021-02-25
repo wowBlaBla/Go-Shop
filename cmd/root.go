@@ -292,6 +292,50 @@ var RootCmd = &cobra.Command{
 		if err := common.Database.AutoMigrate(&models.Profile{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
+		// Manual database migration
+		/*reDimension := regexp.MustCompile(`^([0-9\.,]+)\s*x\s*([0-9\.,]+)\s*x\s*([0-9\.,]+)\s*`)
+		if products, err := models.GetProducts(common.Database); err == nil {
+			for _, product := range products {
+				if product.Dimensions != "" {
+					if res := reDimension.FindAllStringSubmatch(product.Dimensions, 1); len(res) > 0 && len(res[0]) > 1 {
+						if v, err := strconv.ParseFloat(strings.Replace(res[0][1], ",", ".", 1), 10); err == nil {
+							product.Width = v
+						}
+						if v, err := strconv.ParseFloat(strings.Replace(res[0][2], ",", ".", 1), 10); err == nil {
+							product.Height = v
+						}
+						if v, err := strconv.ParseFloat(strings.Replace(res[0][3], ",", ".", 1), 10); err == nil {
+							product.Depth = v
+						}
+						product.Dimensions = ""
+					}
+					if err = models.UpdateProduct(common.Database, product); err != nil {
+						logger.Warningf("%+v", err)
+					}
+				}
+			}
+		}
+		if variations, err := models.GetVariations(common.Database); err == nil {
+			for _, variation := range variations {
+				if variation.Dimensions != "" {
+					if res := reDimension.FindAllStringSubmatch(variation.Dimensions, 1); len(res) > 0 && len(res[0]) > 1 {
+						if v, err := strconv.ParseFloat(strings.Replace(res[0][1], ",", ".", 1), 10); err == nil {
+							variation.Width = v
+						}
+						if v, err := strconv.ParseFloat(strings.Replace(res[0][2], ",", ".", 1), 10); err == nil {
+							variation.Height = v
+						}
+						if v, err := strconv.ParseFloat(strings.Replace(res[0][3], ",", ".", 1), 10); err == nil {
+							variation.Depth = v
+						}
+						variation.Dimensions = ""
+					}
+					if err = models.UpdateVariation(common.Database, variation); err != nil {
+						logger.Warningf("%+v", err)
+					}
+				}
+			}
+		}*/
 		// Project structure
 		if admin := path.Join(dir, "admin"); len(admin) > 0 {
 			if _, err := os.Stat(admin); err != nil {

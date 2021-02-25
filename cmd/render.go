@@ -324,6 +324,41 @@ var renderCmd = &cobra.Command{
 													if max < variation.BasePrice {
 														max = variation.BasePrice
 													}
+													// Price
+													if categoryFile.Price.Min > variation.BasePrice || categoryFile.Price.Min == 0 {
+														categoryFile.Price.Min = variation.BasePrice
+													}
+													if categoryFile.Price.Max < variation.BasePrice {
+														categoryFile.Price.Max = variation.BasePrice
+													}
+													// Width
+													if categoryFile.Dimensions.Width.Min > variation.Width || categoryFile.Dimensions.Width.Min == 0 {
+														categoryFile.Dimensions.Width.Min = variation.Width
+													}
+													if categoryFile.Dimensions.Width.Max < variation.Width {
+														categoryFile.Dimensions.Width.Max = variation.Width
+													}
+													// Height
+													if categoryFile.Dimensions.Height.Min > variation.Height || categoryFile.Dimensions.Height.Min == 0 {
+														categoryFile.Dimensions.Height.Min = variation.Height
+													}
+													if categoryFile.Dimensions.Height.Max < variation.Height {
+														categoryFile.Dimensions.Height.Max = variation.Height
+													}
+													// Depth
+													if categoryFile.Dimensions.Depth.Min > variation.Depth || categoryFile.Dimensions.Depth.Min == 0 {
+														categoryFile.Dimensions.Depth.Min = variation.Depth
+													}
+													if categoryFile.Dimensions.Depth.Max < variation.Depth {
+														categoryFile.Dimensions.Depth.Max = variation.Depth
+													}
+													// Weight
+													if categoryFile.Weight.Min > variation.Weight || categoryFile.Weight.Min == 0 {
+														categoryFile.Weight.Min = variation.Weight
+													}
+													if categoryFile.Weight.Max < variation.Weight {
+														categoryFile.Weight.Max = variation.Weight
+													}
 													// Products parameters
 													for _, parameter := range product.Parameters {
 														if parameter.ID > 0 && parameter.Filtering && parameter.Option != nil {
@@ -912,7 +947,9 @@ var renderCmd = &cobra.Command{
 									SalePrice:    product.SalePrice,
 									Start:        product.Start,
 									End:          product.End,
-									Dimensions:   product.Dimensions,
+									Width:        product.Width,
+									Height:       product.Height,
+									Depth:        product.Depth,
 									Weight:       product.Weight,
 									Availability: product.Availability,
 									Sending:      product.Sending,
@@ -945,7 +982,10 @@ var renderCmd = &cobra.Command{
 											//Thumbnail:   variation.Thumbnail,
 											Description: variation.Description,
 											BasePrice:   variation.BasePrice,
-											Dimensions: variation.Dimensions,
+											//Dimensions: variation.Dimensions,
+											Width: variation.Width,
+											Height: variation.Height,
+											Depth: variation.Depth,
 											Weight: variation.Weight,
 											Availability: variation.Availability,
 											Sending: variation.Sending,
@@ -1189,7 +1229,11 @@ var renderCmd = &cobra.Command{
 									Images:      strings.Join(images, ";"),
 									Variations:  strings.Join(variations, ";"),
 									CategoryID:  category.ID,
-									BasePrice:   basePriceMin,
+									Price:       basePriceMin,
+									Width:       product.Width,
+									Height:      product.Height,
+									Depth:       product.Depth,
+									Weight:      product.Weight,
 								}); err != nil {
 									logger.Warningf("%v", err)
 								}

@@ -19,7 +19,10 @@ type Variation struct {
 	SalePrice float64      `sql:"type:decimal(8,2);"`
 	Start time.Time
 	End time.Time
-	Dimensions string // width x height x depth in cm
+	//Dimensions string // width x height x depth in cm
+	Width float64 `sql:"type:decimal(8,2);"`
+	Height float64 `sql:"type:decimal(8,2);"`
+	Depth float64 `sql:"type:decimal(8,2);"`
 	Weight float64 `sql:"type:decimal(8,2);"`
 	Availability string
 	Sending string
@@ -29,6 +32,16 @@ type Variation struct {
 	Customization string
 	//
 	ProductId uint
+}
+
+func GetVariations(connector *gorm.DB) ([]*Variation, error) {
+	db := connector
+	var variations []*Variation
+	db.Debug().Find(&variations)
+	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return variations, nil
 }
 
 func GetVariationsByProductAndName(connector *gorm.DB, productId uint, name string) ([]*Variation, error) {

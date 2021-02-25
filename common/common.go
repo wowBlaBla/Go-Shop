@@ -29,7 +29,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210224180141"
+	COMPILED = "20210225164201"
 	//
 	Started          time.Time
 	Config           *config.Config
@@ -54,9 +54,23 @@ type CategoryFile struct {
 	BasePriceMax float64
 	Properties   []*PropertyCF
 	Options      []*OptionCF
+	Price        MiniMaxCF
+	Dimensions   DimensionsCF
+	Weight       MiniMaxCF
 	Type         string
 	//
 	Content string
+}
+
+type MiniMaxCF struct {
+	Min float64
+	Max float64
+}
+
+type DimensionsCF struct {
+	Width MiniMaxCF
+	Height MiniMaxCF
+	Depth MiniMaxCF
 }
 
 type PropertyCF struct {
@@ -90,7 +104,10 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		Path string
 		BasePriceMin float64
 		BasePriceMax float64
+		Price MiniMaxCF
 		Options []*OptionCF
+		Dimensions DimensionsCF
+		Weight MiniMaxCF
 		Type string
 	}{
 		ID: p.ID,
@@ -101,6 +118,9 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		BasePriceMin: p.BasePriceMin,
 		BasePriceMax: p.BasePriceMax,
 		Options: p.Options,
+		Price: p.Price,
+		Dimensions: p.Dimensions,
+		Weight: p.Weight,
 		Type: p.Type,
 	}, "", "   "); err == nil {
 		bts = append(bts, "\n\n"...)
@@ -231,7 +251,9 @@ type VariationPF struct {
 	SalePrice  float64 `json:",omitempty"`
 	Start *time.Time `json:",omitempty"`
 	End *time.Time `json:",omitempty"`
-	Dimensions string `json:",omitempty"`
+	Width float64
+	Height float64
+	Depth float64
 	Weight float64 `json:",omitempty"`
 	Availability string `json:",omitempty"`
 	Sending string `json:",omitempty"`

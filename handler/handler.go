@@ -2236,9 +2236,23 @@ func postProductsHandler(c *fiber.Ctx) error {
 					basePrice = vv
 				}
 			}
-			var dimensions string
-			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
-				dimensions = strings.TrimSpace(v[0])
+			var width float64
+			if v, found := data.Value["Width"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					width = vv
+				}
+			}
+			var height float64
+			if v, found := data.Value["Height"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					height = vv
+				}
+			}
+			var depth float64
+			if v, found := data.Value["Depth"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					depth = vv
+				}
 			}
 			var weight float64
 			if v, found := data.Value["Weight"]; found && len(v) > 0 {
@@ -2266,7 +2280,7 @@ func postProductsHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Customization"]; found && len(v) > 0 {
 				customization = strings.TrimSpace(v[0])
 			}
-			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Parameters: parameters, CustomParameters: customParameters, Variation: variation, BasePrice: basePrice, Dimensions: dimensions, Weight: weight, Availability: availability, Sending: sending, Sku: sku, Content: content, Customization: customization}
+			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Parameters: parameters, CustomParameters: customParameters, Variation: variation, BasePrice: basePrice, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, Sending: sending, Sku: sku, Content: content, Customization: customization}
 			if _, err := models.CreateProduct(common.Database, product); err == nil {
 				// Create new product automatically
 				if name == "" {
@@ -2633,9 +2647,23 @@ func putProductHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["End"]; found && len(v) > 0 {
 				end, _ = time.Parse(time.RFC3339, v[0])
 			}
-			var dimensions string
-			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
-				dimensions = strings.TrimSpace(v[0])
+			var width float64
+			if v, found := data.Value["Width"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					width = vv
+				}
+			}
+			var height float64
+			if v, found := data.Value["Height"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					height = vv
+				}
+			}
+			var depth float64
+			if v, found := data.Value["Depth"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					depth = vv
+				}
 			}
 			var weight float64
 			if v, found := data.Value["Weight"]; found && len(v) > 0 {
@@ -2683,8 +2711,9 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Start = start
 			oldEnd := product.End
 			product.End = end
-			oldDimensions := product.Dimensions
-			product.Dimensions = dimensions
+			product.Width = width
+			product.Height = height
+			product.Depth = depth
 			oldWeight := product.Weight
 			product.Weight = weight
 			oldAvailability := product.Availability
@@ -2710,9 +2739,6 @@ func putProductHandler(c *fiber.Ctx) error {
 						}
 						if !oldEnd.Equal(end) {
 							variation.End = product.End
-						}
-						if oldDimensions != dimensions {
-							variation.Dimensions = product.Dimensions
 						}
 						if math.Abs(oldWeight - weight) > 0.01 {
 							variation.Weight = product.Weight
@@ -3343,9 +3369,23 @@ func postVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["SalePrice"]; found && len(v) > 0 {
 				salePrice, _ = strconv.ParseFloat(v[0], 10)
 			}
-			var dimensions string
-			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
-				dimensions = strings.TrimSpace(v[0])
+			var width float64
+			if v, found := data.Value["Width"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					width = vv
+				}
+			}
+			var height float64
+			if v, found := data.Value["Height"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					height = vv
+				}
+			}
+			var depth float64
+			if v, found := data.Value["Depth"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					depth = vv
+				}
 			}
 			var weight float64
 			if v, found := data.Value["Weight"]; found && len(v) > 0 {
@@ -3365,7 +3405,7 @@ func postVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Sku"]; found && len(v) > 0 {
 				sku = strings.TrimSpace(v[0])
 			}
-			variation := &models.Variation{Name: name, Title: title, Description: description, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Dimensions: dimensions, Weight: weight, Availability: availability, Sending: sending, Sku: sku}
+			variation := &models.Variation{Name: name, Title: title, Description: description, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, Sending: sending, Sku: sku}
 			if id, err := models.CreateVariation(common.Database, variation); err == nil {
 				if name == "" {
 					variation.Name = fmt.Sprintf("new-variation-%d", variation.ID)
@@ -3495,9 +3535,23 @@ func putVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["End"]; found && len(v) > 0 {
 				end, _ = time.Parse(time.RFC3339, v[0])
 			}
-			var dimensions string
-			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
-				dimensions = strings.TrimSpace(v[0])
+			var width float64
+			if v, found := data.Value["Width"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					width = vv
+				}
+			}
+			var height float64
+			if v, found := data.Value["Height"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					height = vv
+				}
+			}
+			var depth float64
+			if v, found := data.Value["Depth"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					depth = vv
+				}
 			}
 			var weight float64
 			if v, found := data.Value["Weight"]; found && len(v) > 0 {
@@ -3528,7 +3582,9 @@ func putVariationHandler(c *fiber.Ctx) error {
 			variation.SalePrice = salePrice
 			variation.Start = start
 			variation.End = end
-			variation.Dimensions = dimensions
+			variation.Width = width
+			variation.Height = height
+			variation.Depth = depth
 			variation.Weight = weight
 			variation.Availability = availability
 			variation.Sending = sending
@@ -10286,7 +10342,11 @@ type ProductsFilterItem struct {
 	Description string
 	Images string
 	Variations string
-	BasePrice float64
+	Price float64
+	Width float64
+	Height float64
+	Depth float64
+	Weight float64
 	CategoryId uint
 }
 
@@ -10330,20 +10390,20 @@ func postFilterHandler(c *fiber.Ctx) error {
 		for key, value := range request.Filter {
 			if key != "" && len(strings.TrimSpace(value)) > 0 {
 				switch key {
-				case "BasePrice":
+				case "Price", "Width", "Height", "Depth", "Weight":
 					parts := strings.Split(value, "-")
 					if len(parts) == 1 {
 						if v, err := strconv.Atoi(parts[0]); err == nil {
-							keys1 = append(keys1, "cache_products.Base_Price == ?")
+							keys1 = append(keys1, "cache_products." + key + " == ?")
 							values1 = append(values1, v)
 						}
 					} else {
 						if v, err := strconv.Atoi(parts[0]); err == nil {
-							keys1 = append(keys1, "cache_products.Base_Price >= ?")
+							keys1 = append(keys1, "cache_products." + key + " >= ?")
 							values1 = append(values1, v)
 						}
 						if v, err := strconv.Atoi(parts[1]); err == nil {
-							keys1 = append(keys1, "cache_products.Base_Price <= ?")
+							keys1 = append(keys1, "cache_products." + key + " <= ?")
 							values1 = append(values1, v)
 						}
 					}
@@ -10390,8 +10450,8 @@ func postFilterHandler(c *fiber.Ctx) error {
 		for key, value := range request.Sort {
 			if key != "" && value != "" {
 				switch key {
-				case "BasePrice":
-					orders = append(orders, fmt.Sprintf("cache_products.%v %v", "Base_Price", value))
+				case "Price":
+					orders = append(orders, fmt.Sprintf("cache_products.%v %v", "Price", value))
 				default:
 					orders = append(orders, fmt.Sprintf("cache_products.%v %v", key, value))
 				}
@@ -10401,7 +10461,7 @@ func postFilterHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.CacheProduct{}).Select("cache_products.ID, cache_products.Name, cache_products.Title, cache_products.Path, cache_products.Description, cache_products.Thumbnail, cache_products.Images, cache_products.Variations, cache_products.Base_Price as BasePrice, cache_products.Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join prices on prices.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...)/*.Having(strings.Join(keys2, " and "), values2...)*/.Group("cache_products.product_id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.CacheProduct{}).Select("cache_products.ID, cache_products.Name, cache_products.Title, cache_products.Path, cache_products.Description, cache_products.Thumbnail, cache_products.Images, cache_products.Variations, cache_products.Price as Price, cache_products.Width as Width, cache_products.Height as Height, cache_products.Depth as Depth,  cache_products.Weight as Weight, cache_products.Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join prices on prices.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...)/*.Having(strings.Join(keys2, " and "), values2...)*/.Group("cache_products.product_id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		for rows.Next() {
 			var item ProductsFilterItem
@@ -10414,8 +10474,8 @@ func postFilterHandler(c *fiber.Ctx) error {
 		rows.Close()
 	}
 	//
-	common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Base_Price as BasePrice, Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join prices on prices.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...).Count(&response.Filtered)
-	common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Base_Price as BasePrice, Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join prices on prices.Property_Id = properties.Id").Where("Path LIKE ?", relPath + "%").Count(&response.Total)
+	common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Price, Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join prices on prices.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...).Count(&response.Filtered)
+	common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Price, Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join prices on prices.Property_Id = properties.Id").Where("Path LIKE ?", relPath + "%").Count(&response.Total)
 	//
 	c.Status(http.StatusOK)
 	return c.JSON(response)
@@ -10885,14 +10945,18 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 			var title string
 			var basePrice, salePrice, weight float64
 			var start, end time.Time
-			var dimensions string
+			//var dimensions string
+			var width, height, depth float64
 			if variationId == 0 {
 				title = "default"
 				basePrice = product.BasePrice
 				salePrice = product.SalePrice
 				start = product.Start
 				end = product.End
-				dimensions = product.Dimensions
+				//dimensions = product.Dimensions
+				width = product.Width
+				height = product.Height
+				depth = product.Depth
 				weight = product.Weight
 			} else {
 				if variation, err := models.GetVariation(common.Database, variationId); err == nil {
@@ -10906,7 +10970,9 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 					salePrice = variation.SalePrice
 					start = variation.Start
 					end = variation.End
-					dimensions = variation.Dimensions
+					width = variation.Width
+					height = variation.Height
+					depth = variation.Depth
 					weight = variation.Weight
 				} else {
 					return nil, nil, err
@@ -10928,21 +10994,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 			}else{
 				item.Price = salePrice
 			}
-			if res := reVolume.FindAllStringSubmatch(dimensions, 1); len(res) > 0 && len(res[0]) > 1 {
-				var width float64
-				if v, err := strconv.ParseFloat(res[0][1], 10); err == nil {
-					width = v
-				}
-				var height float64
-				if v, err := strconv.ParseFloat(res[0][2], 10); err == nil {
-					height = v
-				}
-				var depth float64
-				if v, err := strconv.ParseFloat(res[0][3], 10); err == nil {
-					depth = v
-				}
-				item.Volume = width * height * depth / 1000000.0
-			}
+			item.Volume = width * height * depth / 1000000.0
 			item.Weight = weight
 			//
 			if breadcrumbs := models.GetBreadcrumbs(common.Database, categoryId); len(breadcrumbs) > 0 {
@@ -12583,7 +12635,9 @@ type ProductView struct {
 	SalePrice float64 `json:",omitempty"`
 	Start *time.Time `json:",omitempty"`
 	End *time.Time `json:",omitempty"`
-	Dimensions string `json:",omitempty"`
+	Width float64 `json:",omitempty"`
+	Height float64 `json:",omitempty"`
+	Depth float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
 	Availability string `json:",omitempty"`
 	Sending string `json:",omitempty"`
@@ -12664,7 +12718,9 @@ type VariationView struct {
 			Sending string `json:",omitempty"`
 		}
 	}
-	Dimensions string `json:",omitempty"`
+	Width float64 `json:",omitempty"`
+	Height float64 `json:",omitempty"`
+	Depth float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
 	Availability string `json:",omitempty"`
 	Sending string `json:",omitempty"`
@@ -12806,14 +12862,18 @@ func Delivery(transport *models.Transport, tariff *models.Tariff, items []NewIte
 			//var title string
 			var basePrice, /*salePrice,*/ weight float64
 			//var start, end time.Time
-			var dimensions string
+			//var dimensions string
+			var width, height, depth float64
 			if variationId == 0 {
 				//title = "default"
 				basePrice = product.BasePrice
 				//salePrice = product.SalePrice
 				//start = product.Start
 				//end = product.End
-				dimensions = product.Dimensions
+				//dimensions = product.Dimensions
+				width = product.Width
+				height = product.Height
+				depth = product.Depth
 				weight = product.Weight
 			} else {
 				var variation *models.Variation
@@ -12830,7 +12890,10 @@ func Delivery(transport *models.Transport, tariff *models.Tariff, items []NewIte
 				//salePrice = variation.SalePrice
 				//start = variation.Start
 				//end = variation.End
-				dimensions = variation.Dimensions
+				//dimensions = variation.Dimensions
+				width = product.Width
+				height = product.Height
+				depth = product.Depth
 				weight = variation.Weight
 			}
 			// Sum
@@ -12849,23 +12912,9 @@ func Delivery(transport *models.Transport, tariff *models.Tariff, items []NewIte
 				fee = itemFixed
 			}
 			// Volume
-			if res := reVolume.FindAllStringSubmatch(dimensions, 1); len(res) > 0 && len(res[0]) > 1 {
-				var width float64
-				if v, err := strconv.ParseFloat(res[0][1], 10); err == nil {
-					width = v
-				}
-				var height float64
-				if v, err := strconv.ParseFloat(res[0][2], 10); err == nil {
-					height = v
-				}
-				var depth float64
-				if v, err := strconv.ParseFloat(res[0][3], 10); err == nil {
-					depth = v
-				}
-				volume := width * height * depth / 1000000.0
-				result.Volume += volume
-				result.ByVolume += volume * m3 + fee
-			}
+			volume := width * height * depth / 1000000.0
+			result.Volume += volume
+			result.ByVolume += volume * m3 + fee
 			// Weight
 			result.Weight += weight
 			result.ByWeight += weight * kg + fee

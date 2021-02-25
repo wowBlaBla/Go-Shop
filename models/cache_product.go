@@ -13,7 +13,11 @@ type CacheProduct struct {
 	Images string
 	Variations string
 	CategoryID  uint
-	BasePrice   float64 // min value
+	Price   float64 // min value
+	Width float64
+	Height float64
+	Depth float64
+	Weight float64
 }
 
 func (CacheProduct) TableName() string {
