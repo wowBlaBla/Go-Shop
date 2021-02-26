@@ -2,7 +2,6 @@ package models
 
 import (
 	"encoding/json"
-	"github.com/google/logger"
 	"gorm.io/gorm"
 	"sort"
 	"time"
@@ -147,7 +146,6 @@ func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 		for i, variation := range product.Variations {
 			if err := json.Unmarshal([]byte(variation.Customization), &customization); err == nil {
 				images := variation.Images
-				logger.Infof("images1: %+v", images)
 				sort.SliceStable(images, func(i, j int) bool {
 					var x, y = -1, -1
 					for k, id := range customization.Images.Order {
@@ -164,7 +162,6 @@ func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 						return x < y
 					}
 				})
-				logger.Infof("images2: %+v", images)
 				product.Variations[i].Images = images
 			}
 		}

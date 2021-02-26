@@ -70,6 +70,7 @@ type Config struct {
 	}
 	//
 	Products string
+	FlatUrl bool
 	//
 	Resize ResizeConfig
 	//
@@ -81,6 +82,7 @@ type Config struct {
 	Wrangler WranglerConfig
 	//
 	Currency string // usd, eur
+	Symbol string // $, €
 	//
 	Payment PaymentConfig
 	Notification NotificationConfig

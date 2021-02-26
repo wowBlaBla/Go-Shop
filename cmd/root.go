@@ -92,6 +92,7 @@ func initConfig() {
 			common.Config.Wrangler.Bin = "/usr/bin/docker run --rm -v %DIR%/hugo/public:/hugo/public -v %DIR%/worker/workers-site:/worker/workers-site -v %DIR%/worker/wrangler.toml:/worker/wrangler.toml goshop_wrangler"
 		}
 		common.Config.Products = "Products"
+		common.Config.FlatUrl = true
 		common.Config.Resize.Quality = 75
 		common.Config.Resize.Thumbnail.Size = "64x0,128x0,256x0"
 		common.Config.Resize.Image.Size= "128x0,324x0,512x0"

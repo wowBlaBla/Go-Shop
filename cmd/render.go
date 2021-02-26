@@ -12,7 +12,6 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -67,7 +66,7 @@ var renderCmd = &cobra.Command{
 			logger.Fatalf("%v", err)
 		}
 		//
-		logger.Infof("Configure Hugo Theme index")
+		/*logger.Infof("Configure Hugo Theme index")
 		if p := path.Join(dir, "hugo", "themes", common.Config.Hugo.Theme, "layouts", "partials", "scripts.html"); len(p) > 0 {
 			if _, err = os.Stat(p); err == nil {
 				if bts, err := ioutil.ReadFile(p); err == nil {
@@ -88,7 +87,7 @@ var renderCmd = &cobra.Command{
 			}else{
 				logger.Warningf("File %v not found!", p)
 			}
-		}
+		}*/
 		//
 		t1 := time.Now()
 		if p := path.Join(dir, "hugo", "assets", "images", "variations"); p != "" {
@@ -145,8 +144,10 @@ var renderCmd = &cobra.Command{
 		// Categories
 		if categories, err := models.GetCategories(common.Database); err == nil {
 			// Clear existing "products" folder
-			if err := os.RemoveAll(path.Join(output, "products")); err != nil {
-				logger.Infof("%v", err)
+			if common.Config.Products != "" {
+				if err := os.RemoveAll(path.Join(output, strings.ToLower(common.Config.Products))); err != nil {
+					logger.Infof("%v", err)
+				}
 			}
 			logger.Infof("Categories found: %v", len(categories))
 			for i, category := range categories {
@@ -168,11 +169,9 @@ var renderCmd = &cobra.Command{
 					}
 				}
 				f3(common.Database, category.ID)
-				products := common.Config.Products
-				if products == "" {
-					products = "Products"
+				if common.Config.Products != "" {
+					*breadcrumbs = append([]*models.Category{{Name: strings.ToLower(common.Config.Products), Title: common.Config.Products, Model: gorm.Model{UpdatedAt: time.Now()}}}, *breadcrumbs...)
 				}
-				*breadcrumbs = append([]*models.Category{{Name: "products", Title: products, Model: gorm.Model{UpdatedAt: time.Now()}}}, *breadcrumbs...)
 				var names []string
 				for _, crumb := range *breadcrumbs {
 					names = append(names, crumb.Name)
@@ -200,6 +199,13 @@ var renderCmd = &cobra.Command{
 										Path:    "/" + path.Join(arr...),
 										Type:    "categories",
 										Content: category.Content,
+									}
+									if common.Config.FlatUrl {
+										if len(arr) == 1 && arr[0] == strings.ToLower(common.Config.Products) {
+											categoryFile.Url = "/" + strings.ToLower(common.Config.Products)
+										}else{
+											categoryFile.Url = "/" + path.Join(names[1:]...) + "/"
+										}
 									}
 									//
 									if category.Thumbnail != "" {
@@ -277,7 +283,9 @@ var renderCmd = &cobra.Command{
 								}
 							}
 							f3(common.Database, category.ID)
-							*breadcrumbs = append([]*models.Category{{Name: "products", Title: "Products", Model: gorm.Model{UpdatedAt: time.Now()}}}, *breadcrumbs...)
+							if common.Config.Products != "" {
+								*breadcrumbs = append([]*models.Category{{Name: strings.ToLower(common.Config.Products), Title: common.Config.Products, Model: gorm.Model{UpdatedAt: time.Now()}}}, *breadcrumbs...)
+							}
 							var names []string
 							for _, crumb := range *breadcrumbs {
 								names = append(names, crumb.Name)
@@ -1213,6 +1221,9 @@ var renderCmd = &cobra.Command{
 											logger.Errorf("%v", err)
 											return
 										}
+									}
+									if common.Config.FlatUrl {
+										view.Url = "/" + path.Join(append(names[1:], product.Name)...) + "/"
 									}
 									if err = common.WriteProductFile(file, view); err != nil {
 										logger.Errorf("%v", err)

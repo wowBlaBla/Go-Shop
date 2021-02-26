@@ -649,6 +649,10 @@ func getDashboardHandler(c *fiber.Ctx) error {
 
 type BasicSettingsView struct {
 	Debug bool
+	Currency string
+	Symbol string
+	Products string
+	FlatUrl bool
 	Preview      string
 	Payment      config.PaymentConfig
 	Resize       config.ResizeConfig
@@ -667,6 +671,10 @@ type BasicSettingsView struct {
 func getBasicSettingsHandler(c *fiber.Ctx) error {
 	var conf BasicSettingsView
 	conf.Debug = common.Config.Debug
+	conf.Currency = common.Config.Currency
+	conf.Symbol = common.Config.Symbol
+	conf.Products = common.Config.Products
+	conf.FlatUrl = common.Config.FlatUrl
 	conf.Preview = common.Config.Preview
 	conf.Payment = common.Config.Payment
 	conf.Resize = common.Config.Resize
@@ -691,61 +699,133 @@ func putBasicSettingsHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
-	restart := true
-	message := "OK"
+	// Hugo
+	var hugo bool
+	if request.Currency != common.Config.Currency {
+		common.Config.Currency = request.Currency
+		hugo = true
+	}
+	if request.Symbol != common.Config.Symbol {
+		common.Config.Symbol = request.Symbol
+		hugo = true
+	}
+	if request.Products != common.Config.Products {
+		if common.Config.Products != "" {
+			p := path.Join(dir, "hugo", "content", strings.ToLower(common.Config.Products))
+			if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+				if err = os.RemoveAll(p); err != nil {
+					logger.Errorf("%v", err.Error())
+				}
+			}
+		}
+		common.Config.Products = request.Products
+		hugo = true
+	}
+	if request.FlatUrl != common.Config.FlatUrl {
+		common.Config.FlatUrl = request.FlatUrl
+		hugo = true
+	}
+	if request.Payment.Mollie.ProfileID != common.Config.Payment.Mollie.ProfileID {
+		common.Config.Payment.Mollie.ProfileID = request.Payment.Mollie.ProfileID
+		hugo = true
+	}
+	if request.Payment.Stripe.PublishedKey != common.Config.Payment.Stripe.PublishedKey {
+		common.Config.Payment.Stripe.PublishedKey = request.Payment.Stripe.PublishedKey
+		hugo = true
+	}
+	if hugo {
+		var conf HugoSettingsView
+		if _, err := toml.DecodeFile(path.Join(dir, "hugo", "config.toml"), &conf); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+		//
+		conf.Params.Currency = strings.ToLower(common.Config.Currency)
+		conf.Params.Symbol = strings.ToLower(common.Config.Symbol)
+		conf.Params.Products = strings.ToLower(common.Config.Products)
+		conf.Params.MollieProfileId = common.Config.Payment.Mollie.ProfileID
+		conf.Params.StripePublishedKey = common.Config.Payment.Stripe.PublishedKey
+		//
+		f, err := os.Create(path.Join(dir, "hugo", "config.toml"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+		if err = toml.NewEncoder(f).Encode(conf); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}
+	//
+	var message string
 	common.Config.Debug = request.Debug
 	common.Config.Preview = request.Preview
 	// Payment
 	common.Config.Payment = request.Payment
-	// Resize
+	var render = hugo
+	// Resize ?
 	if (request.Resize.Enabled && !common.Config.Resize.Enabled) ||
 		(request.Resize.Enabled && common.Config.Resize.Quality != request.Resize.Quality) ||
 		(request.Resize.Enabled && request.Resize.Thumbnail.Enabled && common.Config.Resize.Thumbnail.Size != request.Resize.Thumbnail.Size) ||
 		(request.Resize.Enabled && request.Resize.Image.Enabled && common.Config.Resize.Image.Size != request.Resize.Image.Size) {
-
-		logger.Infof("Render required")
-		
-		bin := strings.Split(common.Config.Hugo.Bin, " ")
-		//
-		var arguments []string
-		if len(bin) > 1 {
-			for _, x := range bin[1:]{
-				x = strings.Replace(x, "%DIR%", dir, -1)
-				arguments = append(arguments, x)
-			}
-		}
-		arguments = append(arguments, "--cleanDestinationDir")
-		if common.Config.Hugo.Minify {
-			arguments = append(arguments, "--minify")
-		}
-		if len(bin) == 1 {
-			arguments = append(arguments, []string{"-s", path.Join(dir, "hugo")}...)
-		}
-		cmd := exec.Command(bin[0], arguments...)
-		buff := &bytes.Buffer{}
-		cmd.Stderr = buff
-		cmd.Stdout = buff
-		err := cmd.Start()
-		if err == nil {
-			message = "Background process run"
-			restart = false
-		} else {
-			stdout := buff.String()
-			stderr := err.Error()
-			logger.Errorf("%v\n%v", stdout, stderr)
-		}
+		render = true
 	}
-	common.Config.Resize = request.Resize
-	// Notification
-	common.Config.Notification = request.Notification
-	// Restart
-	if restart {
+	if render {
+		message = "Saved, background rendering started"
+		logger.Info(message)
+		go func() {
+			// Prepare
+			cmd := exec.Command(os.Args[0], "render", "-p", path.Join(dir, "hugo", "content"))
+			buff := &bytes.Buffer{}
+			cmd.Stderr = buff
+			cmd.Stdout = buff
+			if err := cmd.Run(); err != nil {
+				stdout := buff.String()
+				stderr := err.Error()
+				logger.Errorf("%v\n%v", stdout, stderr)
+			}
+			// Render
+			bin := strings.Split(common.Config.Hugo.Bin, " ")
+			var arguments []string
+			if len(bin) > 1 {
+				for _, x := range bin[1:]{
+					x = strings.Replace(x, "%DIR%", dir, -1)
+					arguments = append(arguments, x)
+				}
+			}
+			arguments = append(arguments, "--cleanDestinationDir")
+			if common.Config.Hugo.Minify {
+				arguments = append(arguments, "--minify")
+			}
+			if len(bin) == 1 {
+				arguments = append(arguments, []string{"-s", path.Join(dir, "hugo")}...)
+			}
+			cmd = exec.Command(bin[0], arguments...)
+			buff = &bytes.Buffer{}
+			cmd.Stderr = buff
+			cmd.Stdout = buff
+			if err := cmd.Run(); err != nil {
+				stdout := buff.String()
+				stderr := err.Error()
+				logger.Errorf("%v\n%v", stdout, stderr)
+			}
+			//
+			time.Sleep(1 * time.Second)
+			logger.Infof("Restart application because of settings change")
+			os.Exit(0)
+		}()
+	}else{
+		message = "OK"
 		go func() {
 			time.Sleep(1 * time.Second)
 			logger.Infof("Restart application because of settings change")
 			os.Exit(0)
 		}()
 	}
+	common.Config.Resize = request.Resize
+	// Notification
+	common.Config.Notification = request.Notification
+	//
 	if err := common.Config.Save(); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
@@ -761,6 +841,11 @@ type HugoSettingsView struct {
 		Description string `toml:"description"`
 		Keywords string `toml:"keywords"`
 		Logo string `toml:"logo"`
+		Currency string `toml:"currency"`
+		Symbol string `toml:"symbol"`
+		Products string `toml:"products"`
+		MollieProfileId string `toml:"mollieProfileId"`
+		StripePublishedKey string `toml:"stripePublishedKey"`
 	} `toml:"params"`
 	Languages map[string]struct {
 		LanguageName string `toml:"languageName"`
@@ -828,6 +913,12 @@ func putHugoSettingsHandler(c *fiber.Ctx) error {
 			}
 			if v, found := data.Value["Keywords"]; found && len(v) > 0 {
 				conf.Params.Keywords = v[0]
+			}
+			if v, found := data.Value["Currency"]; found && len(v) > 0 {
+				conf.Params.Currency = v[0]
+			}
+			if v, found := data.Value["Products"]; found && len(v) > 0 {
+				conf.Params.Products = v[0]
 			}
 			if v, found := data.Value["Theme"]; found && len(v) > 0 {
 				conf.Theme = v[0]

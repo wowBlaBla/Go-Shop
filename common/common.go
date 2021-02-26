@@ -29,7 +29,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210225164201"
+	COMPILED = "20210226151400"
 	//
 	Started          time.Time
 	Config           *config.Config
@@ -48,6 +48,7 @@ type CategoryFile struct {
 	ID           uint
 	Date         time.Time
 	Title        string
+	Url        string `json:",omitempty"`
 	Thumbnail    string
 	Path         string
 	BasePriceMin float64
@@ -99,6 +100,7 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		ID uint
 		Date time.Time
 		Title string
+		Url string
 		Description string
 		Thumbnail string
 		Path string
@@ -113,6 +115,7 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		ID: p.ID,
 		Date: p.Date,
 		Title: p.Title,
+		Url: p.Url,
 		Thumbnail: p.Thumbnail,
 		Path: p.Path,
 		BasePriceMin: p.BasePriceMin,
@@ -179,6 +182,7 @@ type ProductFile struct {
 	ID uint
 	Type       string
 	Title      string
+	Url        string `json:",omitempty"`
 	Date       time.Time
 	Tags       []string
 	Canonical  string
@@ -294,6 +298,7 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		ID uint
 		Type       string
 		Title      string
+		Url        string `json:",omitempty"`
 		Date       time.Time
 		Tags       []string
 		Canonical  string
@@ -309,6 +314,7 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		ID: p.ID,
 		Type: p.Type,
 		Title: p.Title,
+		Url: p.Url,
 		Date: p.Date,
 		Tags: p.Tags,
 		Canonical: p.Canonical,
