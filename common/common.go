@@ -29,7 +29,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210226151400"
+	COMPILED = "20210301184438"
 	//
 	Started          time.Time
 	Config           *config.Config
@@ -49,6 +49,7 @@ type CategoryFile struct {
 	Date         time.Time
 	Title        string
 	Url        string `json:",omitempty"`
+	Aliases    []string `json:",omitempty"`
 	Thumbnail    string
 	Path         string
 	BasePriceMin float64
@@ -101,6 +102,7 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		Date time.Time
 		Title string
 		Url string
+		Aliases    []string `json:",omitempty"`
 		Description string
 		Thumbnail string
 		Path string
@@ -116,6 +118,7 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		Date: p.Date,
 		Title: p.Title,
 		Url: p.Url,
+		Aliases: p.Aliases,
 		Thumbnail: p.Thumbnail,
 		Path: p.Path,
 		BasePriceMin: p.BasePriceMin,
@@ -179,21 +182,23 @@ func WriteCategoryFile(p string, categoryFile *CategoryFile) error {
 /**/
 
 type ProductFile struct {
-	ID uint
+	ID         uint
 	Type       string
 	Title      string
 	Url        string `json:",omitempty"`
+	Aliases    []string `json:",omitempty"`
 	Date       time.Time
 	Tags       []string
 	Canonical  string
 	Categories []string
-	CategoryId  uint
+	CategoryId uint
 	Thumbnail  string
 	BasePrice  string
 	SalePrice  string `json:",omitempty"`
-	Start *time.Time `json:",omitempty"`
-	End *time.Time `json:",omitempty"`
+	Start      *time.Time `json:",omitempty"`
+	End        *time.Time `json:",omitempty"`
 	Product    ProductPF
+	Related    []string `json:",omitempty"`
 	//
 	Content string
 }
@@ -299,6 +304,7 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Type       string
 		Title      string
 		Url        string `json:",omitempty"`
+		Aliases    []string `json:",omitempty"`
 		Date       time.Time
 		Tags       []string
 		Canonical  string
@@ -310,11 +316,13 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Start       *time.Time `json:",omitempty"`
 		End       *time.Time `json:",omitempty"`
 		Product    ProductPF
+		Related []string `json:",omitempty"`
 	}{
 		ID: p.ID,
 		Type: p.Type,
 		Title: p.Title,
 		Url: p.Url,
+		Aliases: p.Aliases,
 		Date: p.Date,
 		Tags: p.Tags,
 		Canonical: p.Canonical,
@@ -326,6 +334,7 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Start: p.Start,
 		End: p.End,
 		Product: p.Product,
+		Related: p.Related,
 	}, "", "   "); err == nil {
 		bts = append(bts, "\n\n"...)
 		bts = append(bts, p.Content...)

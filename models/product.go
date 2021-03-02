@@ -44,6 +44,8 @@ type Product struct {
 	Images      []*Image     `gorm:"many2many:products_images;"`
 	Tags        []*Tag `gorm:"many2many:products_tags;"`
 	//
+	//RelatedProducts []*Product `gorm:"many2many:products_related;"`
+	//
 	Customization string
 }
 
@@ -238,6 +240,21 @@ func DeleteAllCategoriesFromProduct(connector *gorm.DB, product *Product) error 
 func DeleteAllTagsFromProduct(connector *gorm.DB, product *Product) error {
 	db := connector
 	return db.Debug().Unscoped().Model(&product).Association("Tags").Clear()
+}
+
+/*func AddProductToCategory(connector *gorm.DB, category *Category, product *Product) error {
+	db := connector
+	return db.Model(&category).Association("Products").Append(product)
+}*/
+
+func AddProductToProduct(connector *gorm.DB, product1 *Product, product2 *Product) error {
+	db := connector
+	return db.Model(&product1).Association("RelatedProducts").Append(product2)
+}
+
+func DeleteAllProductsFromProduct(connector *gorm.DB, product *Product) error {
+	db := connector
+	return db.Debug().Unscoped().Model(&product).Association("RelatedProducts").Clear()
 }
 
 func UpdateProduct(connector *gorm.DB, product *Product) error {

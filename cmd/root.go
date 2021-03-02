@@ -277,6 +277,9 @@ var RootCmd = &cobra.Command{
 			logger.Warningf("%+v", err)
 		}
 		//
+		if err := common.Database.AutoMigrate(&models.CacheCategory{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
 		if err := common.Database.AutoMigrate(&models.CacheProduct{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
@@ -292,6 +295,20 @@ var RootCmd = &cobra.Command{
 		//
 		if err := common.Database.AutoMigrate(&models.Profile{}); err != nil {
 			logger.Warningf("%+v", err)
+		}
+		//
+		if err := common.Database.Exec(`CREATE TABLE IF NOT EXISTS products_relations (
+		ProductIdL BIGINT UNSIGNED NOT NULL,
+			ProductIdR BIGINT UNSIGNED NOT NULL,
+			PRIMARY KEY (ProductIdL, ProductIdR),
+			CONSTRAINT Constr_ProductIdL_ProductIdR_fk
+		FOREIGN KEY (ProductIdL) REFERENCES products (ID)
+		ON DELETE CASCADE ON UPDATE CASCADE,
+			CONSTRAINT Constr_ProductIdR_ProductIdL_fk
+		FOREIGN KEY (ProductIdR) REFERENCES products (ID)
+		ON DELETE CASCADE ON UPDATE CASCADE
+		)`).Error; err != nil {
+			logger.Errorf("%+v", err)
 		}
 		// Manual database migration
 		/*reDimension := regexp.MustCompile(`^([0-9\.,]+)\s*x\s*([0-9\.,]+)\s*x\s*([0-9\.,]+)\s*`)

@@ -407,16 +407,35 @@ func postResetHandler(c *fiber.Ctx) error {
 // @Router /api/v1/preview [get]
 // @Tags frontend
 func getPreviewHandler (c *fiber.Ctx) error {
-	logger.Infof("getPreviewHandler")
+	//logger.Infof("getPreviewHandler")
 	if v := c.Query("step", "1"); v == "1" {
-		logger.Infof("Step1")
+		//logger.Infof("Step1")
 		if v := c.Locals("auth"); v != nil {
-			logger.Infof("v: %+v", v)
+			//logger.Infof("v: %+v", v)
 			if vv, ok := v.(bool); ok && vv {
 				if u, err := url.Parse(c.Request().URI().String()); err == nil {
 					u.Scheme = "https"
 					u.Host = common.Config.Preview
 					query := u.Query()
+					if referer := string(c.Request().Header.Referer()); referer != "" {
+						if res := regexp.MustCompile(`/products/(\d+)`).FindAllStringSubmatch(referer, 1); len(res) > 0 && len(res[0]) > 1 {
+							if v, err := strconv.Atoi(res[0][1]); err == nil {
+								if c, err := models.GetCacheProductByProductId(common.Database, uint(v)); err == nil {
+									query.Set("referer", path.Join(c.Path, c.Name))
+
+								}
+							}
+						}else if res := regexp.MustCompile(`/categories/(\d+)`).FindAllStringSubmatch(referer, 1); len(res) > 0 && len(res[0]) > 1 {
+							logger.Infof("res: %+v", res)
+							if v, err := strconv.Atoi(res[0][1]); err == nil {
+								if c, err := models.GetCacheCategoryByProductId(common.Database, uint(v)); err == nil {
+									logger.Infof("c: %+v", c)
+									query.Set("referer", path.Join(c.Path, c.Name))
+
+								}
+							}
+						}
+					}
 					query.Set("step", "2")
 					enc, err := encrypt([]byte(common.SECRET), []byte(fmt.Sprintf("%d", time.Now().Unix())))
 					if err != nil {
@@ -438,7 +457,7 @@ func getPreviewHandler (c *fiber.Ctx) error {
 			return c.SendString(err.Error())
 		}
 	}else if v == "2" {
-		logger.Infof("Step2")
+		//logger.Infof("Step2")
 		if v := c.Query("token", ""); v != "" {
 			if token, err := base64.URLEncoding.DecodeString(v); err == nil {
 				if bts, err := decrypt([]byte(common.SECRET), token); err == nil {
@@ -454,6 +473,10 @@ func getPreviewHandler (c *fiber.Ctx) error {
 								HTTPOnly: true,
 							}
 							c.Cookie(cookie)
+							if referer := c.Query("referer", ""); referer != "" {
+								//logger.Infof("referer: %+v", referer)
+								return c.Redirect(referer, http.StatusFound)
+							}
 							return c.Redirect("/", http.StatusFound)
 						}else{
 							err := fmt.Errorf("token expired")
@@ -851,6 +874,15 @@ type HugoSettingsView struct {
 		LanguageName string `toml:"languageName"`
 		Weight int `toml:"weight"`
 	} `toml:"languages"`
+	Related struct {
+		IncludeNewer bool `toml:"includeNewer"`
+		Threshold int `toml:"threshold"`
+		ToLower bool `toml:"toLower"`
+		Indices []struct{
+			Name string `toml:"name"`
+			Weight int `toml:"weight"`
+		} `toml:"indices"`
+	} `toml:"related"`
 }
 
 // GetHugoSettings godoc
@@ -2638,6 +2670,40 @@ func getProductHandler(c *fiber.Ctx) error {
 		var view ProductView
 		if bts, err := json.MarshalIndent(product, "", "   "); err == nil {
 			if err = json.Unmarshal(bts, &view); err == nil {
+				// Related Products 2
+				if rows, err := common.Database.Debug().Table("products_relations").Select("products_relations.ProductIdL as ProductIdL, products_relations.ProductIdR as ProductIdR").Where("products_relations.ProductIdL = ? or products_relations.ProductIdR = ?", product.ID, product.ID).Rows(); err == nil {
+					for rows.Next() {
+						var r struct {
+							ProductIdL uint
+							ProductIdR uint
+						}
+						if err = common.Database.ScanRows(rows, &r); err == nil {
+							if r.ProductIdL == product.ID {
+								var found bool
+								for _, p := range view.RelatedProducts {
+									if p.ID == r.ProductIdR {
+										found = true
+										break
+									}
+								}
+								if !found {
+									view.RelatedProducts = append(view.RelatedProducts, RelatedProduct{ID: r.ProductIdR})
+								}
+							}else{
+								var found bool
+								for _, p := range view.RelatedProducts {
+									if p.ID == r.ProductIdL {
+										found = true
+										break
+									}
+								}
+								if !found {
+									view.RelatedProducts = append(view.RelatedProducts, RelatedProduct{ID: r.ProductIdL})
+								}
+							}
+						}
+					}
+				}
 				return c.JSON(view)
 			}else{
 				c.Status(http.StatusInternalServerError)
@@ -2929,6 +2995,51 @@ func putProductHandler(c *fiber.Ctx) error {
 					}
 				}
 			}
+			// Related Products
+			if err = models.DeleteAllProductsFromProduct(common.Database, product); err != nil {
+				logger.Errorf("%v", err)
+			}
+			if v, found := data.Value["RelatedProducts"]; found && len(v) > 0 {
+				for _, vv := range strings.Split(strings.TrimSpace(v[0]), ",") {
+					if productId, err := strconv.Atoi(strings.TrimSpace(vv)); err == nil {
+						if p, err := models.GetProduct(common.Database, productId); err == nil {
+							if err = models.AddProductToProduct(common.Database, product, p); err != nil {
+								logger.Errorf("%v", err)
+							}
+						}else{
+							logger.Errorf("%v", err)
+						}
+					}else{
+						logger.Errorf("%v", err)
+					}
+				}
+			}
+			// Related Products 2
+			if err := common.Database.Exec("delete from products_relations where ProductIdL = ? or ProductIdR = ?", product.ID, product.ID).Error; err != nil {
+				logger.Errorf("%+v", err)
+			}
+			if v, found := data.Value["RelatedProducts"]; found && len(v) > 0 {
+				for _, vv := range strings.Split(strings.TrimSpace(v[0]), ",") {
+					if productId, err := strconv.Atoi(strings.TrimSpace(vv)); err == nil {
+						if p, err := models.GetProduct(common.Database, productId); err == nil {
+							if err := common.Database.Exec("insert into products_relations (ProductIdL, ProductIdR) values (?, ?)", product.ID, p.ID).Error; err != nil {
+								logger.Errorf("%+v", err)
+							}
+						}
+					}
+				}
+			}
+			/*if rows, err := common.Database.Debug().Table("products_relations").Select("products_relations.ProductIdL as ProductIdL, products_relations.ProductIdR as ProductIdR").Where("products_relations.ProductIdL = ? or products_relations.ProductIdR = ?", product.ID, product.ID).Rows(); err == nil {
+				for rows.Next() {
+					var r struct{
+						ProductIdL uint
+						ProductIdR uint
+					}
+					if err = common.Database.ScanRows(rows, &r); err == nil {
+
+					}
+				}
+			}*/
 		}else{
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{"Unsupported Content-Type"})
@@ -12767,8 +12878,13 @@ type ProductView struct {
 	//
 	Categories []CategoryView `json:",omitempty"`
 	Tags []TagView `json:",omitempty"`
+	RelatedProducts []RelatedProduct `json:",omitempty"`
 	//
 	Customization string `json:",omitempty"`
+}
+
+type RelatedProduct struct {
+	ID uint
 }
 
 type VariationsView []VariationView
