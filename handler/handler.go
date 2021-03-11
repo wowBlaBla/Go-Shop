@@ -235,11 +235,17 @@ func GetFiber() *fiber.App {
 	v1.Get("/orders/:id", authRequired, getOrderHandler)
 	v1.Put("/orders/:id", authRequired, putOrderHandler)
 	v1.Delete("/orders/:id", authRequired, delOrderHandler)
-	//
+	// Transactions
 	v1.Post("/transactions/list", authRequired, postTransactionsListHandler)
 	v1.Get("/transactions/:id", authRequired, getTransactionHandler)
 	v1.Put("/transactions/:id", authRequired, putTransactionHandler)
 	v1.Delete("/transactions/:id", authRequired, delTransactionHandler)
+	// Widgets
+	v1.Post("/widgets", authRequired, changed("widget created"), postWidgetHandler)
+	v1.Post("/widgets/list", authRequired, postWidgetsListHandler)
+	v1.Get("/widgets/:id", authRequired, getWidgetHandler)
+	v1.Put("/widgets/:id", authRequired, changed("widget updated"), putWidgetHandler)
+	v1.Delete("/widgets/:id", authRequired, changed("widget deleted"), delWidgetHandler)
 	//
 	v1.Get("/me", authRequired, getMeHandler)
 	//
@@ -8079,6 +8085,347 @@ func delTransactionHandler(c *fiber.Ctx) error {
 	if transaction, err := models.GetTransaction(common.Database, id); err == nil {
 		if err = models.DeleteTransaction(common.Database, transaction); err == nil {
 			return c.JSON(HTTPMessage{"OK"})
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+type NewWidget struct {
+	Enabled bool
+	Name string
+	Title string
+	Description string
+	Content string
+	Location string
+	ApplyTo string
+}
+
+// @security BasicAuth
+// CreateWidget godoc
+// @Summary Create widget
+// @Accept json
+// @Produce json
+// @Param option body NewWidget true "body"
+// @Success 200 {object} WidgetView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/widgets [post]
+// @Tags widget
+func postWidgetHandler(c *fiber.Ctx) error {
+	var view WidgetView
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
+			var request NewWidget
+			if err := c.BodyParser(&request); err != nil {
+				return err
+			}
+			request.Name = strings.TrimSpace(request.Name)
+			if request.Name == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(fiber.Map{"ERROR": "Name is not defined"})
+			}
+			request.Title = strings.TrimSpace(request.Title)
+			if request.Title == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(fiber.Map{"ERROR": "Title is not defined"})
+			}
+			if len(request.Description) > 256 {
+				request.Description = request.Description[0:255]
+			}
+			widget := &models.Widget {
+				Enabled: request.Enabled,
+				Name: request.Name,
+				Title: request.Title,
+				Description: request.Description,
+				Content: request.Content,
+				Location: request.Location,
+				ApplyTo: request.ApplyTo,
+			}
+			if _, err := models.CreateWidget(common.Database, widget); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			if bts, err := json.Marshal(widget); err == nil {
+				if err = json.Unmarshal(bts, &view); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+			return c.JSON(view)
+		} else {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Unsupported Content-Type"})
+		}
+	}
+	return c.JSON(view)
+}
+
+type WidgetsListResponse struct {
+	Data []WidgetListItem
+	Filtered int64
+	Total int64
+}
+
+type WidgetListItem struct {
+	ID uint
+	Enabled bool
+	Name string
+	Title string
+	Description string
+	Location string
+	ApplyTo string
+}
+
+// @security BasicAuth
+// SearchWidgets godoc
+// @Summary Search widgets
+// @Accept json
+// @Produce json
+// @Param request body ListRequest true "body"
+// @Success 200 {object} WidgetsListResponse
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/widgets/list [post]
+// @Tags widget
+func postWidgetsListHandler(c *fiber.Ctx) error {
+	var response WidgetsListResponse
+	var request ListRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	if len(request.Sort) == 0 {
+		request.Sort["ID"] = "desc"
+	}
+	if request.Length == 0 {
+		request.Length = 10
+	}
+	// Filter
+	var keys1 []string
+	var values1 []interface{}
+	if len(request.Filter) > 0 {
+		for key, value := range request.Filter {
+			if key != "" && len(strings.TrimSpace(value)) > 0 {
+				switch key {
+				default:
+					keys1 = append(keys1, fmt.Sprintf("widgets.%v like ?", key))
+					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
+				}
+			}
+		}
+	}
+	// Sort
+	var order string
+	if len(request.Sort) > 0 {
+		var orders []string
+		for key, value := range request.Sort {
+			if key != "" && value != "" {
+				switch key {
+				default:
+					orders = append(orders, fmt.Sprintf("widgets.%v %v", key, value))
+				}
+			}
+		}
+		order = strings.Join(orders, ", ")
+	}
+	//
+	rows, err := common.Database.Debug().Model(&models.Widget{}).Select("widgets.ID, widgets.Enabled, widgets.Name, widgets.Title, widgets.Description, widgets.Location, widgets.Apply_To as ApplyTo").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	if err == nil {
+		if err == nil {
+			for rows.Next() {
+				var item WidgetListItem
+				if err = common.Database.ScanRows(rows, &item); err == nil {
+					response.Data = append(response.Data, item)
+				} else {
+					logger.Errorf("%v", err)
+				}
+			}
+		}else{
+			logger.Errorf("%v", err)
+		}
+		rows.Close()
+	}
+	rows, err = common.Database.Debug().Model(&models.Widget{}).Select("widgets.ID, widgets.Enabled, widgets.Name, widgets.Title, widgets.Description, widgets.Location, widgets.Apply_To as ApplyTo").Where(strings.Join(keys1, " and "), values1...).Rows()
+	if err == nil {
+		for rows.Next() {
+			response.Filtered ++
+		}
+		rows.Close()
+	}
+	if len(keys1) > 0 {
+		common.Database.Debug().Model(&models.Coupon{}).Count(&response.Total)
+	}else{
+		response.Total = response.Filtered
+	}
+	c.Status(http.StatusOK)
+	return c.JSON(response)
+}
+
+type WidgetView struct {
+	ID uint
+	Enabled bool
+	Name string `json:",omitempty"`
+	Title string `json:",omitempty"`
+	Description string `json:",omitempty"`
+	Content string `json:",omitempty"`
+	Location string `json:",omitempty"`
+	ApplyTo string `json:",omitempty"`
+	Categories []CategoryView `json:",omitempty"`
+	Products []ProductShortView `json:",omitempty"`
+}
+
+// @security BasicAuth
+// GetWidget godoc
+// @Summary Get widget
+// @Accept json
+// @Produce json
+// @Param id path int true "Widget ID"
+// @Success 200 {object} WidgetView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/widgets/{id} [get]
+// @Tags widget
+func getWidgetHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	if widget, err := models.GetWidget(common.Database, id); err == nil {
+		var view WidgetView
+		if bts, err := json.MarshalIndent(widget, "", "   "); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+type WidgetRequest struct {
+	WidgetView
+	Categories string
+	Products string
+}
+
+// @security BasicAuth
+// UpdateWidget godoc
+// @Summary update widget
+// @Accept json
+// @Produce json
+// @Param widget body WidgetShortView true "body"
+// @Param id path int true "Coupon ID"
+// @Success 200 {object} WidgetShortView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/widgets/{id} [put]
+// @Tags widget
+func putWidgetHandler(c *fiber.Ctx) error {
+	var request WidgetRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
+	}
+	var widget *models.Widget
+	var err error
+	if widget, err = models.GetWidget(common.Database, int(id)); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	widget.Enabled = request.Enabled
+	request.Name = strings.TrimSpace(request.Name)
+	if request.Name == "" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "Name is not defined"})
+	}
+	request.Title = strings.TrimSpace(request.Title)
+	if request.Title == "" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "Title is not defined"})
+	}
+	if len(request.Description) > 256 {
+		request.Description = request.Description[0:255]
+	}
+	widget.Title = request.Title
+	widget.Description = request.Description
+	widget.Content = request.Content
+	widget.Location = request.Location
+	widget.ApplyTo = request.ApplyTo
+	for _, v := range strings.Split(request.Categories, ",") {
+		if id, err := strconv.Atoi(v); err == nil {
+			if category, err := models.GetCategory(common.Database, id); err == nil {
+				if err = models.AddCategoryToWidget(common.Database, widget, category); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+		}
+	}
+	for _, v := range strings.Split(request.Products, ",") {
+		if id, err := strconv.Atoi(v); err == nil {
+			if product, err := models.GetProduct(common.Database, id); err == nil {
+				if err = models.AddProductToWidget(common.Database, widget, product); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+		}
+	}
+	if err := models.UpdateWidget(common.Database, widget); err == nil {
+		var view WidgetView
+		if bts, err := json.MarshalIndent(widget, "", "   "); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+// @security BasicAuth
+// DelWidget godoc
+// @Summary Delete widget
+// @Accept json
+// @Produce json
+// @Param id path int true "Widget ID"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/widgets/{id} [delete]
+// @Tags widget
+func delWidgetHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	if widget, err := models.GetWidget(common.Database, id); err == nil {
+		if err = models.DeleteWidget(common.Database, widget); err == nil {
+			return c.JSON(HTTPMessage{MESSAGE: "OK"})
 		}else{
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})

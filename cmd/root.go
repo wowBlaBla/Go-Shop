@@ -297,6 +297,10 @@ var RootCmd = &cobra.Command{
 			logger.Warningf("%+v", err)
 		}
 		//
+		if err := common.Database.AutoMigrate(&models.Widget{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
+		//
 		if err := common.Database.Exec(`CREATE TABLE IF NOT EXISTS products_relations (
 		ProductIdL BIGINT UNSIGNED NOT NULL,
 			ProductIdR BIGINT UNSIGNED NOT NULL,

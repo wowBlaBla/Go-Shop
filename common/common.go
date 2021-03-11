@@ -29,7 +29,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210310195816"
+	COMPILED = "20210311172302"
 	//
 	Started          time.Time
 	Config           *config.Config
@@ -59,6 +59,7 @@ type CategoryFile struct {
 	Price        MiniMaxCF
 	Dimensions   DimensionsCF
 	Weight       MiniMaxCF
+	Widgets      []WidgetCF
 	Type         string
 	//
 	Content string
@@ -79,6 +80,14 @@ type PropertyCF struct {
 	Name string
 	Title string
 	Values []*ValueCF
+}
+
+type WidgetCF struct {
+	Name    string
+	Title   string
+	Content string
+	Location string
+	ApplyTo string
 }
 
 type OptionCF struct {
@@ -112,6 +121,7 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		Options []*OptionCF
 		Dimensions DimensionsCF
 		Weight MiniMaxCF
+		Widgets []WidgetCF
 		Type string
 	}{
 		ID: p.ID,
@@ -127,6 +137,7 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		Price: p.Price,
 		Dimensions: p.Dimensions,
 		Weight: p.Weight,
+		Widgets: p.Widgets,
 		Type: p.Type,
 	}, "", "   "); err == nil {
 		bts = append(bts, "\n\n"...)
@@ -199,6 +210,7 @@ type ProductFile struct {
 	End        *time.Time `json:",omitempty"`
 	Product    ProductPF
 	Related    []string `json:",omitempty"`
+	Widgets    []WidgetCF `json:",omitempty"`
 	//
 	Content string
 }
@@ -322,6 +334,7 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		End       *time.Time `json:",omitempty"`
 		Product    ProductPF
 		Related []string `json:",omitempty"`
+		Widgets []WidgetCF `json:",omitempty"`
 	}{
 		ID: p.ID,
 		Type: p.Type,
@@ -340,6 +353,7 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		End: p.End,
 		Product: p.Product,
 		Related: p.Related,
+		Widgets: p.Widgets,
 	}, "", "   "); err == nil {
 		bts = append(bts, "\n\n"...)
 		bts = append(bts, p.Content...)

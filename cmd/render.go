@@ -142,6 +142,23 @@ var renderCmd = &cobra.Command{
 				}
 			}
 		}
+		// Widgets
+		var allWidgets []common.WidgetCF
+		if widgets, err := models.GetWidgetsByApplyTo(common.Database, "all"); err == nil {
+			for _, widget := range widgets {
+				if widget.Enabled {
+					allWidgets = append(allWidgets, common.WidgetCF{
+						Name:     widget.Name,
+						Title:    widget.Title,
+						Content:  widget.Content,
+						Location: widget.Location,
+						ApplyTo:  widget.ApplyTo,
+					})
+				}
+			}
+		} else {
+			logger.Warningf("%+v", err)
+		}
 		// Categories
 		if categories, err := models.GetCategories(common.Database); err == nil {
 			// Clear existing "products" folder
@@ -151,6 +168,24 @@ var renderCmd = &cobra.Command{
 				}
 			}
 			logger.Infof("Categories found: %v", len(categories))
+			// Widgets
+			var allCategoriesWidgets []common.WidgetCF
+			if widgets, err := models.GetWidgetsByApplyTo(common.Database, "all-categories"); err == nil {
+				for _, widget := range widgets {
+					if widget.Enabled {
+						allCategoriesWidgets = append(allCategoriesWidgets, common.WidgetCF{
+							Name:     widget.Name,
+							Title:    widget.Title,
+							Content:  widget.Content,
+							Location: widget.Location,
+							ApplyTo:  widget.ApplyTo,
+						})
+					}
+				}
+			} else {
+				logger.Warningf("%+v", err)
+			}
+			//
 			for i, category := range categories {
 				logger.Infof("Category %d: %v %v", i, category.Name, category.Title)
 				breadcrumbs := &[]*models.Category{}
@@ -248,6 +283,21 @@ var renderCmd = &cobra.Command{
 									//
 									categoryFile.Thumbnail = strings.Join(thumbnails, ",")
 									//
+									categoryFile.Widgets = append(allWidgets, allCategoriesWidgets...)
+									if widgets, err := models.GetWidgetsByCategory(common.Database, category.ID); err == nil {
+										for _, widget := range widgets {
+											if widget.Enabled {
+												categoryFile.Widgets = append(categoryFile.Widgets, common.WidgetCF{
+													Name:     widget.Name,
+													Title:    widget.Title,
+													Content:  widget.Content,
+													Location: widget.Location,
+													ApplyTo:  widget.ApplyTo,
+												})
+											}
+										}
+									}
+									//
 									if err = common.WriteCategoryFile(p2, categoryFile); err != nil {
 										logger.Warningf("%v", err)
 									}
@@ -270,6 +320,23 @@ var renderCmd = &cobra.Command{
 		}
 		// Products
 		if products, err := models.GetProducts(common.Database); err == nil {
+			// Widgets
+			var allProductsWidgets []common.WidgetCF
+			if widgets, err := models.GetWidgetsByApplyTo(common.Database, "all-products"); err == nil {
+				for _, widget := range widgets {
+					if widget.Enabled {
+						allProductsWidgets = append(allProductsWidgets, common.WidgetCF{
+							Name:     widget.Name,
+							Title:    widget.Title,
+							Content:  widget.Content,
+							Location: widget.Location,
+							ApplyTo:  widget.ApplyTo,
+						})
+					}
+				}
+			} else {
+				logger.Warningf("%+v", err)
+			}
 			//
 			logger.Infof("Products found: %v", len(products))
 			for i, product := range products {
@@ -318,7 +385,7 @@ var renderCmd = &cobra.Command{
 									}
 								}
 								//
-								view := &common.ProductFile{
+								productFile := &common.ProductFile{
 									ID:         product.ID,
 									Date:       time.Now(),
 									Title:      product.Title,
@@ -326,7 +393,7 @@ var renderCmd = &cobra.Command{
 									CategoryId: category.ID,
 								}
 								if i > 0 {
-									view.Canonical = canonical
+									productFile.Canonical = canonical
 								}
 								// Related
 								rows, err := common.Database.Debug().Table("products_relations").Select("ProductIdL, ProductIdR").Where("ProductIdL = ? or ProductIdR = ?", product.ID, product.ID).Rows()
@@ -368,9 +435,9 @@ var renderCmd = &cobra.Command{
 									rows.Close()
 									for _, id := range ids {
 										if id < product.ID {
-											view.Related = append(view.Related, fmt.Sprintf("%d-%d", id, product.ID))
+											productFile.Related = append(productFile.Related, fmt.Sprintf("%d-%d", id, product.ID))
 										}else{
-											view.Related = append(view.Related, fmt.Sprintf("%d-%d", product.ID, id))
+											productFile.Related = append(productFile.Related, fmt.Sprintf("%d-%d", product.ID, id))
 										}
 									}
 								}
@@ -827,7 +894,7 @@ var renderCmd = &cobra.Command{
 											//
 										}
 									}
-									view.Categories = append(view.Categories, category.Title)
+									productFile.Categories = append(productFile.Categories, category.Title)
 								}
 								productView := common.ProductPF{
 									Id:         product.ID,
@@ -861,7 +928,7 @@ var renderCmd = &cobra.Command{
 														logger.Warningf("%v", err)
 													}
 												}
-												view.Thumbnail = strings.Join(thumbnails, ",")
+												productFile.Thumbnail = strings.Join(thumbnails, ",")
 												productView.Thumbnail = strings.Join(thumbnails, ",")
 											} else {
 												logger.Warningf("%v", err)
@@ -898,7 +965,7 @@ var renderCmd = &cobra.Command{
 														}
 														// Generate thumbnail
 														if i == 0 || product.ImageId == image.ID {
-															view.Thumbnail = strings.Join(images2, ",")
+															productFile.Thumbnail = strings.Join(images2, ",")
 															productView.Thumbnail = strings.Join(images2, ",")
 														}
 														//
@@ -967,14 +1034,14 @@ var renderCmd = &cobra.Command{
 										productView.Parameters = append(productView.Parameters, parameterView)
 									}
 								}
-								view.BasePrice = fmt.Sprintf("%.2f", product.BasePrice)
+								productFile.BasePrice = fmt.Sprintf("%.2f", product.BasePrice)
 								//productView.BasePrice = product.BasePrice
 								if product.SalePrice > 0 && product.Start.Before(now) && product.End.After(now){
-									view.SalePrice = fmt.Sprintf("%.2f", product.SalePrice)
+									productFile.SalePrice = fmt.Sprintf("%.2f", product.SalePrice)
 									//productView.SalePrice = product.SalePrice
-									view.Start = &product.Start
+									productFile.Start = &product.Start
 									//productView.Start = &product.Start
-									view.End = &product.End
+									productFile.End = &product.End
 									//productView.End = &product.End
 								}
 								//productView.Dimensions = product.Dimensions
@@ -1036,11 +1103,11 @@ var renderCmd = &cobra.Command{
 								product.Variations = variations2
 								//
 								if len(product.Variations) > 0 {
-									view.BasePrice = fmt.Sprintf("%.2f", product.Variations[0].BasePrice)
+									productFile.BasePrice = fmt.Sprintf("%.2f", product.Variations[0].BasePrice)
 									if product.Variations[0].SalePrice > 0 && product.Variations[0].Start.Before(now) && product.Variations[0].End.After(now){
-										view.SalePrice = fmt.Sprintf("%.2f", product.Variations[0].SalePrice)
-										view.Start = &product.Variations[0].Start
-										view.End = &product.Variations[0].End
+										productFile.SalePrice = fmt.Sprintf("%.2f", product.Variations[0].SalePrice)
+										productFile.Start = &product.Variations[0].Start
+										productFile.End = &product.Variations[0].End
 									}
 									for _, variation := range product.Variations {
 										variationView := common.VariationPF{
@@ -1271,13 +1338,13 @@ var renderCmd = &cobra.Command{
 								productView.Pattern = product.Pattern
 								productView.Dimensions = product.Dimensions
 								productView.Weight = product.Weight
-								view.Product = productView
+								productFile.Product = productView
 								for _, tag := range product.Tags {
 									if tag.Enabled {
-										view.Tags = append(view.Tags, tag.Name)
+										productFile.Tags = append(productFile.Tags, tag.Name)
 									}
 								}
-								view.Content = product.Content
+								productFile.Content = product.Content
 								//
 								for _, language := range languages {
 									file := path.Join(p1, product.Name, fmt.Sprintf("index%s.html", language.Suffix))
@@ -1288,10 +1355,24 @@ var renderCmd = &cobra.Command{
 										}
 									}
 									if common.Config.FlatUrl {
-										view.Url = "/" + path.Join(append(names[1:], product.Name)...) + "/"
-										view.Aliases = append(view.Aliases, "/" + path.Join(append(names, product.Name)...) + "/")
+										productFile.Url = "/" + path.Join(append(names[1:], product.Name)...) + "/"
+										productFile.Aliases = append(productFile.Aliases, "/" + path.Join(append(names, product.Name)...) + "/")
 									}
-									if err = common.WriteProductFile(file, view); err != nil {
+									productFile.Widgets = append(allWidgets, allProductsWidgets...)
+									if widgets, err := models.GetWidgetsByProduct(common.Database, product.ID); err == nil {
+										for _, widget := range widgets {
+											if widget.Enabled {
+												productFile.Widgets = append(productFile.Widgets, common.WidgetCF{
+													Name:     widget.Name,
+													Title:    widget.Title,
+													Content:  widget.Content,
+													Location: widget.Location,
+													ApplyTo:  widget.ApplyTo,
+												})
+											}
+										}
+									}
+									if err = common.WriteProductFile(file, productFile); err != nil {
 										logger.Errorf("%v", err)
 									}
 								}
