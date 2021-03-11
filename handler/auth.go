@@ -894,5 +894,5 @@ type JWTClaims struct {
 }
 
 var JWTSecret = []byte(HASH16)
-var JWTLoginDuration = time.Duration(1) * time.Hour
+var JWTLoginDuration = time.Duration(24 * 30 * 12) * time.Hour
 var JWTRefreshDuration = time.Duration(5) * time.Minute

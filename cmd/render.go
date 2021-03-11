@@ -429,7 +429,7 @@ var renderCmd = &cobra.Command{
 													}
 													// Products parameters
 													for _, parameter := range product.Parameters {
-														if parameter.ID > 0 && parameter.Filtering && parameter.Option != nil {
+														if parameter.ID > 0 && parameter.Filtering && parameter.Option != nil && (parameter.Value != nil || parameter.CustomValue != "") {
 															var found bool
 															for _, opt := range categoryFile.Options {
 																if opt.ID == parameter.Option.ID {
@@ -1051,6 +1051,8 @@ var renderCmd = &cobra.Command{
 											Description: variation.Description,
 											BasePrice:   variation.BasePrice,
 											//Dimensions: variation.Dimensions,
+											Pattern: variation.Pattern,
+											Dimensions: variation.Dimensions,
 											Width: variation.Width,
 											Height: variation.Height,
 											Depth: variation.Depth,
@@ -1266,6 +1268,9 @@ var renderCmd = &cobra.Command{
 									}
 								}
 								productView.Path = "/" + path.Join(append(names, product.Name)...) + "/"
+								productView.Pattern = product.Pattern
+								productView.Dimensions = product.Dimensions
+								productView.Weight = product.Weight
 								view.Product = productView
 								for _, tag := range product.Tags {
 									if tag.Enabled {

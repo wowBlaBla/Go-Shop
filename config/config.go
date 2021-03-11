@@ -58,6 +58,7 @@ type Config struct {
 		Crt string
 		Key string
 	}
+	Pattern string
 	Preview string
 	//
 	Database struct {

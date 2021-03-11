@@ -19,7 +19,9 @@ type Variation struct {
 	SalePrice float64      `sql:"type:decimal(8,2);"`
 	Start time.Time
 	End time.Time
-	//Dimensions string // width x height x depth in cm
+	//
+	Pattern string
+	Dimensions string
 	Width float64 `sql:"type:decimal(8,2);"`
 	Height float64 `sql:"type:decimal(8,2);"`
 	Depth float64 `sql:"type:decimal(8,2);"`

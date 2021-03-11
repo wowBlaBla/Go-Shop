@@ -152,19 +152,29 @@ definitions:
     type: object
   handler.BasicSettingsView:
     properties:
+      currency:
+        type: string
       debug:
+        type: boolean
+      flatUrl:
         type: boolean
       notification:
         $ref: '#/definitions/config.NotificationConfig'
         type: object
+      pattern:
+        type: string
       payment:
         $ref: '#/definitions/config.PaymentConfig'
         type: object
       preview:
         type: string
+      products:
+        type: string
       resize:
         $ref: '#/definitions/config.ResizeConfig'
         type: object
+      symbol:
+        type: string
     type: object
   handler.BasicWranglerView:
     $ref: '#/definitions/config.WranglerConfig'
@@ -597,6 +607,8 @@ definitions:
         type: integer
       name:
         type: string
+      path:
+        type: string
       size:
         type: integer
       type:
@@ -664,12 +676,40 @@ definitions:
         type: integer
       params:
         properties:
+          currency:
+            type: string
           description:
             type: string
           keywords:
             type: string
           logo:
             type: string
+          mollieProfileId:
+            type: string
+          products:
+            type: string
+          stripePublishedKey:
+            type: string
+          symbol:
+            type: string
+        type: object
+      related:
+        properties:
+          includeNewer:
+            type: boolean
+          indices:
+            items:
+              properties:
+                name:
+                  type: string
+                weight:
+                  type: integer
+              type: object
+            type: array
+          threshold:
+            type: integer
+          toLower:
+            type: boolean
         type: object
       theme:
         type: string
@@ -746,6 +786,8 @@ definitions:
           updated:
             type: string
         type: object
+      pattern:
+        type: string
       preview:
         type: string
       started:
@@ -875,6 +917,13 @@ definitions:
       id:
         type: string
       profileId:
+        type: string
+    type: object
+  handler.MollieSubmitRequest:
+    properties:
+      language:
+        type: string
+      method:
         type: string
     type: object
   handler.NewAccount:
@@ -1019,6 +1068,8 @@ definitions:
       lastname:
         type: string
       name:
+        type: string
+      phone:
         type: string
       region:
         type: string
@@ -1481,6 +1532,8 @@ definitions:
         type: string
       customization:
         type: string
+      depth:
+        type: number
       description:
         type: string
       dimensions:
@@ -1493,6 +1546,8 @@ definitions:
         items:
           $ref: '#/definitions/handler.File2View'
         type: array
+      height:
+        type: number
       id:
         type: integer
       imageId:
@@ -1503,10 +1558,14 @@ definitions:
         type: array
       name:
         type: string
+      new:
+        type: boolean
       parameters:
         items:
           $ref: '#/definitions/handler.ParameterView'
         type: array
+      pattern:
+        type: string
       properties:
         items:
           properties:
@@ -1559,6 +1618,10 @@ definitions:
               type: string
           type: object
         type: array
+      relatedProducts:
+        items:
+          $ref: '#/definitions/handler.RelatedProduct'
+        type: array
       salePrice:
         type: number
       sending:
@@ -1575,21 +1638,27 @@ definitions:
         type: string
       title:
         type: string
+      variation:
+        type: string
       variations:
         items:
           $ref: '#/definitions/handler.VariationView'
         type: array
       weight:
         type: number
+      width:
+        type: number
     type: object
   handler.ProductsFilterItem:
     properties:
-      basePrice:
-        type: number
       categoryId:
         type: integer
+      depth:
+        type: number
       description:
         type: string
+      height:
+        type: number
       id:
         type: integer
       images:
@@ -1598,12 +1667,18 @@ definitions:
         type: string
       path:
         type: string
+      price:
+        type: number
       thumbnail:
         type: string
       title:
         type: string
       variations:
         type: string
+      weight:
+        type: number
+      width:
+        type: number
     type: object
   handler.ProductsFilterResponse:
     properties:
@@ -1704,6 +1779,11 @@ definitions:
         type: string
       type:
         type: string
+    type: object
+  handler.RelatedProduct:
+    properties:
+      id:
+        type: integer
     type: object
   handler.StripeCardView:
     type: object
@@ -2023,15 +2103,33 @@ definitions:
         type: string
       basePrice:
         type: number
+      customization:
+        type: string
+      depth:
+        type: number
       description:
         type: string
       dimensions:
         type: string
       end:
         type: string
+      files:
+        items:
+          $ref: '#/definitions/handler.File2View'
+        type: array
+      height:
+        type: number
       id:
         type: integer
+      images:
+        items:
+          $ref: '#/definitions/handler.ImageView'
+        type: array
       name:
+        type: string
+      new:
+        type: boolean
+      pattern:
         type: string
       productId:
         type: integer
@@ -2100,6 +2198,8 @@ definitions:
       title:
         type: string
       weight:
+        type: number
+      width:
         type: number
     type: object
   handler.VariationsListItem:
@@ -2440,7 +2540,7 @@ paths:
       - account
       - frontend
   /api/v1/account/orders/{id}/mollie/submit:
-    get:
+    post:
       consumes:
       - application/json
       parameters:
@@ -2449,6 +2549,12 @@ paths:
         name: id
         required: true
         type: integer
+      - description: body
+        in: body
+        name: form
+        required: true
+        schema:
+          $ref: '#/definitions/handler.MollieSubmitRequest'
       produces:
       - application/json
       responses:
@@ -3565,7 +3671,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Filter products
+      summary: Search and Filter products. Use fixed word 'Search' to make search, another options according to doc
       tags:
       - frontend
   /api/v1/images:

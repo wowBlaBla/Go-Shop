@@ -19,6 +19,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/google/logger"
 	"github.com/jinzhu/now"
+	"github.com/nfnt/resize"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"github.com/stripe/stripe-go/v71"
 	checkout_session "github.com/stripe/stripe-go/v71/checkout/session"
@@ -30,6 +31,7 @@ import (
 	"html/template"
 	"image"
 	_ "image/gif"
+	"image/jpeg"
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
@@ -127,6 +129,7 @@ func GetFiber() *fiber.App {
 	v1.Get("/preview", authOptional, getPreviewHandler)
 	v1.Get("/info", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getInfoHandler)
 	v1.Get("/dashboard", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getDashboardHandler)
+	v1.Get("/resize", getResizeHandler)
 	v1.Get("/settings/basic", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getBasicSettingsHandler)
 	v1.Put("/settings/basic", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("basic settings updated"), putBasicSettingsHandler)
 	v1.Get("/settings/hugo", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getHugoSettingsHandler)
@@ -299,12 +302,13 @@ func GetFiber() *fiber.App {
 	v1.Get("/account/orders/:id/stripe/success", authRequired, getAccountOrderStripeSuccessHandler)   // +
 	// Mollie
 	v1.Post("/account/orders/:id/mollie/submit", authRequired, postAccountOrderMollieSubmitHandler)
-	v1.Get("/account/orders/:id/mollie/success", authRequired, getAccountOrderMollieSuccessHandler)
+	v1.Get("/account/orders/:id/mollie/success", authOptional, getAccountOrderMollieSuccessHandler)
 	//
 	v1.Get("/payment_methods", authRequired, getPaymentMethodsHandler)
 	//
 	v1.Post("/profiles", postProfileHandler)
 	v1.Get("/test", getTestHandler)
+	v1.Post("/test", getTestHandler)
 	v1.Post("/checkout", postCheckoutHandler)
 	//
 	v1.Post("/filter", postFilterHandler)
@@ -523,6 +527,7 @@ type InfoView struct {
 	Application string
 	Started string
 	Debug bool `json:",omitempty"`
+	Pattern string `json:",omitempty"`
 	Preview string `json:",omitempty"`
 	Authorization string `json:",omitempty"`
 	ExpirationAt string `json:",omitempty"`
@@ -548,6 +553,7 @@ func getInfoHandler(c *fiber.Ctx) error {
 	view.Application = fmt.Sprintf("%v v%v, build: %v", common.APPLICATION, common.VERSION, common.COMPILED)
 	view.Started = common.Started.Format(time.RFC3339)
 	view.Debug = common.Config.Debug
+	view.Pattern = common.Config.Pattern
 	view.Preview = common.Config.Preview
 	if v := c.Locals("authorization"); v != nil {
 		view.Application = v.(string)
@@ -670,12 +676,73 @@ func getDashboardHandler(c *fiber.Ctx) error {
 	return c.JSON(view)
 }
 
+func getResizeHandler (c *fiber.Ctx) error {
+	width := 120
+	if v := c.Query("width", ""); v != "" {
+		if vv, err := strconv.Atoi(v); err == nil {
+			width = vv
+		}
+	}
+	height := 120
+	if v := c.Query("height", ""); v != "" {
+		if vv, err := strconv.Atoi(v); err == nil {
+			height = vv
+		}
+	}
+	if p := c.Query("path", ""); p != "" {
+		src := path.Join(dir, strings.Replace(p, "../", "/", -1))
+		if fi, err := os.Stat(src); err == nil {
+			req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(c.Request().Header.Header())))
+			if err != nil {
+				return err
+			}
+			if v := req.Header.Get("If-Modified-Since"); v != "" {
+				if vv, err := time.Parse(time.RFC1123, v); err == nil {
+					if vv.Sub(fi.ModTime()) <= time.Second {
+						return c.SendStatus(http.StatusNotModified)
+					}
+				}else{
+					logger.Infof("err: %+v", err)
+				}
+			}
+			if file, err := os.Open(src); err == nil {
+				img, err := jpeg.Decode(file)
+				if err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+				file.Close()
+				m := resize.Resize(uint(width), uint(height), img, resize.Lanczos3)
+				out := new(bytes.Buffer)
+				if err = jpeg.Encode(out, m, &jpeg.Options{Quality: 80}); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+				c.Status(http.StatusOK)
+				c.Response().Header.SetContentType("image/jpeg")
+				c.Response().Header.SetLastModified(fi.ModTime())
+				return c.SendStream(bytes.NewReader(out.Bytes()), len(out.Bytes()))
+			} else {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{"Path not set"})
+	}
+}
+
 type BasicSettingsView struct {
 	Debug bool
 	Currency string
 	Symbol string
 	Products string
 	FlatUrl bool
+	Pattern string
 	Preview      string
 	Payment      config.PaymentConfig
 	Resize       config.ResizeConfig
@@ -698,6 +765,7 @@ func getBasicSettingsHandler(c *fiber.Ctx) error {
 	conf.Symbol = common.Config.Symbol
 	conf.Products = common.Config.Products
 	conf.FlatUrl = common.Config.FlatUrl
+	conf.Pattern = common.Config.Pattern
 	conf.Preview = common.Config.Preview
 	conf.Payment = common.Config.Payment
 	conf.Resize = common.Config.Resize
@@ -782,6 +850,7 @@ func putBasicSettingsHandler(c *fiber.Ctx) error {
 	//
 	var message string
 	common.Config.Debug = request.Debug
+	common.Config.Pattern = request.Pattern
 	common.Config.Preview = request.Preview
 	// Payment
 	common.Config.Payment = request.Payment
@@ -2359,6 +2428,18 @@ func postProductsHandler(c *fiber.Ctx) error {
 					basePrice = vv
 				}
 			}
+			var pattern string
+			if v, found := data.Value["Pattern"]; found && len(v) > 0 {
+				pattern = strings.TrimSpace(v[0])
+			}else if common.Config.Pattern != "" {
+				pattern = common.Config.Pattern
+			}else{
+				pattern = "whd"
+			}
+			var dimensions string
+			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
+				dimensions = strings.TrimSpace(v[0])
+			}
 			var width float64
 			if v, found := data.Value["Width"]; found && len(v) > 0 {
 				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
@@ -2403,7 +2484,7 @@ func postProductsHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Customization"]; found && len(v) > 0 {
 				customization = strings.TrimSpace(v[0])
 			}
-			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Parameters: parameters, CustomParameters: customParameters, Variation: variation, BasePrice: basePrice, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, Sending: sending, Sku: sku, Content: content, Customization: customization}
+			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Parameters: parameters, CustomParameters: customParameters, Variation: variation, BasePrice: basePrice, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, Sending: sending, Sku: sku, Content: content, Customization: customization}
 			if _, err := models.CreateProduct(common.Database, product); err == nil {
 				// Create new product automatically
 				if name == "" {
@@ -2614,14 +2695,12 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, products.Sku, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, products.Sku, group_concat(distinct variations.ID) as VariationsIds, group_concat(distinct variations.Title) as VariationsTitles").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
 				var item ProductsListItem
 				if err = common.Database.ScanRows(rows, &item); err == nil {
-					item.VariationsIds = strings.TrimRight(item.VariationsIds, ", ")
-					item.VariationsTitles = strings.TrimRight(item.VariationsTitles, ", ")
 					response.Data = append(response.Data, item)
 				} else {
 					logger.Errorf("%v", err)
@@ -2632,7 +2711,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, products.Sku, group_concat(variations.ID, ', ') as VariationsIds, group_concat(variations.Title, ', ') as VariationsTitles").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, products.Sku, group_concat(distinct variations.ID) as VariationsIds, group_concat(distinct variations.Title) as VariationsTitles").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -2670,6 +2749,7 @@ func getProductHandler(c *fiber.Ctx) error {
 		var view ProductView
 		if bts, err := json.MarshalIndent(product, "", "   "); err == nil {
 			if err = json.Unmarshal(bts, &view); err == nil {
+				view.New = product.UpdatedAt.Sub(product.CreatedAt).Seconds() < 1.0
 				// Related Products 2
 				if rows, err := common.Database.Debug().Table("products_relations").Select("products_relations.ProductIdL as ProductIdL, products_relations.ProductIdR as ProductIdR").Where("products_relations.ProductIdL = ? or products_relations.ProductIdR = ?", product.ID, product.ID).Rows(); err == nil {
 					for rows.Next() {
@@ -2804,6 +2884,14 @@ func putProductHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["End"]; found && len(v) > 0 {
 				end, _ = time.Parse(time.RFC3339, v[0])
 			}
+			var pattern string
+			if v, found := data.Value["Pattern"]; found && len(v) > 0 {
+				pattern = strings.TrimSpace(v[0])
+			}
+			var dimensions string
+			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
+				dimensions = strings.TrimSpace(v[0])
+			}
 			var width float64
 			if v, found := data.Value["Width"]; found && len(v) > 0 {
 				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
@@ -2868,6 +2956,8 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Start = start
 			oldEnd := product.End
 			product.End = end
+			product.Pattern = pattern
+			product.Dimensions = dimensions
 			product.Width = width
 			product.Height = height
 			product.Depth = depth
@@ -2944,6 +3034,25 @@ func putProductHandler(c *fiber.Ctx) error {
 							return c.JSON(HTTPError{err.Error()})
 						}
 						product.Thumbnail = "/" + path.Join("variations", filename)
+					}
+				}
+			}
+			if product.ID > 0 {
+				var name = product.Name
+				for ;; {
+					if product2, err := models.GetProductByName(common.Database, name); err == nil && product2.ID != product.ID {
+						if res := regexp.MustCompile(`(.*)-(\d+)$`).FindAllStringSubmatch(product.Name, 1); len(res) > 0 && len(res[0]) > 2 {
+							if v, err := strconv.Atoi(res[0][2]); err == nil {
+								name = fmt.Sprintf("%v-%d", res[0][1], v + 1)
+							}else{
+								name = fmt.Sprintf("%v-%d", res[0][1], 1)
+							}
+						}else{
+							name = fmt.Sprintf("%v-%d", res[0][1], 1)
+						}
+					}else{
+						product.Name = name
+						break
 					}
 				}
 			}
@@ -3571,6 +3680,18 @@ func postVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["SalePrice"]; found && len(v) > 0 {
 				salePrice, _ = strconv.ParseFloat(v[0], 10)
 			}
+			var pattern string
+			if v, found := data.Value["Pattern"]; found && len(v) > 0 {
+				pattern = strings.TrimSpace(v[0])
+			}else if common.Config.Pattern != "" {
+				pattern = common.Config.Pattern
+			}else{
+				pattern = "whd"
+			}
+			var dimensions string
+			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
+				dimensions = strings.TrimSpace(v[0])
+			}
 			var width float64
 			if v, found := data.Value["Width"]; found && len(v) > 0 {
 				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
@@ -3607,7 +3728,7 @@ func postVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Sku"]; found && len(v) > 0 {
 				sku = strings.TrimSpace(v[0])
 			}
-			variation := &models.Variation{Name: name, Title: title, Description: description, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, Sending: sending, Sku: sku}
+			variation := &models.Variation{Name: name, Title: title, Description: description, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, Sending: sending, Sku: sku}
 			if id, err := models.CreateVariation(common.Database, variation); err == nil {
 				if name == "" {
 					variation.Name = fmt.Sprintf("new-variation-%d", variation.ID)
@@ -3737,6 +3858,14 @@ func putVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["End"]; found && len(v) > 0 {
 				end, _ = time.Parse(time.RFC3339, v[0])
 			}
+			var pattern string
+			if v, found := data.Value["Pattern"]; found && len(v) > 0 {
+				pattern = strings.TrimSpace(v[0])
+			}
+			var dimensions string
+			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
+				dimensions = strings.TrimSpace(v[0])
+			}
 			var width float64
 			if v, found := data.Value["Width"]; found && len(v) > 0 {
 				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
@@ -3784,6 +3913,8 @@ func putVariationHandler(c *fiber.Ctx) error {
 			variation.SalePrice = salePrice
 			variation.Start = start
 			variation.End = end
+			variation.Pattern = pattern
+			variation.Dimensions = dimensions
 			variation.Width = width
 			variation.Height = height
 			variation.Depth = depth
@@ -3930,6 +4061,7 @@ func getVariationHandler(c *fiber.Ctx) error {
 			var view VariationView
 			if bts, err := json.MarshalIndent(variation, "", "   "); err == nil {
 				if err = json.Unmarshal(bts, &view); err == nil {
+					view.New = variation.UpdatedAt.Sub(variation.CreatedAt).Seconds() < 1.0
 					return c.JSON(view)
 				}else{
 					c.Status(http.StatusInternalServerError)
@@ -10246,6 +10378,7 @@ type NewProfile struct {
 	Name string
 	Lastname string
 	Company string
+	Phone string
 	Address string
 	Zip string
 	City string
@@ -10300,6 +10433,10 @@ func postAccountProfileHandler(c *fiber.Ctx) error {
 				return c.JSON(HTTPError{"Lastname is empty"})
 			}
 			var company = strings.TrimSpace(request.Company)
+			var phone = strings.TrimSpace(request.Phone)
+			if len(phone) > 64 {
+				phone = ""
+			}
 			var address = strings.TrimSpace(request.Address)
 			if address == "" {
 				c.Status(http.StatusInternalServerError)
@@ -10329,6 +10466,7 @@ func postAccountProfileHandler(c *fiber.Ctx) error {
 				Name:     name,
 				Lastname: lastname,
 				Company:  company,
+				Phone: phone,
 				Address:  address,
 				Zip:      zip,
 				City:     city,
@@ -10463,6 +10601,10 @@ func postProfileHandler(c *fiber.Ctx) error {
 				return c.JSON(HTTPError{"Lastname is empty"})
 			}
 			var company = strings.TrimSpace(request.Company)
+			var phone = strings.TrimSpace(request.Phone)
+			if len(phone) > 64 {
+				phone = ""
+			}
 			var address = strings.TrimSpace(request.Address)
 			if address == "" {
 				c.Status(http.StatusInternalServerError)
@@ -10492,6 +10634,7 @@ func postProfileHandler(c *fiber.Ctx) error {
 				Name:     name,
 				Lastname: lastname,
 				Company:  company,
+				Phone:  phone,
 				Address:  address,
 				Zip:      zip,
 				City:     city,
@@ -10553,8 +10696,8 @@ type ProductsFilterItem struct {
 }
 
 // @security BasicAuth
-// SearchCategories godoc
-// @Summary Filter products
+// Search and Filter products godoc
+// @Summary Search and Filter products. Use fixed word 'Search' to make search, another options according to doc
 // @Accept json
 // @Produce json
 // @Param relPath query string true "Category RelPath"
@@ -10642,6 +10785,13 @@ func postFilterHandler(c *fiber.Ctx) error {
 		values1 = append(values1, values2...)
 	}
 	keys1 = append(keys1, "Path LIKE ?")
+	if common.Config.FlatUrl {
+		if prefix := "/" + strings.ToLower(common.Config.Products); prefix + "/" == relPath {
+			relPath = "/"
+		}else{
+			relPath = "/" + strings.ToLower(common.Config.Products) + relPath
+		}
+	}
 	values1 = append(values1, relPath + "%")
 	////logger.Infof("keys1: %+v, values1: %+v", keys1, values1)
 	//
@@ -11194,7 +11344,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 				item.Price = salePrice
 				item.SalePrice = salePrice
 			}else{
-				item.Price = salePrice
+				item.Price = basePrice
 			}
 			item.Volume = width * height * depth / 1000000.0
 			item.Weight = weight
@@ -12444,15 +12594,22 @@ type MollieOrderView struct {
 	Checkout string `json:",omitempty"`
 }
 
+type MollieSubmitRequest struct {
+	Language string `json:"language"`
+	Method string
+}
+
 // PostMollieOrder godoc
 // @Summary Post mollie order
 // @Accept json
 // @Produce json
 // @Param id path int true "Order ID"
+// @Query method query string true "for example: postMessage"
+// @Param form body MollieSubmitRequest true "body"
 // @Success 200 {object} MollieOrderView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
-// @Router /api/v1/account/orders/{id}/mollie/submit [get]
+// @Router /api/v1/account/orders/{id}/mollie/submit [post]
 // @Tags account
 // @Tags frontend
 func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
@@ -12494,10 +12651,7 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 			}
 		}
 
-		var request struct {
-			Language string `json:"language"`
-			Method string
-		}
+		var request MollieSubmitRequest
 		if err := c.BodyParser(&request); err != nil {
 			return err
 		}
@@ -12572,6 +12726,7 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 			address.FamilyName = profile.Lastname
 			address.OrganizationName = profile.Company
 			address.StreetAndNumber = profile.Address
+			address.Phone = profile.Phone
 			address.City = profile.City
 			address.PostalCode = profile.Zip
 			address.Country = profile.Country
@@ -12581,11 +12736,10 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 		}
 		o.BillingAddress = address
 		o.ShippingAddress = address
+		o.Locale = "en_US"
 		// Locale
 		if request.Language != "" {
-			if request.Language == "en" {
-				o.Locale = "en_US"
-			}else if request.Language == "de" {
+			if request.Language == "de" {
 				o.Locale = "de_DE"
 			}
 		}
@@ -12640,7 +12794,6 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 // @Tags account
 // @Tags frontend
 func getAccountOrderMollieSuccessHandler(c *fiber.Ctx) error {
-	log.Printf("getAccountOrderMollieSuccessHandler")
 	c.Response().Header.Set("Content-Type", "text/html")
 	var id int
 	if v := c.Params("id"); v != "" {
@@ -12837,6 +12990,8 @@ type ProductView struct {
 	SalePrice float64 `json:",omitempty"`
 	Start *time.Time `json:",omitempty"`
 	End *time.Time `json:",omitempty"`
+	Pattern string `json:",omitempty"`
+	Dimensions string `json:",omitempty"`
 	Width float64 `json:",omitempty"`
 	Height float64 `json:",omitempty"`
 	Depth float64 `json:",omitempty"`
@@ -12881,6 +13036,7 @@ type ProductView struct {
 	RelatedProducts []RelatedProduct `json:",omitempty"`
 	//
 	Customization string `json:",omitempty"`
+	New bool `json:",omitempty"`
 }
 
 type RelatedProduct struct {
@@ -12925,6 +13081,8 @@ type VariationView struct {
 			Sending string `json:",omitempty"`
 		}
 	}
+	Pattern string `json:",omitempty"`
+	Dimensions string `json:",omitempty"`
 	Width float64 `json:",omitempty"`
 	Height float64 `json:",omitempty"`
 	Depth float64 `json:",omitempty"`
@@ -12936,6 +13094,7 @@ type VariationView struct {
 	Images []ImageView `json:",omitempty"`
 	ProductId uint
 	Customization string
+	New bool `json:",omitempty"`
 }
 
 type HTTPMessage struct {

@@ -479,7 +479,7 @@ var doc = `{
             }
         },
         "/api/v1/account/orders/{id}/mollie/submit": {
-            "get": {
+            "post": {
                 "consumes": [
                     "application/json"
                 ],
@@ -498,6 +498,15 @@ var doc = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "form",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.MollieSubmitRequest"
+                        }
                     }
                 ],
                 "responses": {
@@ -2129,7 +2138,7 @@ var doc = `{
                 "tags": [
                     "frontend"
                 ],
-                "summary": "Filter products",
+                "summary": "Search and Filter products. Use fixed word 'Search' to make search, another options according to doc",
                 "parameters": [
                     {
                         "type": "string",
@@ -7107,12 +7116,21 @@ var doc = `{
         "handler.BasicSettingsView": {
             "type": "object",
             "properties": {
+                "currency": {
+                    "type": "string"
+                },
                 "debug": {
+                    "type": "boolean"
+                },
+                "flatUrl": {
                     "type": "boolean"
                 },
                 "notification": {
                     "type": "object",
                     "$ref": "#/definitions/config.NotificationConfig"
+                },
+                "pattern": {
+                    "type": "string"
                 },
                 "payment": {
                     "type": "object",
@@ -7121,9 +7139,15 @@ var doc = `{
                 "preview": {
                     "type": "string"
                 },
+                "products": {
+                    "type": "string"
+                },
                 "resize": {
                     "type": "object",
                     "$ref": "#/definitions/config.ResizeConfig"
+                },
+                "symbol": {
+                    "type": "string"
                 }
             }
         },
@@ -7783,6 +7807,9 @@ var doc = `{
                 "name": {
                     "type": "string"
                 },
+                "path": {
+                    "type": "string"
+                },
                 "size": {
                     "type": "integer"
                 },
@@ -7887,6 +7914,9 @@ var doc = `{
                 "params": {
                     "type": "object",
                     "properties": {
+                        "currency": {
+                            "type": "string"
+                        },
                         "description": {
                             "type": "string"
                         },
@@ -7895,6 +7925,46 @@ var doc = `{
                         },
                         "logo": {
                             "type": "string"
+                        },
+                        "mollieProfileId": {
+                            "type": "string"
+                        },
+                        "products": {
+                            "type": "string"
+                        },
+                        "stripePublishedKey": {
+                            "type": "string"
+                        },
+                        "symbol": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "related": {
+                    "type": "object",
+                    "properties": {
+                        "includeNewer": {
+                            "type": "boolean"
+                        },
+                        "indices": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "weight": {
+                                        "type": "integer"
+                                    }
+                                }
+                            }
+                        },
+                        "threshold": {
+                            "type": "integer"
+                        },
+                        "toLower": {
+                            "type": "boolean"
                         }
                     }
                 },
@@ -8012,6 +8082,9 @@ var doc = `{
                             "type": "string"
                         }
                     }
+                },
+                "pattern": {
+                    "type": "string"
                 },
                 "preview": {
                     "type": "string"
@@ -8205,6 +8278,17 @@ var doc = `{
                     "type": "string"
                 },
                 "profileId": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.MollieSubmitRequest": {
+            "type": "object",
+            "properties": {
+                "language": {
+                    "type": "string"
+                },
+                "method": {
                     "type": "string"
                 }
             }
@@ -8427,6 +8511,9 @@ var doc = `{
                     "type": "string"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "phone": {
                     "type": "string"
                 },
                 "region": {
@@ -9135,6 +9222,9 @@ var doc = `{
                 "customization": {
                     "type": "string"
                 },
+                "depth": {
+                    "type": "number"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -9153,6 +9243,9 @@ var doc = `{
                         "$ref": "#/definitions/handler.File2View"
                     }
                 },
+                "height": {
+                    "type": "number"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -9168,11 +9261,17 @@ var doc = `{
                 "name": {
                     "type": "string"
                 },
+                "new": {
+                    "type": "boolean"
+                },
                 "parameters": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handler.ParameterView"
                     }
+                },
+                "pattern": {
+                    "type": "string"
                 },
                 "properties": {
                     "type": "array",
@@ -9254,6 +9353,12 @@ var doc = `{
                         }
                     }
                 },
+                "relatedProducts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.RelatedProduct"
+                    }
+                },
                 "salePrice": {
                     "type": "number"
                 },
@@ -9278,6 +9383,9 @@ var doc = `{
                 "title": {
                     "type": "string"
                 },
+                "variation": {
+                    "type": "string"
+                },
                 "variations": {
                     "type": "array",
                     "items": {
@@ -9286,20 +9394,26 @@ var doc = `{
                 },
                 "weight": {
                     "type": "number"
+                },
+                "width": {
+                    "type": "number"
                 }
             }
         },
         "handler.ProductsFilterItem": {
             "type": "object",
             "properties": {
-                "basePrice": {
-                    "type": "number"
-                },
                 "categoryId": {
                     "type": "integer"
                 },
+                "depth": {
+                    "type": "number"
+                },
                 "description": {
                     "type": "string"
+                },
+                "height": {
+                    "type": "number"
                 },
                 "id": {
                     "type": "integer"
@@ -9313,6 +9427,9 @@ var doc = `{
                 "path": {
                     "type": "string"
                 },
+                "price": {
+                    "type": "number"
+                },
                 "thumbnail": {
                     "type": "string"
                 },
@@ -9321,6 +9438,12 @@ var doc = `{
                 },
                 "variations": {
                     "type": "string"
+                },
+                "weight": {
+                    "type": "number"
+                },
+                "width": {
+                    "type": "number"
                 }
             }
         },
@@ -9474,6 +9597,14 @@ var doc = `{
                 },
                 "type": {
                     "type": "string"
+                }
+            }
+        },
+        "handler.RelatedProduct": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
                 }
             }
         },
@@ -9964,6 +10095,12 @@ var doc = `{
                 "basePrice": {
                     "type": "number"
                 },
+                "customization": {
+                    "type": "string"
+                },
+                "depth": {
+                    "type": "number"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -9973,10 +10110,31 @@ var doc = `{
                 "end": {
                     "type": "string"
                 },
+                "files": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.File2View"
+                    }
+                },
+                "height": {
+                    "type": "number"
+                },
                 "id": {
                     "type": "integer"
                 },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.ImageView"
+                    }
+                },
                 "name": {
+                    "type": "string"
+                },
+                "new": {
+                    "type": "boolean"
+                },
+                "pattern": {
                     "type": "string"
                 },
                 "productId": {
@@ -10081,6 +10239,9 @@ var doc = `{
                     "type": "string"
                 },
                 "weight": {
+                    "type": "number"
+                },
+                "width": {
                     "type": "number"
                 }
             }

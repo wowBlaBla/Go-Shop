@@ -9,6 +9,7 @@ type Profile struct {
 	Name string
 	Lastname string
 	Company string
+	Phone string
 	Address string
 	Zip string
 	City string
