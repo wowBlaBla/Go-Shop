@@ -29,7 +29,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210311172302"
+	COMPILED = "20210315125458"
 	//
 	Started          time.Time
 	Config           *config.Config
@@ -112,7 +112,7 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		Title string
 		Url string
 		Aliases    []string `json:",omitempty"`
-		Description string
+		Description string `json:",omitempty"`
 		Thumbnail string
 		Path string
 		BasePriceMin float64
@@ -229,6 +229,8 @@ type ProductPF struct {
 	Pattern string `json:",omitempty"`
 	Dimensions string `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
+	Availability string `json:",omitempty"`
+	Time string `json:",omitempty"`
 	Properties []PropertyPF
 	Variations []VariationPF
 }
@@ -260,7 +262,7 @@ type ValuePPF struct {
 	Thumbnail string `json:",omitempty"`
 	Value string
 	Availability string `json:",omitempty"`
-	Sending string `json:",omitempty"`
+	//Sending string `json:",omitempty"`
 }
 
 type VariationPF struct {
@@ -268,22 +270,23 @@ type VariationPF struct {
 	Name string
 	Title string
 	Thumbnail string `json:",omitempty"`
-	Description string
-	Images     []string
-	Files     []FilePF
+	Description string `json:",omitempty"`
+	Images     []string `json:",omitempty"`
+	Files     []FilePF `json:",omitempty"`
 	BasePrice float64
 	SalePrice  float64 `json:",omitempty"`
 	Start *time.Time `json:",omitempty"`
 	End *time.Time `json:",omitempty"`
 	Pattern string `json:",omitempty"`
 	Dimensions string `json:",omitempty"`
-	Width float64
-	Height float64
-	Depth float64
+	Width float64 `json:",omitempty"`
+	Height float64 `json:",omitempty"`
+	Depth float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
 	Availability string `json:",omitempty"`
-	Sending string `json:",omitempty"`
-	Properties []PropertyPF
+	//Sending string `json:",omitempty"`
+	Time string `json:",omitempty"`
+	Properties []PropertyPF `json:",omitempty"`
 	Selected bool
 }
 
@@ -292,7 +295,7 @@ type PropertyPF struct {
 	Type string
 	Name string
 	Title string
-	Description string
+	Description string`json:",omitempty"`
 	Values []ValuePF
 }
 
@@ -303,7 +306,7 @@ type ValuePF struct {
 	Thumbnail string `json:",omitempty"`
 	Value string
 	Availability string `json:",omitempty"`
-	Sending string `json:",omitempty"`
+	//Sending string `json:",omitempty"`
 	Price PricePF
 	Selected bool
 }
@@ -312,7 +315,7 @@ type PricePF struct {
 	Id uint
 	Price float64
 	Availability string `json:",omitempty"`
-	Sending string `json:",omitempty"`
+	//Sending string `json:",omitempty"`
 }
 
 func (p *ProductFile) MarshalJSON() ([]byte, error) {
@@ -482,7 +485,7 @@ type ValueFile struct {
 	ID           uint
 	Date         time.Time
 	Title        string
-	Description  string
+	Description  string `json:",omitempty"`
 	Type         string
 	Thumbnail    string `json:",omitempty"`
 	Value        string
@@ -495,7 +498,7 @@ func (v *ValueFile) MarshalJSON() ([]byte, error) {
 		ID uint
 		Type       string
 		Title      string
-		Description  string
+		Description  string `json:",omitempty"`
 		Date       time.Time
 		Thumbnail    string
 		Value      string

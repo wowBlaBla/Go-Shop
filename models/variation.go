@@ -27,11 +27,14 @@ type Variation struct {
 	Depth float64 `sql:"type:decimal(8,2);"`
 	Weight float64 `sql:"type:decimal(8,2);"`
 	Availability string
-	Sending string
+	//Sending string
 	Sku string
 	Images      []*Image   `gorm:"many2many:variations_images;"`
 	Files       []*File    `gorm:"many2many:variations_files;"`
 	Customization string
+	//
+	TimeId uint
+	Time       *Time `gorm:"foreignKey:time_id;"`
 	//
 	ProductId uint
 }

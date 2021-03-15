@@ -31,7 +31,7 @@ type Product struct {
 	Depth float64 `sql:"type:decimal(8,2);"`
 	Weight float64 `sql:"type:decimal(8,2);"`
 	Availability string
-	Sending string
+	//Sending string
 	Sku string
 	//
 	Properties []*Property `gorm:"foreignKey:ProductId"`
@@ -45,6 +45,12 @@ type Product struct {
 	//
 	Images      []*Image     `gorm:"many2many:products_images;"`
 	Tags        []*Tag `gorm:"many2many:products_tags;"`
+	//
+	VendorId uint
+	Vendor       *Vendor `gorm:"foreignKey:vendor_id;"`
+	//
+	TimeId uint
+	Time       *Time `gorm:"foreignKey:time_id;"`
 	//
 	//RelatedProducts []*Product `gorm:"many2many:products_related;"`
 	//
@@ -104,7 +110,7 @@ func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	db := connector
 	var product Product
-	if err := db.Debug().Preload("Categories").Preload("Parameters").Preload("Parameters.Option").Preload("Parameters.Value").Preload("Properties").Preload("Properties.Option").Preload("Properties.Prices").Preload("Properties.Prices.Value").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Preload("Variations.Images").Preload("Variations.Files").Preload("Tags").First(&product, id).Error; err != nil {
+	if err := db.Debug().Preload("Categories").Preload("Parameters").Preload("Parameters.Option").Preload("Parameters.Value").Preload("Properties").Preload("Properties.Option").Preload("Properties.Prices").Preload("Properties.Prices.Value").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Preload("Variations.Images").Preload("Variations.Files").Preload("Variations.Time").Preload("Time").Preload("Tags").First(&product, id).Error; err != nil {
 		return nil, err
 	}
 	var customization struct {

@@ -11,7 +11,7 @@ type Value struct {
 	Thumbnail string
 	Value string
 	Availability string
-	Sending string
+	//Sending string
 }
 
 func GetValues(connector *gorm.DB) ([]*Value, error) {

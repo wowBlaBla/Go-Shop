@@ -275,6 +275,21 @@ func GetFiber() *fiber.App {
 	v1.Put("/notification/email/:id", authRequired, changed("email template updated"), putEmailTemplateHandler)
 	v1.Delete("/notification/email/:id", authRequired, changed("email template deleted"), delEmailTemplateHandler)
 	//
+	// Vendors
+	v1.Get("/vendors", authRequired, getVendorsHandler)
+	v1.Post("/vendors", authRequired, changed("vendor created"), postVendorHandler)
+	v1.Post("/vendors/list", authRequired, postVendorsListHandler)
+	v1.Get("/vendors/:id", authRequired, getVendorHandler)
+	v1.Put("/vendors/:id", authRequired, changed("vendor updated"), putVendorHandler)
+	v1.Delete("/vendors/:id", authRequired, changed("vendor deleted"), delVendorHandler)
+	// Times
+	v1.Get("/times", authRequired, getTimesHandler)
+	v1.Post("/times", authRequired, changed("time created"), postTimeHandler)
+	v1.Post("/times/list", authRequired, postTimesListHandler)
+	v1.Get("/times/:id", authRequired, getTimeHandler)
+	v1.Put("/times/:id", authRequired, changed("time updated"), putTimeHandler)
+	v1.Delete("/times/:id", authRequired, changed("time deleted"), delTimeHandler)
+	//
 	v1.Get("/users", authRequired, getUsersHandler)
 	v1.Post("/users/list", authRequired, postUsersListHandler)
 	v1.Get("/users/:id", authRequired, getUserHandler)
@@ -562,7 +577,7 @@ func getInfoHandler(c *fiber.Ctx) error {
 	view.Pattern = common.Config.Pattern
 	view.Preview = common.Config.Preview
 	if v := c.Locals("authorization"); v != nil {
-		view.Application = v.(string)
+		view.Authorization = v.(string)
 	}
 	if v := c.Locals("expiration"); v != nil {
 		if expiration := v.(int64); expiration > 0 {
@@ -2474,9 +2489,11 @@ func postProductsHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Availability"]; found && len(v) > 0 {
 				availability = strings.TrimSpace(v[0])
 			}
-			var sending string
-			if v, found := data.Value["Sending"]; found && len(v) > 0 {
-				sending = strings.TrimSpace(v[0])
+			var timeId uint
+			if v, found := data.Value["TimeId"]; found && len(v) > 0 {
+				if vv, _ := strconv.Atoi(v[0]); err == nil {
+					timeId = uint(vv)
+				}
 			}
 			var sku string
 			if v, found := data.Value["Sku"]; found && len(v) > 0 {
@@ -2490,7 +2507,7 @@ func postProductsHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Customization"]; found && len(v) > 0 {
 				customization = strings.TrimSpace(v[0])
 			}
-			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Parameters: parameters, CustomParameters: customParameters, Variation: variation, BasePrice: basePrice, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, Sending: sending, Sku: sku, Content: content, Customization: customization}
+			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Parameters: parameters, CustomParameters: customParameters, Variation: variation, BasePrice: basePrice, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, TimeId: timeId, Sku: sku, Content: content, Customization: customization}
 			if _, err := models.CreateProduct(common.Database, product); err == nil {
 				// Create new product automatically
 				if name == "" {
@@ -2926,10 +2943,6 @@ func putProductHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Availability"]; found && len(v) > 0 {
 				availability = strings.TrimSpace(v[0])
 			}
-			var sending string
-			if v, found := data.Value["Sending"]; found && len(v) > 0 {
-				sending = strings.TrimSpace(v[0])
-			}
 			var sku string
 			if v, found := data.Value["Sku"]; found && len(v) > 0 {
 				sku = strings.TrimSpace(v[0])
@@ -2942,6 +2955,18 @@ func putProductHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["ImageId"]; found && len(v) > 0 {
 				if vv, _ := strconv.Atoi(v[0]); err == nil {
 					imageId = uint(vv)
+				}
+			}
+			var vendorId uint
+			if v, found := data.Value["VendorId"]; found && len(v) > 0 {
+				if vv, _ := strconv.Atoi(v[0]); err == nil {
+					vendorId = uint(vv)
+				}
+			}
+			var timeId uint
+			if v, found := data.Value["TimeId"]; found && len(v) > 0 {
+				if vv, _ := strconv.Atoi(v[0]); err == nil {
+					timeId = uint(vv)
 				}
 			}
 			var customization string
@@ -2971,11 +2996,11 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Weight = weight
 			oldAvailability := product.Availability
 			product.Availability = availability
-			oldSending := product.Sending
-			product.Sending = sending
 			oldSku := product.Sku
 			product.Sku = sku
 			product.ImageId = imageId
+			product.VendorId = vendorId
+			product.TimeId = timeId
 			product.Content = content
 			product.Customization = customization
 			if variations, err := models.GetProductVariations(common.Database, int(product.ID)); err == nil {
@@ -2998,9 +3023,6 @@ func putProductHandler(c *fiber.Ctx) error {
 						}
 						if oldAvailability != availability {
 							variation.Availability = product.Availability
-						}
-						if oldSending != sending {
-							variation.Sending = product.Sending
 						}
 						if oldSku != sku {
 							variation.Sku = product.Sku
@@ -3726,15 +3748,17 @@ func postVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Availability"]; found && len(v) > 0 {
 				availability = strings.TrimSpace(v[0])
 			}
-			var sending string
-			if v, found := data.Value["Sending"]; found && len(v) > 0 {
-				sending = strings.TrimSpace(v[0])
+			var timeId uint
+			if v, found := data.Value["TimeId"]; found && len(v) > 0 {
+				if vv, _ := strconv.Atoi(v[0]); err == nil {
+					timeId = uint(vv)
+				}
 			}
 			var sku string
 			if v, found := data.Value["Sku"]; found && len(v) > 0 {
 				sku = strings.TrimSpace(v[0])
 			}
-			variation := &models.Variation{Name: name, Title: title, Description: description, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, Sending: sending, Sku: sku}
+			variation := &models.Variation{Name: name, Title: title, Description: description, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, TimeId: timeId, Sku: sku}
 			if id, err := models.CreateVariation(common.Database, variation); err == nil {
 				if name == "" {
 					variation.Name = fmt.Sprintf("new-variation-%d", variation.ID)
@@ -3900,9 +3924,11 @@ func putVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Availability"]; found && len(v) > 0 {
 				availability = strings.TrimSpace(v[0])
 			}
-			var sending string
-			if v, found := data.Value["Sending"]; found && len(v) > 0 {
-				sending = strings.TrimSpace(v[0])
+			var timeId uint
+			if v, found := data.Value["TimeId"]; found && len(v) > 0 {
+				if vv, _ := strconv.Atoi(v[0]); err == nil {
+					timeId = uint(vv)
+				}
 			}
 			var sku string
 			if v, found := data.Value["Sku"]; found && len(v) > 0 {
@@ -3926,7 +3952,7 @@ func putVariationHandler(c *fiber.Ctx) error {
 			variation.Depth = depth
 			variation.Weight = weight
 			variation.Availability = availability
-			variation.Sending = sending
+			variation.TimeId = timeId
 			variation.Sku = sku
 			variation.Customization = customization
 			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
@@ -5772,11 +5798,7 @@ func postValueHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Availability"]; found && len(v) > 0 {
 				availability = strings.TrimSpace(v[0])
 			}
-			var sending string
-			if v, found := data.Value["Sending"]; found && len(v) > 0 {
-				sending = strings.TrimSpace(v[0])
-			}
-			value := &models.Value{Title: title, Description: description, Value: val, OptionId: option.ID, Availability: availability, Sending: sending}
+			value := &models.Value{Title: title, Description: description, Value: val, OptionId: option.ID, Availability: availability}
 			if id, err := models.CreateValue(common.Database, value); err == nil {
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
 					p := path.Join(dir, "storage", "values")
@@ -6041,15 +6063,11 @@ func putValueHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Availability"]; found && len(v) > 0 {
 				availability = strings.TrimSpace(v[0])
 			}
-			var sending string
-			if v, found := data.Value["Sending"]; found && len(v) > 0 {
-				sending = strings.TrimSpace(v[0])
-			}
 			value.Title = title
 			value.Description = description
 			value.Value = val
 			value.Availability = availability
-			value.Sending = sending
+			//value.Sending = sending
 			//
 			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
 				// To delete existing
@@ -8095,6 +8113,7 @@ func delTransactionHandler(c *fiber.Ctx) error {
 	}
 }
 
+// Widgets
 type NewWidget struct {
 	Enabled bool
 	Name string
@@ -9898,6 +9917,835 @@ func delEmailTemplateHandler(c *fiber.Ctx) error {
 	}
 	if template, err := models.GetEmailTemplate(common.Database, id); err == nil {
 		if err = models.DeleteEmailTemplate(common.Database, template); err == nil {
+			return c.JSON(HTTPMessage{MESSAGE: "OK"})
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+// Vendor
+type VendorsView []VendorView
+
+// @security BasicAuth
+// GetVendors godoc
+// @Summary Get vendors
+// @Accept json
+// @Produce json
+// @Success 200 {object} VendorsView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/vendors [get]
+// @Tags vendor
+func getVendorsHandler(c *fiber.Ctx) error {
+	if vendors, err := models.GetVendors(common.Database); err == nil {
+		var view VendorsView
+		if bts, err := json.MarshalIndent(vendors, "", "   "); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+type VendorView struct{
+	ID uint
+	Enabled bool
+	Name string
+	Title string
+	Thumbnail string
+	Description string
+	Content string
+	Times []TimeView `json:",omitempty"`
+}
+
+type NewVendor struct {
+	Enabled bool
+	Name string
+	Title string
+	Description string
+	Content string
+}
+
+// @security BasicAuth
+// CreateVendor godoc
+// @Summary Create vendor
+// @Accept json
+// @Produce json
+// @Param vendor body NewVendor true "body"
+// @Success 200 {object} VendorView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/vendors [post]
+// @Tags vendor
+func postVendorHandler(c *fiber.Ctx) error {
+	var view VendorView
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
+			data, err := c.Request().MultipartForm()
+			if err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			var enabled bool
+			if v, found := data.Value["Enabled"]; found && len(v) > 0 {
+				enabled, err = strconv.ParseBool(v[0])
+				if err != nil {
+					logger.Infof("%+v", err)
+				}
+			}
+			var name string
+			if v, found := data.Value["Name"]; found && len(v) > 0 {
+				name = strings.TrimSpace(v[0])
+			}
+			var title string
+			if v, found := data.Value["Title"]; found && len(v) > 0 {
+				title = strings.TrimSpace(v[0])
+			}
+			var description string
+			if v, found := data.Value["Description"]; found && len(v) > 0 {
+				description = strings.TrimSpace(v[0])
+			}
+			var content string
+			if v, found := data.Value["Content"]; found && len(v) > 0 {
+				content = strings.TrimSpace(v[0])
+			}
+			vendor := &models.Vendor {
+				Enabled: enabled,
+				Name:    name,
+				Title:   title,
+				Description: description,
+				Content: content,
+			}
+			if id, err := models.CreateVendor(common.Database, vendor); err == nil {
+				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
+					p := path.Join(dir, "storage", "vendors")
+					if _, err := os.Stat(p); err != nil {
+						if err = os.MkdirAll(p, 0755); err != nil {
+							logger.Errorf("%v", err)
+						}
+					}
+					filename := fmt.Sprintf("%d-%s-thumbnail%s", id, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(vendor.Name, "-"), path.Ext(v[0].Filename))
+					if p := path.Join(p, filename); len(p) > 0 {
+						if in, err := v[0].Open(); err == nil {
+							out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
+							if err != nil {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+							defer out.Close()
+							if _, err := io.Copy(out, in); err != nil {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+							vendor.Thumbnail = "/" + path.Join("vendors", filename)
+							if err = models.UpdateVendor(common.Database, vendor); err != nil {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+						}
+					}
+				}
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			if bts, err := json.Marshal(vendor); err == nil {
+				if err = json.Unmarshal(bts, &view); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+			return c.JSON(view)
+		} else {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Unsupported Content-Type"})
+		}
+	}
+	return c.JSON(view)
+}
+
+type VendorsListResponse struct {
+	Data []VendorsListItem
+	Filtered int64
+	Total int64
+}
+
+type VendorsListItem struct {
+	ID uint
+	Enabled bool
+	Name string
+	Title string
+	Description string
+	Content string
+}
+
+// @security BasicAuth
+// SearchVendors godoc
+// @Summary Search vendors
+// @Accept json
+// @Produce json
+// @Param request body ListRequest true "body"
+// @Success 200 {object} VendorsListResponse
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/vendors/list [post]
+// @Tags vendor
+func postVendorsListHandler(c *fiber.Ctx) error {
+	var response VendorsListResponse
+	var request ListRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	if len(request.Sort) == 0 {
+		request.Sort["Title"] = "asc"
+	}
+	if request.Length == 0 {
+		request.Length = 10
+	}
+	// Filter
+	var keys1 []string
+	var values1 []interface{}
+	if len(request.Filter) > 0 {
+		for key, value := range request.Filter {
+			if key != "" && len(strings.TrimSpace(value)) > 0 {
+				switch key {
+				default:
+					keys1 = append(keys1, fmt.Sprintf("vendors.%v like ?", key))
+					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
+				}
+			}
+		}
+	}
+	//logger.Infof("keys1: %+v, values1: %+v", keys1, values1)
+	//
+	// Sort
+	var order string
+	if len(request.Sort) > 0 {
+		var orders []string
+		for key, value := range request.Sort {
+			if key != "" && value != "" {
+				switch key {
+				default:
+					orders = append(orders, fmt.Sprintf("vendors.%v %v", key, value))
+				}
+			}
+		}
+		order = strings.Join(orders, ", ")
+	}
+	//logger.Infof("order: %+v", order)
+	//
+	rows, err := common.Database.Debug().Model(&models.Vendor{}).Select("vendors.ID, vendors.Enabled, vendors.Name, vendors.Title, vendors.Description, vendors.Content").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	if err == nil {
+		if err == nil {
+			for rows.Next() {
+				var item VendorsListItem
+				if err = common.Database.ScanRows(rows, &item); err == nil {
+					response.Data = append(response.Data, item)
+				} else {
+					logger.Errorf("%v", err)
+				}
+			}
+		}else{
+			logger.Errorf("%v", err)
+		}
+		rows.Close()
+	}
+	rows, err = common.Database.Debug().Model(&models.Vendor{}).Select("vendors.ID, vendors.Enabled, vendors.Name, vendors.Title, vendors.Description, vendors.Content").Where(strings.Join(keys1, " and "), values1...).Rows()
+	if err == nil {
+		for rows.Next() {
+			response.Filtered ++
+		}
+		rows.Close()
+	}
+	if len(keys1) > 0 {
+		common.Database.Debug().Model(&models.Vendor{}).Count(&response.Total)
+	}else{
+		response.Total = response.Filtered
+	}
+	c.Status(http.StatusOK)
+	return c.JSON(response)
+}
+
+// @security BasicAuth
+// GetVendor godoc
+// @Summary Get vendor
+// @Accept json
+// @Produce json
+// @Param id path int true "Vendor ID"
+// @Success 200 {object} VendorView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/vendors/{id} [get]
+// @Tags vendor
+func getVendorHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	if vendor, err := models.GetVendor(common.Database, id); err == nil {
+		var view VendorView
+		if bts, err := json.MarshalIndent(vendor, "", "   "); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+// @security BasicAuth
+// UpdateVendor godoc
+// @Summary update vendor
+// @Accept json
+// @Produce json
+// @Param vendor body VendorView true "body"
+// @Param id path int true "Vendor ID"
+// @Success 200 {object} TagView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/vendors/{id} [put]
+// @Tags vendor
+func putVendorHandler(c *fiber.Ctx) error {
+	var vendor *models.Vendor
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+		var err error
+		if vendor, err = models.GetVendor(common.Database, id); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
+	}
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
+			data, err := c.Request().MultipartForm()
+			if err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			var enabled bool
+			if v, found := data.Value["Enabled"]; found && len(v) > 0 {
+				enabled, err = strconv.ParseBool(v[0])
+				if err != nil {
+					logger.Infof("%+v", err)
+				}
+			}
+			var title string
+			if v, found := data.Value["Title"]; found && len(v) > 0 {
+				title = strings.TrimSpace(v[0])
+			}
+			var description string
+			if v, found := data.Value["Description"]; found && len(v) > 0 {
+				description = strings.TrimSpace(v[0])
+			}
+			var content string
+			if v, found := data.Value["Content"]; found && len(v) > 0 {
+				content = strings.TrimSpace(v[0])
+			}
+			vendor.Enabled = enabled
+			vendor.Title = title
+			vendor.Description = description
+			vendor.Content = content
+			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
+				// To delete existing
+				if vendor.Thumbnail != "" {
+					if err = os.Remove(path.Join(dir, vendor.Thumbnail)); err != nil {
+						logger.Errorf("%v", err)
+					}
+					vendor.Thumbnail = ""
+				}
+			}else if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
+				p := path.Join(dir, "storage", "vendors")
+				if _, err := os.Stat(p); err != nil {
+					if err = os.MkdirAll(p, 0755); err != nil {
+						logger.Errorf("%v", err)
+					}
+				}
+				filename := fmt.Sprintf("%d-%s-thumbnail%s", id, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(vendor.Name, "-"), path.Ext(v[0].Filename))
+				if p := path.Join(p, filename); len(p) > 0 {
+					if in, err := v[0].Open(); err == nil {
+						out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
+						if err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+						defer out.Close()
+						if _, err := io.Copy(out, in); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+						vendor.Thumbnail = "/" + path.Join("vendors", filename)
+						if err = models.UpdateVendor(common.Database, vendor); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+					}
+				}
+			}
+			// Times
+			if err = models.DeleteAllTimesFromVendor(common.Database, vendor); err != nil {
+				logger.Errorf("%v", err)
+			}
+			if v, found := data.Value["Times"]; found && len(v) > 0 {
+				for _, vv := range strings.Split(strings.TrimSpace(v[0]), ",") {
+					if timeId, err := strconv.Atoi(strings.TrimSpace(vv)); err == nil {
+						if time, err := models.GetTime(common.Database, timeId); err == nil {
+							if err = models.AddTimeToVendor(common.Database, time, vendor); err != nil {
+								logger.Errorf("%v", err)
+							}
+						}else{
+							logger.Errorf("%v", err)
+						}
+					}else{
+						logger.Errorf("%v", err)
+					}
+				}
+			}
+			//
+			if err := models.UpdateVendor(common.Database, vendor); err == nil {
+				if vendor, err := models.GetVendor(common.Database, id); err == nil {
+					var view VendorView
+					if bts, err := json.Marshal(vendor); err == nil {
+						if err = json.Unmarshal(bts, &view); err == nil {
+							return c.JSON(view)
+						}else{
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+					}else{
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Unsupported Content-Type"})
+		}
+	}
+	c.Status(http.StatusInternalServerError)
+	return c.JSON(HTTPError{"Something went wrong"})
+}
+
+// @security BasicAuth
+// DelVendor godoc
+// @Summary Delete vendor
+// @Accept json
+// @Produce json
+// @Param id path int true "Vendor ID"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/vendors/{id} [delete]
+// @Tags vendor
+func delVendorHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	if vendor, err := models.GetVendor(common.Database, id); err == nil {
+		if thumbnail := vendor.Thumbnail; thumbnail != "" {
+			if err = os.Remove(path.Join(dir, "storage", thumbnail)); err != nil {
+				logger.Warningf("%v", err.Error())
+			}
+		}
+		if err = models.DeleteVendor(common.Database, vendor); err == nil {
+			return c.JSON(HTTPMessage{MESSAGE: "OK"})
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+// Times
+
+type TimesView []TimeView
+
+// @security BasicAuth
+// GetTimes godoc
+// @Summary Get times
+// @Accept json
+// @Produce json
+// @Success 200 {object} TimesView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/times [get]
+// @Tags time
+func getTimesHandler(c *fiber.Ctx) error {
+	var times []*models.Time
+	var err error
+	if v := c.Query("vid"); v != "" {
+		id, _ := strconv.Atoi(v)
+		if times, err = models.GetTimesByVendorId(common.Database, uint(id)); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		if times, err = models.GetTimes(common.Database); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}
+	var view TimesView
+	if bts, err := json.MarshalIndent(times, "", "   "); err == nil {
+		if err = json.Unmarshal(bts, &view); err == nil {
+			return c.JSON(view)
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+type NewTime struct {
+	Enabled bool
+	Name string
+	Title string
+}
+
+// @security BasicAuth
+// CreateTime godoc
+// @Summary Create time
+// @Accept json
+// @Produce json
+// @Param option body NewTime true "body"
+// @Success 200 {object} TimeView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/times [post]
+// @Tags time
+func postTimeHandler(c *fiber.Ctx) error {
+	var view TimeView
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
+			var request NewTime
+			if err := c.BodyParser(&request); err != nil {
+				return err
+			}
+			request.Name = strings.TrimSpace(request.Name)
+			if request.Name == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(fiber.Map{"ERROR": "Name is not defined"})
+			}
+			request.Title = strings.TrimSpace(request.Title)
+			if request.Title == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(fiber.Map{"ERROR": "Title is not defined"})
+			}
+			time := &models.Time {
+				Enabled: request.Enabled,
+				Name: request.Name,
+				Title: request.Title,
+			}
+			
+			if v := c.Query("vid"); v != "" {
+				if id, err := strconv.Atoi(v); err == nil {
+					if vendor, err := models.GetVendor(common.Database, id); err == nil {
+						if oldTime, err := models.GetTimeByName(common.Database, request.Name); err == nil {
+							time = oldTime
+							if err = models.AddTimeToVendor(common.Database, oldTime, vendor); err != nil {
+								logger.Warningf("%v", err.Error())
+							}
+						}else{
+							if _, err := models.CreateTime(common.Database, time); err == nil {
+								if err = models.AddTimeToVendor(common.Database, time, vendor); err != nil {
+									logger.Warningf("%v", err.Error())
+								}
+							}
+						}
+
+					}
+				}
+			}else{
+				if _, err := models.GetTimeByName(common.Database, request.Name); err == nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{"already exists"})
+				}
+				if _, err := models.CreateTime(common.Database, time); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+
+			if bts, err := json.Marshal(time); err == nil {
+				if err = json.Unmarshal(bts, &view); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+			return c.JSON(view)
+		} else {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Unsupported Content-Type"})
+		}
+	}
+	return c.JSON(view)
+}
+
+type TimesListResponse struct {
+	Data []TimeListItem
+	Filtered int64
+	Total int64
+}
+
+type TimeListItem struct {
+	ID uint
+	Enabled bool
+	Name string
+	Title string
+	Value int
+}
+
+// @security BasicAuth
+// SearchTimes godoc
+// @Summary Search times
+// @Accept json
+// @Produce json
+// @Param request body ListRequest true "body"
+// @Success 200 {object} TimesListResponse
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/times/list [post]
+// @Tags time
+func postTimesListHandler(c *fiber.Ctx) error {
+	var response TimesListResponse
+	var request ListRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	if len(request.Sort) == 0 {
+		request.Sort["ID"] = "asc"
+	}
+	if request.Length == 0 {
+		request.Length = 10
+	}
+	// Filter
+	var keys1 []string
+	var values1 []interface{}
+	if len(request.Filter) > 0 {
+		for key, value := range request.Filter {
+			if key != "" && len(strings.TrimSpace(value)) > 0 {
+				switch key {
+				default:
+					keys1 = append(keys1, fmt.Sprintf("times.%v like ?", key))
+					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
+				}
+			}
+		}
+	}
+	// Sort
+	var order string
+	if len(request.Sort) > 0 {
+		var orders []string
+		for key, value := range request.Sort {
+			if key != "" && value != "" {
+				switch key {
+				default:
+					orders = append(orders, fmt.Sprintf("times.%v %v", key, value))
+				}
+			}
+		}
+		order = strings.Join(orders, ", ")
+	}
+	//
+	rows, err := common.Database.Debug().Model(&models.Time{}).Select("times.ID, times.Enabled, times.Name, times.Title, times.Value").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	if err == nil {
+		if err == nil {
+			for rows.Next() {
+				var item TimeListItem
+				if err = common.Database.ScanRows(rows, &item); err == nil {
+					response.Data = append(response.Data, item)
+				} else {
+					logger.Errorf("%v", err)
+				}
+			}
+		}else{
+			logger.Errorf("%v", err)
+		}
+		rows.Close()
+	}
+	rows, err = common.Database.Debug().Model(&models.Time{}).Select("times.ID, times.Enabled, times.Name, times.Title, times.Value").Where(strings.Join(keys1, " and "), values1...).Rows()
+	if err == nil {
+		for rows.Next() {
+			response.Filtered ++
+		}
+		rows.Close()
+	}
+	if len(keys1) > 0 {
+		common.Database.Debug().Model(&models.Coupon{}).Count(&response.Total)
+	}else{
+		response.Total = response.Filtered
+	}
+	c.Status(http.StatusOK)
+	return c.JSON(response)
+}
+
+type TimeView struct {
+	ID uint
+	Enabled bool
+	Name string `json:",omitempty"`
+	Title string `json:",omitempty"`
+	Value int `json:",omitempty"`
+}
+
+// @security BasicAuth
+// GetTime godoc
+// @Summary Get time
+// @Accept json
+// @Produce json
+// @Param id path int true "Time ID"
+// @Success 200 {object} TimeView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/times/{id} [get]
+// @Tags time
+func getTimeHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	if time, err := models.GetTime(common.Database, id); err == nil {
+		var view TimeView
+		if bts, err := json.MarshalIndent(time, "", "   "); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+type TimeRequest struct {
+	TimeView
+	Categories string
+	Products string
+}
+
+// @security BasicAuth
+// UpdateTime godoc
+// @Summary update time
+// @Accept json
+// @Produce json
+// @Param time body TimeShortView true "body"
+// @Param id path int true "Coupon ID"
+// @Success 200 {object} TimeShortView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/times/{id} [put]
+// @Tags time
+func putTimeHandler(c *fiber.Ctx) error {
+	var request TimeRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
+	}
+	var time *models.Time
+	var err error
+	if time, err = models.GetTime(common.Database, int(id)); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	time.Enabled = request.Enabled
+	request.Name = strings.TrimSpace(request.Name)
+	if request.Name == "" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "Name is not defined"})
+	}
+	request.Title = strings.TrimSpace(request.Title)
+	if request.Title == "" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "Title is not defined"})
+	}
+	time.Title = request.Title
+	if err := models.UpdateTime(common.Database, time); err == nil {
+		var view TimeView
+		if bts, err := json.MarshalIndent(time, "", "   "); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+// @security BasicAuth
+// DelTime godoc
+// @Summary Delete time
+// @Accept json
+// @Produce json
+// @Param id path int true "Time ID"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/times/{id} [delete]
+// @Tags time
+func delTimeHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	if time, err := models.GetTime(common.Database, id); err == nil {
+		if err = models.DeleteTime(common.Database, time); err == nil {
 			return c.JSON(HTTPMessage{MESSAGE: "OK"})
 		}else{
 			c.Status(http.StatusInternalServerError)
@@ -13378,6 +14226,9 @@ type ProductView struct {
 	ImageId int `json:",omitempty"`
 	Images []ImageView `json:",omitempty"`
 	//
+	VendorId int `json:",omitempty"`
+	TimeId int `json:",omitempty"`
+	//
 	Categories []CategoryView `json:",omitempty"`
 	Tags []TagView `json:",omitempty"`
 	RelatedProducts []RelatedProduct `json:",omitempty"`
@@ -13435,7 +14286,8 @@ type VariationView struct {
 	Depth float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
 	Availability string `json:",omitempty"`
-	Sending string `json:",omitempty"`
+	//Sending string `json:",omitempty"`
+	TimeId uint `json:",omitempty"`
 	Sku string
 	Files []File2View `json:",omitempty"`
 	Images []ImageView `json:",omitempty"`

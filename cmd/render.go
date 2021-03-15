@@ -1026,7 +1026,6 @@ var renderCmd = &cobra.Command{
 												//Thumbnail: "",
 												Value: parameter.Value.Value,
 												Availability: parameter.Value.Availability,
-												Sending: parameter.Value.Sending,
 											}
 										} else {
 											parameterView.CustomValue = parameter.CustomValue
@@ -1087,7 +1086,7 @@ var renderCmd = &cobra.Command{
 									Depth:        product.Depth,
 									Weight:       product.Weight,
 									Availability: product.Availability,
-									Sending:      product.Sending,
+									Time:         product.Time,
 									Sku:          product.Sku,
 									ProductId:    product.ID,
 								}
@@ -1125,8 +1124,10 @@ var renderCmd = &cobra.Command{
 											Depth: variation.Depth,
 											Weight: variation.Weight,
 											Availability: variation.Availability,
-											Sending: variation.Sending,
 											Selected:    len(productView.Variations) == 0,
+										}
+										if variation.Time != nil {
+											variationView.Time = variation.Time.Title
 										}
 										// Images
 										if variationView.Id == 0 {
@@ -1262,12 +1263,10 @@ var renderCmd = &cobra.Command{
 													//Thumbnail: price.Value.Thumbnail,
 													Value: price.Value.Value,
 													Availability: price.Value.Availability,
-													Sending: price.Value.Sending,
 													Price: common.PricePF{
 														Id:    price.ID,
 														Price: price.Price,
 														Availability: price.Availability,
-														Sending: price.Sending,
 													},
 													Selected: h == 0,
 												}
@@ -1338,6 +1337,10 @@ var renderCmd = &cobra.Command{
 								productView.Pattern = product.Pattern
 								productView.Dimensions = product.Dimensions
 								productView.Weight = product.Weight
+								productView.Availability = product.Availability
+								if product.Time != nil {
+									productView.Time = product.Time.Title
+								}
 								productFile.Product = productView
 								for _, tag := range product.Tags {
 									if tag.Enabled {

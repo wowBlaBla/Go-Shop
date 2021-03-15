@@ -297,6 +297,14 @@ var RootCmd = &cobra.Command{
 			logger.Warningf("%+v", err)
 		}
 		//
+		if err := common.Database.AutoMigrate(&models.Vendor{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
+		//
+		if err := common.Database.AutoMigrate(&models.Time{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
+		//
 		if err := common.Database.AutoMigrate(&models.Widget{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
