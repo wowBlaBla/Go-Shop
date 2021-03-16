@@ -14,6 +14,7 @@ type Item struct {
 	BasePrice   float64          `sql:"type:decimal(8,2);"`
 	SalePrice   float64          `sql:"type:decimal(8,2);"`
 	Price       float64          `sql:"type:decimal(8,2);"`
+	VAT float64 `sql:"type:decimal(8,2);"`
 	Discount    float64          `sql:"type:decimal(8,2);"`
 	Quantity    int
 	Delivery    float64          `sql:"type:decimal(8,2);"`

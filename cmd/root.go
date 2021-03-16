@@ -98,6 +98,7 @@ func initConfig() {
 		common.Config.Resize.Image.Size= "128x0,324x0,512x0"
 		common.Config.Currency = "usd"
 		common.Config.Payment.Default = "stripe"
+		common.Config.Payment.Country = "DE"
 		common.Config.Payment.VAT = 19
 		common.Config.Swagger.Enabled = false
 		common.Config.Swagger.Url = fmt.Sprintf("http://localhost:%d/swagger.json", config.DEFAULT_PORT)

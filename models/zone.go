@@ -5,6 +5,7 @@ import "gorm.io/gorm"
 type Zone struct {
 	gorm.Model
 	Enabled bool
+	Title string
 	Country string
 	ZIP string `gorm:"column:zip"`
 	Description string
@@ -46,11 +47,26 @@ func GetZone(connector *gorm.DB, id int) (*Zone, error) {
 	return &zone, nil
 }
 
+func GetZoneByCountry(connector *gorm.DB, country string) (*Zone, error) {
+	db := connector
+	var zone Zone
+	if err := db.Debug().Where("country = ? and (zip = '' or zip is null)", country).First(&zone).Error; err != nil {
+		return nil, err
+	}
+	return &zone, nil
+}
+
 func GetZoneByCountryAndZIP(connector *gorm.DB, country, zip string) (*Zone, error) {
 	db := connector
 	var zone Zone
-	if err := db.Where("country = ? and zip = ?", country, zip).First(&zone).Error; err != nil {
-		return nil, err
+	if zip == "" {
+		if err := db.Debug().Where("country = ? and (zip = '' or zip is null)", country).First(&zone).Error; err != nil {
+			return nil, err
+		}
+	}else{
+		if err := db.Debug().Where("country = ? and zip = ?", country, zip).First(&zone).Error; err != nil {
+			return nil, err
+		}
 	}
 	return &zone, nil
 }

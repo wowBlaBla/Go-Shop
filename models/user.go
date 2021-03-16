@@ -27,6 +27,19 @@ type User struct {
 	Notification   bool
 	ResetCode      string
 	ResetAttempt   time.Time
+	//
+	Name string
+	Lastname string
+	Company string
+	Phone string
+	Address string
+	Zip string
+	City string
+	Region string
+	Country string
+	ITN string
+	OtherShipping bool
+	//
 	Profiles       []*Profile `gorm:"foreignKey:UserId"`
 	//
 	UpdatedAt time.Time

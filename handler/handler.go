@@ -327,6 +327,7 @@ func GetFiber() *fiber.App {
 	//
 	v1.Get("/payment_methods", authRequired, getPaymentMethodsHandler)
 	//
+	v1.Post("/email", postEmailHandler)
 	v1.Post("/profiles", postProfileHandler)
 	v1.Get("/test", getTestHandler)
 	v1.Post("/test", getTestHandler)
@@ -8343,9 +8344,9 @@ type WidgetRequest struct {
 // @Summary update widget
 // @Accept json
 // @Produce json
-// @Param widget body WidgetShortView true "body"
+// @Param widget body WidgetRequest true "body"
 // @Param id path int true "Coupon ID"
-// @Success 200 {object} WidgetShortView
+// @Success 200 {object} WidgetView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/widgets/{id} [put]
@@ -8461,6 +8462,18 @@ type MeView struct {
 	Login string
 	Email string
 	EmailConfirmed bool
+	//
+	Name string
+	Lastname string
+	Company string
+	Phone string
+	Address string
+	Zip string
+	City string
+	Region string
+	Country string
+	ITN string `json:",omitempty"`
+	//
 	Role int `json:",omitempty"`
 	Profiles []ProfileView `json:",omitempty"`
 	IsAdmin bool `json:",omitempty"`
@@ -8476,6 +8489,9 @@ type ProfileView struct {
 	City string
 	Region string
 	Country string
+	Phone string `json:",omitempty"`
+	ITN string `json:",omitempty"`
+	Billing bool `json:",omitempty"`
 	TransportId uint
 }
 
@@ -9194,6 +9210,7 @@ type ZonesView []ZoneView
 type ZoneView struct{
 	ID      uint
 	Enabled bool
+	Title string
 	Country string
 	ZIP     string
 }
@@ -9230,6 +9247,7 @@ func getZonesHandler(c *fiber.Ctx) error {
 
 type NewZone struct {
 	Enabled bool
+	Title string
 	Country string
 	ZIP     string
 }
@@ -9257,7 +9275,6 @@ func postZoneHandler(c *fiber.Ctx) error {
 					Item string
 					Kg float64
 					M3 float64
-
 				}
 			}
 			if err := c.BodyParser(&request); err != nil {
@@ -9270,9 +9287,8 @@ func postZoneHandler(c *fiber.Ctx) error {
 				return c.JSON(fiber.Map{"ERROR": "Country is not defined"})
 			}
 			request.ZIP = strings.TrimSpace(request.ZIP)
-			if request.ZIP == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(fiber.Map{"ERROR": "ZIP is not defined"})
+			if request.Title == "" {
+				request.Title = request.Country + "-" + request.ZIP
 			}
 			if zones, err := models.GetZonesByCountryAndZIP(common.Database, request.Country, request.ZIP); err == nil && len(zones) > 0 {
 				c.Status(http.StatusInternalServerError)
@@ -9280,6 +9296,7 @@ func postZoneHandler(c *fiber.Ctx) error {
 			}
 			zone := &models.Zone {
 				Enabled: request.Enabled,
+				Title: request.Title,
 				Country: request.Country,
 				ZIP: request.ZIP,
 			}
@@ -9342,6 +9359,8 @@ type ZonesListResponse struct {
 
 type ZonesListItem struct {
 	ID      uint
+	Enabled bool
+	Title string
 	Country string
 	ZIP     string `gorm:"column:zip" json:"ZIP"`
 	Description string
@@ -9404,7 +9423,7 @@ func postZonesListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Zone{}).Select("zones.ID, zones.Country, zones.ZIP, zones.Description").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Zone{}).Select("zones.ID, zones.Enabled, zones.Title, zones.Country, zones.ZIP, zones.Description").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -9420,7 +9439,7 @@ func postZonesListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Zone{}).Select("zones.ID, zones.Country, zones.ZIP, zones.Description").Where(strings.Join(keys1, " and "), values1...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Zone{}).Select("zones.ID, zone.Enabled, zones.Title, zones.Country, zones.ZIP, zones.Description").Where(strings.Join(keys1, " and "), values1...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -9516,11 +9535,11 @@ func putZoneHandler(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"ERROR": "Country is not defined"})
 	}
 	request.ZIP = strings.TrimSpace(request.ZIP)
-	if request.ZIP == "" {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(fiber.Map{"ERROR": "ZIP is not defined"})
+	if request.Title == "" {
+		request.Title = request.Country + "-" + request.ZIP
 	}
 	zone.Enabled = request.Enabled
+	zone.Title = request.Title
 	zone.Country = request.Country
 	zone.ZIP = request.ZIP
 	var tariffs []string
@@ -10672,9 +10691,9 @@ type TimeRequest struct {
 // @Summary update time
 // @Accept json
 // @Produce json
-// @Param time body TimeShortView true "body"
+// @Param time body TimeRequest true "body"
 // @Param id path int true "Coupon ID"
-// @Success 200 {object} TimeShortView
+// @Success 200 {object} TimeView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/times/{id} [put]
@@ -10767,6 +10786,18 @@ type UserView struct {
 	Login string
 	Email string
 	EmailConfirmed bool
+	//
+	Name string
+	Lastname string
+	Company string
+	Phone string
+	Address string
+	Zip string
+	City string
+	Region string
+	Country string
+	ITN string
+	//
 	Role int `json:",omitempty"`
 	Notification bool
 }
@@ -11284,6 +11315,7 @@ func postPublishHandler(c *fiber.Ctx) error {
 type AccountView struct {
 	Admin bool
 	Profiles []ProfileView `json:",omitempty"`
+	ProfileId uint `json:",omitempty"`
 	UserView
 }
 
@@ -11310,6 +11342,9 @@ func getAccountHandler(c *fiber.Ctx) error {
 			if bts, err := json.Marshal(user); err == nil {
 				if err = json.Unmarshal(bts, &view); err == nil {
 					view.Admin = user.Role < models.ROLE_USER
+					if len(user.Profiles) > 0 {
+						view.ProfileId = user.Profiles[len(user.Profiles) - 1].ID
+					}
 					return c.JSON(view)
 				}else{
 					c.Status(http.StatusInternalServerError)
@@ -11327,6 +11362,19 @@ func getAccountHandler(c *fiber.Ctx) error {
 type NewAccount struct {
 	Email string
 	CSRF string
+	//
+	Name string
+	Lastname string
+	Company string
+	Phone string
+	Address string
+	Zip string
+	City string
+	Region string
+	Country string
+	ITN string
+	//
+	OtherShipping bool
 }
 
 type Account2View struct {
@@ -11354,18 +11402,14 @@ func postAccountHandler(c *fiber.Ctx) error {
 	}
 	//
 	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		var email string
+		//var email string
+		var request NewAccount
 		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
-			var request NewAccount
 			if err := c.BodyParser(&request); err != nil {
-				return err
-			}
-			email = strings.TrimSpace(request.Email)
-			if email == "" {
 				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Email is empty"})
+				return c.JSON(HTTPError{err.Error()})
 			}
-		} else if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
+		/*} else if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
 			data, err := c.Request().MultipartForm()
 			if err != nil {
 				c.Status(http.StatusInternalServerError)
@@ -11379,11 +11423,17 @@ func postAccountHandler(c *fiber.Ctx) error {
 			if email == "" {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Email is empty"})
-			}
-		}else {
+			}*/
+		} else {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{"Unsupported Content-Type"})
 		}
+		//
+		if request.Email == "" {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Email is empty"})
+		}
+		email := request.Email
 		//
 		if _, err := models.GetUserByEmail(common.Database, email); err == nil {
 			c.Status(http.StatusInternalServerError)
@@ -11405,16 +11455,98 @@ func postAccountHandler(c *fiber.Ctx) error {
 			Role: models.ROLE_USER,
 			Notification: true,
 		}
+		//
+		var name = strings.TrimSpace(request.Name)
+		if name == "" {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Name is empty"})
+		}
+		var lastname = strings.TrimSpace(request.Lastname)
+		if lastname == "" {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Lastname is empty"})
+		}
+		var company = strings.TrimSpace(request.Company)
+		var phone = strings.TrimSpace(request.Phone)
+		if len(phone) > 64 {
+			phone = ""
+		}
+		var address = strings.TrimSpace(request.Address)
+		if address == "" {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Address is empty"})
+		}
+		var zip = strings.TrimSpace(request.Zip)
+		if zip == "" {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Zip is empty"})
+		}
+		var city = strings.TrimSpace(request.City)
+		if city == "" {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"City is empty"})
+		}
+		var region = strings.TrimSpace(request.Region)
+		if region == "" {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Region is empty"})
+		}
+		var country = strings.TrimSpace(request.Country)
+		if country == "" {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Country is empty"})
+		}
+		var itn = strings.TrimSpace(request.ITN)
+		if len(itn) > 32 {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"ITN is incorrect"})
+		}
+		//
+		user.Name = name
+		user.Lastname = lastname
+		user.Company = company
+		user.Phone = phone
+		user.Address = address
+		user.Zip = zip
+		user.City = city
+		user.Region = region
+		user.Country = country
+		user.ITN = itn
 		id, err := models.CreateUser(common.Database, user)
 		if err != nil {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
 		}
 		user.ID = id
+		var profileId uint
+		if !request.OtherShipping {
+			profile := &models.Profile{
+				Name:     name,
+				Lastname: lastname,
+				Company:  company,
+				Phone: phone,
+				Address:  address,
+				Zip:      zip,
+				City:     city,
+				Region:   region,
+				Country:  country,
+				ITN: itn,
+				UserId:   user.ID,
+				Billing: true,
+			}
+			if profileId, err = models.CreateProfile(common.Database, profile); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			user.Profiles = []*models.Profile{profile}
+		}else{
+			user.OtherShipping = request.OtherShipping
+		}
 		var view AccountView
 		if bts, err := json.Marshal(user); err == nil {
 			if err = json.Unmarshal(bts, &view); err == nil {
 				view.Admin = user.Role < models.ROLE_USER
+				view.ProfileId = profileId
 			}else{
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
@@ -11620,7 +11752,7 @@ func postAccountProfileHandler(c *fiber.Ctx) error {
 			var name = strings.TrimSpace(request.Name)
 			if name == "" {
 				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Country is empty"})
+				return c.JSON(HTTPError{"Name is empty"})
 			}
 			var lastname = strings.TrimSpace(request.Lastname)
 			if lastname == "" {
@@ -11689,6 +11821,41 @@ func postAccountProfileHandler(c *fiber.Ctx) error {
 	}
 	//
 	return c.JSON(view)
+}
+
+type EmailRequest struct {
+	Email string
+}
+
+// CheckEmail godoc
+// @Summary Check email
+// @Accept json
+// @Produce json
+// @Param email body EmailRequest true "body"
+// @Success 200 {object} Account2View
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/email [post]
+// @Tags account
+// @Tags frontend
+func postEmailHandler(c *fiber.Ctx) error {
+	var request EmailRequest
+	if err := c.BodyParser(&request); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	request.Email = strings.TrimSpace(request.Email)
+	if request.Email == "" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{"Empty email"})
+	}
+	time.Sleep(1 * time.Second)
+	if _, err := models.GetUserByEmail(common.Database, request.Email); err == nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{"Empty already in use"})
+	}
+	c.Status(http.StatusOK)
+	return c.JSON(HTTPMessage{"OK"})
 }
 
 type CartItem struct {
@@ -12164,6 +12331,7 @@ type OrderShortView struct{
 	Discount float64 `json:",omitempty"`
 	Delivery float64 `json:",omitempty"`
 	Discount2 float64 `json:",omitempty"`
+	VAT float64
 	Total float64 `json:",omitempty"`
 	Volume float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
@@ -12192,6 +12360,7 @@ type ItemShortView struct {
 	Price float64                  `json:",omitempty"`
 	Discount float64                  `json:",omitempty"`
 	Quantity int                   `json:",omitempty"`
+	VAT        float64
 	Total      float64             `json:",omitempty"`
 	Volume float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
@@ -12457,6 +12626,23 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 	order := &models.Order{Status: models.ORDER_STATUS_NEW}
 	now := time.Now()
+	vat := common.Config.Payment.VAT
+	tax := 1.0
+	// Profile
+	var profile *models.Profile
+	var err error
+	if request.ProfileId > 0 {
+		order.ProfileId = request.ProfileId
+		profile, err = models.GetProfile(common.Database, request.ProfileId)
+		if err == nil {
+			if profile.Country != common.Config.Payment.Country {
+				tax -= common.Config.Payment.VAT / 100.0
+				vat = 0
+			}
+		} else {
+			return nil, nil, err
+		}
+	}
 	// Coupons
 	var coupons []*models.Coupon
 	for _, code := range request.Coupons {
@@ -12474,7 +12660,6 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 		}
 	}
 	//
-	//var view OrderShortView
 	var itemsShortView []ItemShortView
 	for _, rItem := range request.Items {
 		var arr []int
@@ -12525,9 +12710,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 					return nil, nil, err
 				}
 			}
-
 			categoryId := rItem.CategoryId
-
 			item := &models.Item{
 				Uuid:     rItem.UUID,
 				CategoryId: rItem.CategoryId,
@@ -12536,11 +12719,12 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 				Quantity: rItem.Quantity,
 			}
 			if salePrice > 0 && start.Before(now) && end.After(now) {
-				item.Price = salePrice
-				item.SalePrice = salePrice
+				item.Price = salePrice * tax
+				item.SalePrice = salePrice * tax
 			}else{
-				item.Price = basePrice
+				item.Price = basePrice * tax
 			}
+			item.VAT = vat
 			item.Volume = width * height * depth / 1000000.0
 			item.Weight = weight
 			//
@@ -12579,9 +12763,9 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 						//
 						propertyShortView.Value = price.Value.Value
 						if price.Price > 0 {
-							propertyShortView.Price = price.Price
+							propertyShortView.Price = price.Price * tax
 						}
-						item.Price += price.Price
+						item.Price += price.Price * tax
 						propertiesShortView = append(propertiesShortView, propertyShortView)
 					} else {
 						return nil, nil, err
@@ -12655,40 +12839,12 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 			}
 			// [/Item Description]
 			itemsShortView = append(itemsShortView, itemShortView)
-
 			order.Items = append(order.Items, item)
 			order.Quantity += item.Quantity
 			order.Volume += item.Volume
 			order.Weight += item.Weight
 			order.Sum += item.Total
 			order.Discount += item.Discount
-			//
-			//itemShortView.Path = item.Path
-			//itemShortView.Thumbnail = item.Thumbnail
-			//itemShortView.Price = item.Price
-			//itemShortView.Discount = item.Discount
-			//itemShortView.Quantity = item.Quantity
-			//itemShortView.Total = item.Total
-			////
-			//view.Quantity += itemShortView.Quantity
-			//view.Items = append(view.Items, itemShortView)
-			//
-			//view.Volume += itemShortView.Volume * float64(itemShortView.Quantity)
-			//view.Weight += itemShortView.Weight * float64(itemShortView.Quantity)
-		}
-	}
-	//
-	//order.Volume = view.Volume
-	//order.Weight = view.Weight
-	// *****************************************************************************************************************
-	// Profile
-	var profile *models.Profile
-	var err error
-	if request.ProfileId > 0 {
-		order.ProfileId = request.ProfileId
-		profile, err = models.GetProfile(common.Database, request.ProfileId)
-		if err != nil {
-			return nil, nil, err
 		}
 	}
 	// Transports
@@ -12703,11 +12859,22 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 				//
 				var tariff *models.Tariff
 				if profile != nil {
-					// 2 Get Zone by Country and Zip
+					// 2 Get Zone by Country, Country and Zip
 					var zoneId uint
-					zone, err := models.GetZoneByCountryAndZIP(common.Database, profile.Country, profile.Zip)
-					if err == nil {
+					if zone, err := models.GetZoneByCountry(common.Database, profile.Country); err == nil {
 						zoneId = zone.ID
+					}
+					for i := 0; i <= len(profile.Zip); i++ {
+						n := len(profile.Zip) - i
+						zip := profile.Zip[0:n]
+						for j := n; j < len(profile.Zip); j++ {
+							zip += "X"
+						}
+						zone, err := models.GetZoneByCountryAndZIP(common.Database, profile.Country, zip)
+						if err == nil {
+							zoneId = zone.ID
+							break
+						}
 					}
 					// 3 Get Tariff by Transport and Zone
 					tariff, _ = models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
@@ -12779,14 +12946,14 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 					if itemIsPercent {
 						delivery += (item.Price * itemPercent / 100.0) * float64(item.Quantity)
 					}else{
-						delivery += itemFixed * float64(item.Quantity)
+						delivery += itemFixed * tax * float64(item.Quantity)
 					}
 				}
 				// Delivery: fixed
 				if orderIsPercent {
 					delivery += order.Sum * orderPercent / 100.0
 				}else{
-					delivery += orderFixed
+					delivery += orderFixed * tax
 				}
 				// Delivery: dynamic
 				byVolume := delivery + order.Volume * m3
@@ -12877,6 +13044,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 		}
 	}
 	//
+	order.VAT = vat
 	var view *OrderShortView
 	if bts, err := json.Marshal(order); err == nil {
 		if err = json.Unmarshal(bts, &view); err == nil {

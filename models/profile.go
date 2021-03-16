@@ -16,6 +16,8 @@ type Profile struct {
 	Region string
 	Country string
 	Payment string
+	Billing bool //?
+	ITN string
 	//
 	UserId uint
 }

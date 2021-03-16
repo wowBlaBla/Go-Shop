@@ -1386,7 +1386,7 @@ var renderCmd = &cobra.Command{
 									Name:        product.Name,
 									Title:       product.Title,
 									Description: product.Description,
-									Thumbnail:   strings.Join(thumbnails, ","),
+									Thumbnail:   productView.Thumbnail,
 									Images:      strings.Join(images, ";"),
 									Variations:  strings.Join(variations, ";"),
 									CategoryID:  category.ID,

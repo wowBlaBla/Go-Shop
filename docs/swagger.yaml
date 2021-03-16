@@ -928,9 +928,27 @@ definitions:
     type: object
   handler.NewAccount:
     properties:
+      address:
+        type: string
+      city:
+        type: string
+      company:
+        type: string
+      country:
+        type: string
       csrf:
         type: string
       email:
+        type: string
+      lastname:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      region:
+        type: string
+      zip:
         type: string
     type: object
   handler.NewCategory:
@@ -1120,6 +1138,15 @@ definitions:
       title:
         type: string
     type: object
+  handler.NewTime:
+    properties:
+      enabled:
+        type: boolean
+      name:
+        type: string
+      title:
+        type: string
+    type: object
   handler.NewTransport:
     properties:
       enabled:
@@ -1155,6 +1182,36 @@ definitions:
       name:
         type: string
       sku:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.NewVendor:
+    properties:
+      content:
+        type: string
+      description:
+        type: string
+      enabled:
+        type: boolean
+      name:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.NewWidget:
+    properties:
+      applyTo:
+        type: string
+      content:
+        type: string
+      description:
+        type: string
+      enabled:
+        type: boolean
+      location:
+        type: string
+      name:
         type: string
       title:
         type: string
@@ -1636,6 +1693,8 @@ definitions:
         type: array
       thumbnail:
         type: string
+      timeId:
+        type: integer
       title:
         type: string
       variation:
@@ -1644,6 +1703,8 @@ definitions:
         items:
           $ref: '#/definitions/handler.VariationView'
         type: array
+      vendorId:
+        type: integer
       weight:
         type: number
       width:
@@ -1861,6 +1922,64 @@ definitions:
   handler.TariffsView:
     items:
       $ref: '#/definitions/handler.TariffView'
+    type: array
+  handler.TimeListItem:
+    properties:
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      title:
+        type: string
+      value:
+        type: integer
+    type: object
+  handler.TimeRequest:
+    properties:
+      categories:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      products:
+        type: string
+      title:
+        type: string
+      value:
+        type: integer
+    type: object
+  handler.TimeView:
+    properties:
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      title:
+        type: string
+      value:
+        type: integer
+    type: object
+  handler.TimesListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.TimeListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.TimesView:
+    items:
+      $ref: '#/definitions/handler.TimeView'
     type: array
   handler.TransactionView:
     properties:
@@ -2187,14 +2306,15 @@ definitions:
         type: array
       salePrice:
         type: number
-      sending:
-        type: string
       sku:
         type: string
       start:
         type: string
       thumbnail:
         type: string
+      timeId:
+        description: Sending string `json:",omitempty"`
+        type: integer
       title:
         type: string
       weight:
@@ -2240,6 +2360,135 @@ definitions:
     items:
       $ref: '#/definitions/handler.VariationView'
     type: array
+  handler.VendorView:
+    properties:
+      content:
+        type: string
+      description:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      thumbnail:
+        type: string
+      times:
+        items:
+          $ref: '#/definitions/handler.TimeView'
+        type: array
+      title:
+        type: string
+    type: object
+  handler.VendorsListItem:
+    properties:
+      content:
+        type: string
+      description:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.VendorsListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.VendorsListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
+  handler.VendorsView:
+    items:
+      $ref: '#/definitions/handler.VendorView'
+    type: array
+  handler.WidgetListItem:
+    properties:
+      applyTo:
+        type: string
+      description:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      location:
+        type: string
+      name:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.WidgetRequest:
+    properties:
+      applyTo:
+        type: string
+      categories:
+        type: string
+      content:
+        type: string
+      description:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      location:
+        type: string
+      name:
+        type: string
+      products:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.WidgetView:
+    properties:
+      applyTo:
+        type: string
+      categories:
+        items:
+          $ref: '#/definitions/handler.CategoryView'
+        type: array
+      content:
+        type: string
+      description:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      location:
+        type: string
+      name:
+        type: string
+      products:
+        items:
+          $ref: '#/definitions/handler.ProductShortView'
+        type: array
+      title:
+        type: string
+    type: object
+  handler.WidgetsListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.WidgetListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
   handler.WranglerSettingsView:
     properties:
       accountId:
@@ -5576,6 +5825,185 @@ paths:
       security:
       - BasicAuth: []
       summary: Get tariffs
+  /api/v1/times:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TimesView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get times
+      tags:
+      - time
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewTime'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TimeView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create time
+      tags:
+      - time
+  /api/v1/times/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Time ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete time
+      tags:
+      - time
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Time ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TimeView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get time
+      tags:
+      - time
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: time
+        required: true
+        schema:
+          $ref: '#/definitions/handler.TimeRequest'
+      - description: Coupon ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TimeView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update time
+      tags:
+      - time
+  /api/v1/times/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TimesListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search times
+      tags:
+      - time
   /api/v1/transactions/{id}:
     delete:
       consumes:
@@ -6411,6 +6839,341 @@ paths:
       summary: Search variations
       tags:
       - variation
+  /api/v1/vendors:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.VendorsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get vendors
+      tags:
+      - vendor
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: vendor
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewVendor'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.VendorView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create vendor
+      tags:
+      - vendor
+  /api/v1/vendors/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Vendor ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete vendor
+      tags:
+      - vendor
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Vendor ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.VendorView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get vendor
+      tags:
+      - vendor
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: vendor
+        required: true
+        schema:
+          $ref: '#/definitions/handler.VendorView'
+      - description: Vendor ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.TagView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update vendor
+      tags:
+      - vendor
+  /api/v1/vendors/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.VendorsListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search vendors
+      tags:
+      - vendor
+  /api/v1/widgets:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewWidget'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.WidgetView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create widget
+      tags:
+      - widget
+  /api/v1/widgets/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Widget ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete widget
+      tags:
+      - widget
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Widget ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.WidgetView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get widget
+      tags:
+      - widget
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: widget
+        required: true
+        schema:
+          $ref: '#/definitions/handler.WidgetRequest'
+      - description: Coupon ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.WidgetView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: update widget
+      tags:
+      - widget
+  /api/v1/widgets/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.WidgetsListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search widgets
+      tags:
+      - widget
   /api/v1/zones:
     get:
       consumes:

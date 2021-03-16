@@ -103,6 +103,7 @@ type WranglerConfig struct {
 type PaymentConfig struct {
 	Enabled bool
 	Default string
+	Country string
 	Stripe struct {
 		Enabled bool
 		PublishedKey string
