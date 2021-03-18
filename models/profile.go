@@ -6,18 +6,18 @@ import (
 
 type Profile struct {
 	gorm.Model
-	Name string
+	Name     string
 	Lastname string
-	Company string
-	Phone string
-	Address string
-	Zip string
-	City string
-	Region string
-	Country string
-	Payment string
-	Billing bool //?
-	ITN string
+	Company  string
+	Phone    string
+	Address  string
+	Zip      string
+	City     string
+	Region   string
+	Country  string
+	Payment  string
+	Billing  bool //?
+	ITN      string
 	//
 	UserId uint
 }

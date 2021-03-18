@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"github.com/BurntSushi/toml"
 	swagger "github.com/arsmn/fiber-swagger/v2"
+	"github.com/dannyvankooten/vat"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
@@ -331,6 +332,7 @@ func GetFiber() *fiber.App {
 	v1.Post("/profiles", postProfileHandler)
 	v1.Get("/test", getTestHandler)
 	v1.Post("/test", getTestHandler)
+	v1.Post("/vat", postVATHandler)
 	v1.Post("/checkout", postCheckoutHandler)
 	//
 	v1.Post("/filter", postFilterHandler)
@@ -8701,6 +8703,14 @@ func getTariffsHandler(c *fiber.Ctx) error {
 
 
 // Transport
+type TransportShortView struct{
+	ID uint
+	Name string
+	Title string
+	Thumbnail string
+	Services []TransportServiceView `json:",omitempty"`
+}
+
 type TransportsView []TransportView
 
 type TransportView struct{
@@ -8715,6 +8725,8 @@ type TransportView struct{
 	Item string
 	Kg float64
 	M3 float64
+	Free float64 `json:",omitempty"`
+	Services string `json:",omitempty"`
 }
 
 // @security BasicAuth
@@ -8729,6 +8741,9 @@ type TransportView struct{
 // @Tags transport
 func getTransportsHandler(c *fiber.Ctx) error {
 	if transports, err := models.GetTransports(common.Database); err == nil {
+		sort.Slice(transports, func(i, j int) bool {
+			return transports[i].Weight < transports[j].Weight
+		})
 		var view TransportsView
 		if bts, err := json.MarshalIndent(transports, "", "   "); err == nil {
 			if err = json.Unmarshal(bts, &view); err == nil {
@@ -8830,6 +8845,17 @@ func postTransportHandler(c *fiber.Ctx) error {
 					logger.Infof("%+v", err)
 				}
 			}
+			var free float64
+			if v, found := data.Value["Free"]; found && len(v) > 0 {
+				free, err = strconv.ParseFloat(v[0],10)
+				if err != nil {
+					logger.Infof("%+v", err)
+				}
+			}
+			var services string
+			if v, found := data.Value["Services"]; found && len(v) > 0 {
+				services = strings.TrimSpace(v[0])
+			}
 			transport := &models.Transport {
 				Enabled: enabled,
 				Name:    name,
@@ -8840,6 +8866,8 @@ func postTransportHandler(c *fiber.Ctx) error {
 				Item:    item,
 				Kg:      kg,
 				M3:      m3,
+				Free: free,
+				Services: services,
 			}
 			if id, err := models.CreateTransport(common.Database, transport); err == nil {
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
@@ -9115,6 +9143,17 @@ func putTransportHandler(c *fiber.Ctx) error {
 					logger.Infof("%+v", err)
 				}
 			}
+			var free float64
+			if v, found := data.Value["Free"]; found && len(v) > 0 {
+				free, err = strconv.ParseFloat(v[0],10)
+				if err != nil {
+					logger.Infof("%+v", err)
+				}
+			}
+			var services string
+			if v, found := data.Value["Services"]; found && len(v) > 0 {
+				services = strings.TrimSpace(v[0])
+			}
 			transport.Enabled = enabled
 			transport.Title = title
 			transport.Weight = weight
@@ -9123,6 +9162,8 @@ func putTransportHandler(c *fiber.Ctx) error {
 			transport.Item = item
 			transport.Kg = kg
 			transport.M3 = m3
+			transport.Free = free
+			transport.Services = services
 			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
 				// To delete existing
 				if transport.Thumbnail != "" {
@@ -9161,7 +9202,18 @@ func putTransportHandler(c *fiber.Ctx) error {
 			}
 			//
 			if err := models.UpdateTransport(common.Database, transport); err == nil {
-				return c.JSON(TransportView{ID: transport.ID, Title: transport.Title, Thumbnail: transport.Thumbnail})
+				var view TransportView
+				if bts, err := json.Marshal(transport); err == nil {
+					if err = json.Unmarshal(bts, &view); err == nil {
+						return c.JSON(view)
+					}else{
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
 			}else{
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
@@ -11374,6 +11426,8 @@ type NewAccount struct {
 	Country string
 	ITN string
 	//
+	Profile NewProfile
+	//
 	OtherShipping bool
 }
 
@@ -11428,6 +11482,7 @@ func postAccountHandler(c *fiber.Ctx) error {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{"Unsupported Content-Type"})
 		}
+		logger.Infof("Profile1: %+v", request)
 		//
 		if request.Email == "" {
 			c.Status(http.StatusInternalServerError)
@@ -11518,21 +11573,68 @@ func postAccountHandler(c *fiber.Ctx) error {
 			return c.JSON(HTTPError{err.Error()})
 		}
 		user.ID = id
+		// How to create profile?
 		var profileId uint
-		if !request.OtherShipping {
+		if request.Profile.Name != "" {
+			logger.Infof("Profile2: %+v", request.Profile)
+			// create profile from shipping data
+			var name = strings.TrimSpace(request.Profile.Name)
+			if name == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Name is empty"})
+			}
+			var lastname = strings.TrimSpace(request.Profile.Lastname)
+			if lastname == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Lastname is empty"})
+			}
+			var company = strings.TrimSpace(request.Profile.Company)
+			var phone = strings.TrimSpace(request.Profile.Phone)
+			if len(phone) > 64 {
+				phone = ""
+			}
+			var address = strings.TrimSpace(request.Profile.Address)
+			if address == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Address is empty"})
+			}
+			var zip = strings.TrimSpace(request.Profile.Zip)
+			if zip == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Zip is empty"})
+			}
+			var city = strings.TrimSpace(request.Profile.City)
+			if city == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"City is empty"})
+			}
+			var region = strings.TrimSpace(request.Profile.Region)
+			if region == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Region is empty"})
+			}
+			var country = strings.TrimSpace(request.Profile.Country)
+			if country == "" {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Country is empty"})
+			}
+			var itn = strings.TrimSpace(request.Profile.ITN)
+			if len(itn) > 32 {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"ITN is incorrect"})
+			}
 			profile := &models.Profile{
 				Name:     name,
 				Lastname: lastname,
 				Company:  company,
-				Phone: phone,
+				Phone:    phone,
 				Address:  address,
 				Zip:      zip,
 				City:     city,
 				Region:   region,
 				Country:  country,
-				ITN: itn,
+				ITN:      itn,
 				UserId:   user.ID,
-				Billing: true,
 			}
 			if profileId, err = models.CreateProfile(common.Database, profile); err != nil {
 				c.Status(http.StatusInternalServerError)
@@ -11540,7 +11642,26 @@ func postAccountHandler(c *fiber.Ctx) error {
 			}
 			user.Profiles = []*models.Profile{profile}
 		}else{
-			user.OtherShipping = request.OtherShipping
+			// create profile from billing
+			profile := &models.Profile{
+				Name:     name,
+				Lastname: lastname,
+				Company:  company,
+				Phone:    phone,
+				Address:  address,
+				Zip:      zip,
+				City:     city,
+				Region:   region,
+				Country:  country,
+				ITN:      itn,
+				UserId:   user.ID,
+				Billing:  true,
+			}
+			if profileId, err = models.CreateProfile(common.Database, profile); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			user.Profiles = []*models.Profile{profile}
 		}
 		var view AccountView
 		if bts, err := json.Marshal(user); err == nil {
@@ -11711,6 +11832,7 @@ type NewProfile struct {
 	City string
 	Region string
 	Country string
+	ITN string
 }
 
 // @security BasicAuth
@@ -11789,6 +11911,11 @@ func postAccountProfileHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Country is empty"})
 			}
+			var itn = strings.TrimSpace(request.ITN)
+			if len(itn) > 32 {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"ITN is incorrect"})
+			}
 			profile := &models.Profile{
 				Name:     name,
 				Lastname: lastname,
@@ -11799,6 +11926,7 @@ func postAccountProfileHandler(c *fiber.Ctx) error {
 				City:     city,
 				Region:   region,
 				Country:  country,
+				ITN: itn,
 				UserId:   userId,
 			}
 			//
@@ -12030,6 +12158,47 @@ func getTestHandler(c *fiber.Ctx) error {
 	logger.Infof("getTestHandler")
 	time.Sleep(3 * time.Second)
 	return return1(c, http.StatusOK, map[string]interface{}{"MESSAGE": "OK", "Status": "paid"})
+}
+
+type VATRequest struct {
+	VAT string
+}
+
+// CheckVAT godoc
+// @Summary Check vat, should be solid string without space, eg. ATU40198200
+// @Accept json
+// @Produce json
+// @Param request body VATRequest true "body"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/vat [post]
+// @Tags account
+// @Tags frontend
+func postVATHandler(c *fiber.Ctx) error {
+	var request VATRequest
+	if err := c.BodyParser(&request); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	request.VAT = strings.TrimSpace(request.VAT)
+	if request.VAT == "" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{"Empty ITN"})
+	}
+	time.Sleep(1 * time.Second)
+	if status, err := vat.ValidateNumber(request.VAT); err == nil {
+		if status {
+			c.Status(http.StatusOK)
+			return c.JSON(HTTPMessage{"OK"})
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPMessage{"Invalid"})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
 }
 
 type FilterRequest ListRequest
@@ -12280,6 +12449,7 @@ type CheckoutRequest struct {
 	Comment string
 	ProfileId uint
 	TransportId uint
+	TransportServices []TransportServiceView
 	PaymentMethod string
 	Coupons []string
 }
@@ -12338,6 +12508,7 @@ type OrderShortView struct{
 	Comment string `json:",omitempty"`
 	//
 	Deliveries []DeliveryView `json:",omitempty"`
+	Transport *TransportShortView `json:",omitempty"`
 	PaymentMethods *PaymentMethodsView `json:",omitempty"`
 }
 
@@ -12347,7 +12518,16 @@ type DeliveryView struct {
 	Thumbnail string
 	ByVolume float64
 	ByWeight float64
+	Services []TransportServiceView `json:",omitempty"`
 	Value float64
+}
+
+type TransportServiceView struct {
+	Name string
+	Title string
+	Description string
+	Price float64
+	Selected bool
 }
 
 type ItemShortView struct {
@@ -12636,8 +12816,17 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 		profile, err = models.GetProfile(common.Database, request.ProfileId)
 		if err == nil {
 			if profile.Country != common.Config.Payment.Country {
-				tax -= common.Config.Payment.VAT / 100.0
-				vat = 0
+				var allowed bool
+				switch profile.Country {
+				case "AT":
+					allowed = profile.ITN != ""
+				default:
+					allowed = true
+				}
+				if allowed {
+					tax -= common.Config.Payment.VAT / 100.0
+					vat = 0
+				}
 			}
 		} else {
 			return nil, nil, err
@@ -12849,6 +13038,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 	}
 	// Transports
 	var deliveriesShortView []DeliveryView
+	var transportView *TransportShortView
 	if transports, err := models.GetTransports(common.Database); err == nil {
 		for _, transport := range transports {
 			// All available transports OR selected
@@ -12965,18 +13155,51 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 					value = byWeight
 				}
 				//
-				if request.TransportId == 0 {
+				if transport.Free > 0 && order.Sum > transport.Free {
+					value = 0
+				}
+				//
+				var services []TransportServiceView
+				if transport.Services != "" {
+					if err = json.Unmarshal([]byte(transport.Services), &services); err != nil {
+						logger.Warningf("%+v", err)
+					}
+				}
+				//
+				if request.TransportId > 0 {
+					transportView = &TransportShortView{
+						ID: transport.ID,
+						Name: transport.Name,
+						Title: transport.Title,
+						Thumbnail: transport.Thumbnail,
+						//Services: services,
+					}
+
+					for _, service := range services {
+						for j := 0; j < len(request.TransportServices); j++ {
+							if request.TransportServices[j].Name == service.Name {
+								service.Selected = true
+								break
+							}
+						}
+						if service.Selected {
+							transportView.Services = append(transportView.Services, service)
+							value += service.Price
+						}
+					}
+					//
+					order.TransportId = request.TransportId
+					order.Delivery = math.Round(value * 100) / 100
+				}else{
 					deliveriesShortView = append(deliveriesShortView, DeliveryView{
 						ID:        transport.ID,
 						Title:     transport.Title,
 						Thumbnail: transport.Thumbnail,
 						ByVolume: math.Round(byVolume * 100) / 100,
 						ByWeight: math.Round(byWeight * 100) / 100,
+						Services: services,
 						Value: math.Round(value * 100) / 100,
 					})
-				}else{
-					order.TransportId = request.TransportId
-					order.Delivery = math.Round(value * 100) / 100
 				}
 			}
 		}
@@ -13050,6 +13273,8 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 		if err = json.Unmarshal(bts, &view); err == nil {
 			view.Items = itemsShortView
 			view.Deliveries = deliveriesShortView
+			view.Transport = transportView
+			//
 			view.PaymentMethods = paymentMethodsView
 		} else {
 			logger.Warningf("%v", err.Error())
@@ -14056,7 +14281,7 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 					line.DiscountAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), 0)
 				}
 				line.TotalAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), total)
-				line.VatAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), total * (common.Config.Payment.VAT / 100.0) / ((100.0 + common.Config.Payment.VAT) / 100.0))*/
+				line.VatAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), total * (common.Config.Payment.ITN / 100.0) / ((100.0 + common.Config.Payment.ITN) / 100.0))*/
 				if item.Thumbnail != "" {
 					line.ImageUrl = base + strings.Split(item.Thumbnail, ",")[0]
 				}

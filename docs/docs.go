@@ -1873,6 +1873,52 @@ var doc = `{
                 }
             }
         },
+        "/api/v1/email": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account",
+                    "frontend"
+                ],
+                "summary": "Check email",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "email",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.EmailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.Account2View"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/files": {
             "post": {
                 "security": [
@@ -6818,6 +6864,52 @@ var doc = `{
                 }
             }
         },
+        "/api/v1/vat": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account",
+                    "frontend"
+                ],
+                "summary": "Check vat, should be solid string without space, eg. ATU40198200",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.VATRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/vendors": {
             "get": {
                 "security": [
@@ -7748,6 +7840,9 @@ var doc = `{
                         }
                     }
                 },
+                "country": {
+                    "type": "string"
+                },
                 "default": {
                     "type": "string"
                 },
@@ -7850,8 +7945,20 @@ var doc = `{
         "handler.Account2View": {
             "type": "object",
             "properties": {
+                "address": {
+                    "type": "string"
+                },
                 "admin": {
                     "type": "boolean"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "company": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
                 },
                 "email": {
                     "type": "string"
@@ -7868,11 +7975,26 @@ var doc = `{
                 "id": {
                     "type": "integer"
                 },
+                "itn": {
+                    "type": "string"
+                },
+                "lastname": {
+                    "type": "string"
+                },
                 "login": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "notification": {
                     "type": "boolean"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "profileId": {
+                    "type": "integer"
                 },
                 "profiles": {
                     "type": "array",
@@ -7880,10 +8002,16 @@ var doc = `{
                         "$ref": "#/definitions/handler.ProfileView"
                     }
                 },
+                "region": {
+                    "type": "string"
+                },
                 "role": {
                     "type": "integer"
                 },
                 "token": {
+                    "type": "string"
+                },
+                "zip": {
                     "type": "string"
                 }
             }
@@ -7891,8 +8019,20 @@ var doc = `{
         "handler.AccountView": {
             "type": "object",
             "properties": {
+                "address": {
+                    "type": "string"
+                },
                 "admin": {
                     "type": "boolean"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "company": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
                 },
                 "email": {
                     "type": "string"
@@ -7906,11 +8046,26 @@ var doc = `{
                 "id": {
                     "type": "integer"
                 },
+                "itn": {
+                    "type": "string"
+                },
+                "lastname": {
+                    "type": "string"
+                },
                 "login": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "notification": {
                     "type": "boolean"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "profileId": {
+                    "type": "integer"
                 },
                 "profiles": {
                     "type": "array",
@@ -7918,8 +8073,14 @@ var doc = `{
                         "$ref": "#/definitions/handler.ProfileView"
                     }
                 },
+                "region": {
+                    "type": "string"
+                },
                 "role": {
                     "type": "integer"
+                },
+                "zip": {
+                    "type": "string"
                 }
             }
         },
@@ -8135,6 +8296,12 @@ var doc = `{
                 },
                 "transportId": {
                     "type": "integer"
+                },
+                "transportServices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.TransportServiceView"
+                    }
                 }
             }
         },
@@ -8440,6 +8607,12 @@ var doc = `{
                 "id": {
                     "type": "integer"
                 },
+                "services": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.TransportServiceView"
+                    }
+                },
                 "thumbnail": {
                     "type": "string"
                 },
@@ -8456,6 +8629,14 @@ var doc = `{
             "properties": {
                 "id": {
                     "type": "integer"
+                }
+            }
+        },
+        "handler.EmailRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
                 }
             }
         },
@@ -8956,6 +9137,9 @@ var doc = `{
                     "type": "object",
                     "$ref": "#/definitions/handler.VariationShortView"
                 },
+                "vat": {
+                    "type": "number"
+                },
                 "volume": {
                     "type": "number"
                 },
@@ -9060,6 +9244,18 @@ var doc = `{
         "handler.MeView": {
             "type": "object",
             "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "company": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
                 "email": {
                     "type": "string"
                 },
@@ -9075,7 +9271,19 @@ var doc = `{
                 "isAdmin": {
                     "type": "boolean"
                 },
+                "itn": {
+                    "type": "string"
+                },
+                "lastname": {
+                    "type": "string"
+                },
                 "login": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
                     "type": "string"
                 },
                 "profiles": {
@@ -9084,8 +9292,14 @@ var doc = `{
                         "$ref": "#/definitions/handler.ProfileView"
                     }
                 },
+                "region": {
+                    "type": "string"
+                },
                 "role": {
                     "type": "integer"
+                },
+                "zip": {
+                    "type": "string"
                 }
             }
         },
@@ -9135,14 +9349,24 @@ var doc = `{
                 "email": {
                     "type": "string"
                 },
+                "itn": {
+                    "type": "string"
+                },
                 "lastname": {
                     "type": "string"
                 },
                 "name": {
                     "type": "string"
                 },
+                "otherShipping": {
+                    "type": "boolean"
+                },
                 "phone": {
                     "type": "string"
+                },
+                "profile": {
+                    "type": "object",
+                    "$ref": "#/definitions/handler.NewProfile"
                 },
                 "region": {
                     "type": "string"
@@ -9353,6 +9577,9 @@ var doc = `{
                     "type": "string"
                 },
                 "email": {
+                    "type": "string"
+                },
+                "itn": {
                     "type": "string"
                 },
                 "lastname": {
@@ -9568,6 +9795,9 @@ var doc = `{
                 },
                 "enabled": {
                     "type": "boolean"
+                },
+                "title": {
+                    "type": "string"
                 },
                 "zip": {
                     "type": "string"
@@ -9801,6 +10031,13 @@ var doc = `{
                     "type": "number"
                 },
                 "total": {
+                    "type": "number"
+                },
+                "transport": {
+                    "type": "object",
+                    "$ref": "#/definitions/handler.TransportShortView"
+                },
+                "vat": {
                     "type": "number"
                 },
                 "volume": {
@@ -10442,6 +10679,9 @@ var doc = `{
                 "address": {
                     "type": "string"
                 },
+                "billing": {
+                    "type": "boolean"
+                },
                 "city": {
                     "type": "string"
                 },
@@ -10454,10 +10694,16 @@ var doc = `{
                 "id": {
                     "type": "integer"
                 },
+                "itn": {
+                    "type": "string"
+                },
                 "lastname": {
                     "type": "string"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "phone": {
                     "type": "string"
                 },
                 "region": {
@@ -10821,11 +11067,57 @@ var doc = `{
                 }
             }
         },
+        "handler.TransportServiceView": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "selected": {
+                    "type": "boolean"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.TransportShortView": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "services": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.TransportServiceView"
+                    }
+                },
+                "thumbnail": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.TransportView": {
             "type": "object",
             "properties": {
                 "enabled": {
                     "type": "boolean"
+                },
+                "free": {
+                    "type": "number"
                 },
                 "id": {
                     "type": "integer"
@@ -10843,6 +11135,9 @@ var doc = `{
                     "type": "string"
                 },
                 "order": {
+                    "type": "string"
+                },
+                "services": {
                     "type": "string"
                 },
                 "thumbnail": {
@@ -10934,6 +11229,18 @@ var doc = `{
         "handler.UserView": {
             "type": "object",
             "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "company": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
                 "email": {
                     "type": "string"
                 },
@@ -10946,14 +11253,32 @@ var doc = `{
                 "id": {
                     "type": "integer"
                 },
+                "itn": {
+                    "type": "string"
+                },
+                "lastname": {
+                    "type": "string"
+                },
                 "login": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "notification": {
                     "type": "boolean"
                 },
+                "phone": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
                 "role": {
                     "type": "integer"
+                },
+                "zip": {
+                    "type": "string"
                 }
             }
         },
@@ -11007,6 +11332,14 @@ var doc = `{
             "type": "array",
             "items": {
                 "$ref": "#/definitions/handler.UserView"
+            }
+        },
+        "handler.VATRequest": {
+            "type": "object",
+            "properties": {
+                "vat": {
+                    "type": "string"
+                }
             }
         },
         "handler.ValueView": {
@@ -11548,6 +11881,9 @@ var doc = `{
                 "id": {
                     "type": "integer"
                 },
+                "title": {
+                    "type": "string"
+                },
                 "zip": {
                     "type": "string"
                 }
@@ -11565,8 +11901,14 @@ var doc = `{
                 "description": {
                     "type": "string"
                 },
+                "enabled": {
+                    "type": "boolean"
+                },
                 "id": {
                     "type": "integer"
+                },
+                "title": {
+                    "type": "string"
                 }
             }
         },

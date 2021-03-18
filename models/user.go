@@ -28,16 +28,16 @@ type User struct {
 	ResetCode      string
 	ResetAttempt   time.Time
 	//
-	Name string
-	Lastname string
-	Company string
-	Phone string
-	Address string
-	Zip string
-	City string
-	Region string
-	Country string
-	ITN string
+	Name          string
+	Lastname      string
+	Company       string
+	Phone         string
+	Address       string
+	Zip           string
+	City          string
+	Region        string
+	Country       string
+	ITN           string
 	OtherShipping bool
 	//
 	Profiles       []*Profile `gorm:"foreignKey:UserId"`

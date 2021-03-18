@@ -29,6 +29,8 @@ definitions:
           enabled:
             type: boolean
         type: object
+      country:
+        type: string
       default:
         type: string
       enabled:
@@ -95,8 +97,16 @@ definitions:
     type: object
   handler.Account2View:
     properties:
+      address:
+        type: string
       admin:
         type: boolean
+      city:
+        type: string
+      company:
+        type: string
+      country:
+        type: string
       email:
         type: string
       emailConfirmed:
@@ -107,23 +117,45 @@ definitions:
         type: string
       id:
         type: integer
+      itn:
+        type: string
+      lastname:
+        type: string
       login:
+        type: string
+      name:
         type: string
       notification:
         type: boolean
+      phone:
+        type: string
+      profileId:
+        type: integer
       profiles:
         items:
           $ref: '#/definitions/handler.ProfileView'
         type: array
+      region:
+        type: string
       role:
         type: integer
       token:
         type: string
+      zip:
+        type: string
     type: object
   handler.AccountView:
     properties:
+      address:
+        type: string
       admin:
         type: boolean
+      city:
+        type: string
+      company:
+        type: string
+      country:
+        type: string
       email:
         type: string
       emailConfirmed:
@@ -132,16 +164,30 @@ definitions:
         type: boolean
       id:
         type: integer
+      itn:
+        type: string
+      lastname:
+        type: string
       login:
+        type: string
+      name:
         type: string
       notification:
         type: boolean
+      phone:
+        type: string
+      profileId:
+        type: integer
       profiles:
         items:
           $ref: '#/definitions/handler.ProfileView'
         type: array
+      region:
+        type: string
       role:
         type: integer
+      zip:
+        type: string
     type: object
   handler.AutocompleteRequest:
     properties:
@@ -284,6 +330,10 @@ definitions:
         type: integer
       transportId:
         type: integer
+      transportServices:
+        items:
+          $ref: '#/definitions/handler.TransportServiceView'
+        type: array
     type: object
   handler.CommandView:
     properties:
@@ -485,6 +535,10 @@ definitions:
         type: number
       id:
         type: integer
+      services:
+        items:
+          $ref: '#/definitions/handler.TransportServiceView'
+        type: array
       thumbnail:
         type: string
       title:
@@ -496,6 +550,11 @@ definitions:
     properties:
       id:
         type: integer
+    type: object
+  handler.EmailRequest:
+    properties:
+      email:
+        type: string
     type: object
   handler.EmailTemplateView:
     properties:
@@ -821,6 +880,8 @@ definitions:
       variation:
         $ref: '#/definitions/handler.VariationShortView'
         type: object
+      vat:
+        type: number
       volume:
         type: number
       weight:
@@ -891,6 +952,14 @@ definitions:
     type: object
   handler.MeView:
     properties:
+      address:
+        type: string
+      city:
+        type: string
+      company:
+        type: string
+      country:
+        type: string
       email:
         type: string
       emailConfirmed:
@@ -901,14 +970,26 @@ definitions:
         type: integer
       isAdmin:
         type: boolean
+      itn:
+        type: string
+      lastname:
+        type: string
       login:
+        type: string
+      name:
+        type: string
+      phone:
         type: string
       profiles:
         items:
           $ref: '#/definitions/handler.ProfileView'
         type: array
+      region:
+        type: string
       role:
         type: integer
+      zip:
+        type: string
     type: object
   handler.MollieOrderView:
     properties:
@@ -940,12 +1021,19 @@ definitions:
         type: string
       email:
         type: string
+      itn:
+        type: string
       lastname:
         type: string
       name:
         type: string
+      otherShipping:
+        type: boolean
       phone:
         type: string
+      profile:
+        $ref: '#/definitions/handler.NewProfile'
+        type: object
       region:
         type: string
       zip:
@@ -1082,6 +1170,8 @@ definitions:
       country:
         type: string
       email:
+        type: string
+      itn:
         type: string
       lastname:
         type: string
@@ -1222,6 +1312,8 @@ definitions:
         type: string
       enabled:
         type: boolean
+      title:
+        type: string
       zip:
         type: string
     type: object
@@ -1375,6 +1467,11 @@ definitions:
       sum:
         type: number
       total:
+        type: number
+      transport:
+        $ref: '#/definitions/handler.TransportShortView'
+        type: object
+      vat:
         type: number
       volume:
         type: number
@@ -1794,6 +1891,8 @@ definitions:
     properties:
       address:
         type: string
+      billing:
+        type: boolean
       city:
         type: string
       company:
@@ -1802,9 +1901,13 @@ definitions:
         type: string
       id:
         type: integer
+      itn:
+        type: string
       lastname:
         type: string
       name:
+        type: string
+      phone:
         type: string
       region:
         type: string
@@ -2041,10 +2144,40 @@ definitions:
           type: array
         type: array
     type: object
+  handler.TransportServiceView:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      price:
+        type: number
+      selected:
+        type: boolean
+      title:
+        type: string
+    type: object
+  handler.TransportShortView:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      services:
+        items:
+          $ref: '#/definitions/handler.TransportServiceView'
+        type: array
+      thumbnail:
+        type: string
+      title:
+        type: string
+    type: object
   handler.TransportView:
     properties:
       enabled:
         type: boolean
+      free:
+        type: number
       id:
         type: integer
       item:
@@ -2056,6 +2189,8 @@ definitions:
       name:
         type: string
       order:
+        type: string
+      services:
         type: string
       thumbnail:
         type: string
@@ -2115,6 +2250,14 @@ definitions:
     type: object
   handler.UserView:
     properties:
+      address:
+        type: string
+      city:
+        type: string
+      company:
+        type: string
+      country:
+        type: string
       email:
         type: string
       emailConfirmed:
@@ -2123,12 +2266,24 @@ definitions:
         type: boolean
       id:
         type: integer
+      itn:
+        type: string
+      lastname:
+        type: string
       login:
+        type: string
+      name:
         type: string
       notification:
         type: boolean
+      phone:
+        type: string
+      region:
+        type: string
       role:
         type: integer
+      zip:
+        type: string
     type: object
   handler.UsersListItem:
     properties:
@@ -2164,6 +2319,11 @@ definitions:
     items:
       $ref: '#/definitions/handler.UserView'
     type: array
+  handler.VATRequest:
+    properties:
+      vat:
+        type: string
+    type: object
   handler.ValueView:
     properties:
       availability:
@@ -2517,6 +2677,8 @@ definitions:
         type: boolean
       id:
         type: integer
+      title:
+        type: string
       zip:
         type: string
     type: object
@@ -2528,8 +2690,12 @@ definitions:
         type: string
       description:
         type: string
+      enabled:
+        type: boolean
       id:
         type: integer
+      title:
+        type: string
     type: object
   handler.ZonesListResponse:
     properties:
@@ -3730,6 +3896,36 @@ paths:
       - BasicAuth: []
       summary: (DEPRECATED) Calculate shipping cost
       tags:
+      - frontend
+  /api/v1/email:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: email
+        required: true
+        schema:
+          $ref: '#/definitions/handler.EmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.Account2View'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Check email
+      tags:
+      - account
       - frontend
   /api/v1/files:
     post:
@@ -6839,6 +7035,36 @@ paths:
       summary: Search variations
       tags:
       - variation
+  /api/v1/vat:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.VATRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Check vat, should be solid string without space, eg. ATU40198200
+      tags:
+      - account
+      - frontend
   /api/v1/vendors:
     get:
       consumes:

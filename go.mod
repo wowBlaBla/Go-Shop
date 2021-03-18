@@ -9,6 +9,7 @@ require (
 	github.com/arsmn/fiber-casbin/v2 v2.0.0 // indirect
 	github.com/arsmn/fiber-swagger/v2 v2.0.0
 	github.com/cloudflare/tableflip v1.2.0
+	github.com/dannyvankooten/vat v0.0.0-20200422095635-741cefddc898
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dsnet/compress v0.0.1 // indirect

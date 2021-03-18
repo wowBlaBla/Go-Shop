@@ -50,7 +50,7 @@ func GetZone(connector *gorm.DB, id int) (*Zone, error) {
 func GetZoneByCountry(connector *gorm.DB, country string) (*Zone, error) {
 	db := connector
 	var zone Zone
-	if err := db.Debug().Where("country = ? and (zip = '' or zip is null)", country).First(&zone).Error; err != nil {
+	if err := db.Where("country = ? and (zip = '' or zip is null)", country).First(&zone).Error; err != nil {
 		return nil, err
 	}
 	return &zone, nil

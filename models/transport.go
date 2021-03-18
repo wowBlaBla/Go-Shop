@@ -14,6 +14,8 @@ type Transport struct {
 	Item string
 	Kg float64 `sql:"type:decimal(8,2);"`
 	M3 float64 `sql:"type:decimal(8,3);"`
+	Free float64 `sql:"type:decimal(8,2);"` // free after order total
+	Services string
 }
 
 func GetTransports(connector *gorm.DB) ([]*Transport, error) {
