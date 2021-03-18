@@ -6,6 +6,7 @@ import (
 
 type Profile struct {
 	gorm.Model
+	//Type string // Billing, Shipping
 	Name     string
 	Lastname string
 	Company  string
