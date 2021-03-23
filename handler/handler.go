@@ -14,7 +14,6 @@ import (
 	"github.com/BurntSushi/toml"
 	swagger "github.com/arsmn/fiber-swagger/v2"
 	"github.com/dannyvankooten/vat"
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -25,7 +24,6 @@ import (
 	"github.com/stripe/stripe-go/v71"
 	checkout_session "github.com/stripe/stripe-go/v71/checkout/session"
 	"github.com/yonnic/goshop/common"
-	"github.com/yonnic/goshop/common/mollie"
 	"github.com/yonnic/goshop/config"
 	"github.com/yonnic/goshop/models"
 	"gorm.io/gorm"
@@ -303,8 +301,12 @@ func GetFiber() *fiber.App {
 	v1.Get("/account", authRequired, getAccountHandler)
 	v1.Post("/account", csrf, postAccountHandler)
 	v1.Put("/account", authRequired, putAccountHandler)
-	v1.Get("/account/profiles", authRequired, getAccountProfilesHandler)
-	v1.Post("/account/profiles", authRequired, postAccountProfileHandler)
+	//v1.Get("/account/profiles", authRequired, getAccountProfilesHandler)
+	//v1.Post("/account/profiles", authRequired, postAccountProfileHandler)
+	v1.Get("/account/billing_profiles", authRequired, getAccountBillingProfilesHandler)
+	v1.Post("/account/billing_profiles", authRequired, postAccountBillingProfileHandler)
+	v1.Get("/account/shipping_profiles", authRequired, getAccountShippingProfilesHandler)
+	v1.Post("/account/shipping_profiles", authRequired, postAccountShippingProfileHandler)
 	//
 	v1.Get("/account/orders", authRequired, getAccountOrdersHandler)
 	v1.Post("/account/orders", authRequired, postAccountOrdersHandler)
@@ -315,12 +317,6 @@ func GetFiber() *fiber.App {
 	v1.Post("/account/orders/:id/advance_payment/submit", authRequired, postAccountOrderAdvancePaymentSubmitHandler)
 	// On Delivery
 	v1.Post("/account/orders/:id/on_delivery/submit", authRequired, postAccountOrderOnDeliverySubmitHandler)
-	// Stripe
-	v1.Get("/account/orders/:id/stripe/customer", authRequired, getAccountOrderStripeCustomerHandler) // +
-	v1.Get("/account/orders/:id/stripe/card", authRequired, getAccountOrderStripeCardHandler)         // +
-	v1.Post("/account/orders/:id/stripe/card", authRequired, postAccountOrderStripeCardHandler)       // +
-	v1.Post("/account/orders/:id/stripe/submit", authRequired, postAccountOrderStripeSubmitHandler)   // +
-	v1.Get("/account/orders/:id/stripe/success", authRequired, getAccountOrderStripeSuccessHandler)   // +
 	// Mollie
 	v1.Post("/account/orders/:id/mollie/submit", authRequired, postAccountOrderMollieSubmitHandler)
 	v1.Get("/account/orders/:id/mollie/success", authOptional, getAccountOrderMollieSuccessHandler)
@@ -328,7 +324,6 @@ func GetFiber() *fiber.App {
 	v1.Get("/payment_methods", authRequired, getPaymentMethodsHandler)
 	//
 	v1.Post("/email", postEmailHandler)
-	v1.Post("/profiles", postProfileHandler)
 	v1.Get("/test", getTestHandler)
 	v1.Post("/test", getTestHandler)
 	v1.Post("/vat", postVATHandler)
@@ -760,6 +755,7 @@ func getResizeHandler (c *fiber.Ctx) error {
 }
 
 type BasicSettingsView struct {
+	Url string
 	Debug bool
 	Currency string
 	Symbol string
@@ -784,6 +780,7 @@ type BasicSettingsView struct {
 func getBasicSettingsHandler(c *fiber.Ctx) error {
 	var conf BasicSettingsView
 	conf.Debug = common.Config.Debug
+	conf.Url = common.Config.Url
 	conf.Currency = common.Config.Currency
 	conf.Symbol = common.Config.Symbol
 	conf.Products = common.Config.Products
@@ -872,6 +869,7 @@ func putBasicSettingsHandler(c *fiber.Ctx) error {
 	}
 	//
 	var message string
+	common.Config.Url = request.Url
 	common.Config.Debug = request.Debug
 	common.Config.Pattern = request.Pattern
 	common.Config.Preview = request.Preview
@@ -3190,6 +3188,7 @@ type ProfileView struct {
 	ID uint
 	Name string
 	Lastname string
+	Email string
 	Company string
 	Address string
 	Zip string
@@ -3275,7 +3274,7 @@ func postDeliveryHandler(c *fiber.Ctx) error {
 						if err == nil {
 							zoneId = zone.ID
 						}
-						// 3 Get Tariff by Transport and Zone
+						// 3 Get Tariff by Shipping and Zone
 						tariff, _ := models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
 						if cost, err := Delivery(transport, tariff, request.Items); err == nil {
 							costs = append(costs, cost)
@@ -3407,7 +3406,7 @@ func getTariffsHandler(c *fiber.Ctx) error {
 }
 
 
-// Transport
+// Shipping
 type TransportsView []TransportView
 
 type TransportView struct{
@@ -3730,7 +3729,7 @@ func postTransportsListHandler(c *fiber.Ctx) error {
 // @Summary Get transport
 // @Accept json
 // @Produce json
-// @Param id path int true "Transport ID"
+// @Param id path int true "Shipping ID"
 // @Success 200 {object} TransportView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
@@ -3766,7 +3765,7 @@ func getTransportHandler(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param transport body TransportView true "body"
-// @Param id path int true "Transport ID"
+// @Param id path int true "Shipping ID"
 // @Success 200 {object} TagView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
@@ -3929,7 +3928,7 @@ func putTransportHandler(c *fiber.Ctx) error {
 // @Summary Delete transport
 // @Accept json
 // @Produce json
-// @Param id path int true "Transport ID"
+// @Param id path int true "Shipping ID"
 // @Success 200 {object} HTTPMessage
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
@@ -4624,33 +4623,107 @@ func putEmailTemplateHandler(c *fiber.Ctx) error {
 	}
 	if common.NOTIFICATION != nil && common.NOTIFICATION.SendGrid != nil && request.Email != "" {
 		//
-		/*vars := make(map[string]interface{})
-		vars["OrderId"] = 123
-		vars["OrderTotal"] = 1234.56
-		vars["UserEmail"] = "test@mail.com"*/
-		vars := &common.NotificationTemplateVariables{ }
-		if order, err := models.GetOrderFull(common.Database, 30); err == nil {
-			var orderView struct {
-				models.Order
-				Items []struct {
-					ItemShortView
-					Description string
-				}
-			}
-			if bts, err := json.Marshal(order); err == nil {
-				if err = json.Unmarshal(bts, &orderView); err == nil {
-					for i := 0; i < len(orderView.Items); i++ {
-						var itemView ItemShortView
-						if err = json.Unmarshal([]byte(orderView.Items[i].Description), &itemView); err == nil {
-							orderView.Items[i].Variation = itemView.Variation
-							orderView.Items[i].Properties = itemView.Properties
-						}
-					}
-					vars.Order = orderView
-				} else {
-					logger.Infof("%+v", err)
-				}
-			}
+		vars := &common.NotificationTemplateVariables{
+			Url: common.Config.Url,
+			Symbol: "$",
+		}
+		if common.Config.Symbol != "" {
+			vars.Symbol = common.Config.Symbol
+		}
+		var orderView struct {
+			ID uint
+			CreatedAt time.Time
+			OrderShortView
+			Status string
+		}
+		if err = json.Unmarshal([]byte(`
+{
+  "Billing": {
+    "ID": 2,
+    "Name": "mollie",
+    "Title": "Mollie",
+    "Profile": {
+      "ID": 25,
+      "Email": "john0035@mail.com",
+      "Name": "John",
+      "Lastname": "Smith",
+      "Phone": "+49123456789",
+      "Address": "First 1/23",
+      "Zip": "12345",
+      "City": "Berlin",
+      "Country": "de"
+    },
+    "Method": "creditcard"
+  },
+  "Items": [
+    {
+      "Uuid": "[21,23,84]",
+      "Title": "Product With Variation",
+      "Path": "/products/bedroom/bed/product-with-variation",
+      "Thumbnail": "/images/products/59-image-1613727567.jpg,/images/products/resize/59-image-1613727567_324x0.jpg 324w,/images/products/resize/59-image-1613727567_512x0.jpg 512w,/images/products/resize/59-image-1613727567_1024x0.jpg 1024w",
+      "Variation": {
+        "Title": "With Boxes"
+      },
+      "Properties": [
+        {
+          "Title": "Boxes count",
+          "Value": "4",
+          "Price": 100
+        }
+      ],
+      "Price": 1300,
+      "Quantity": 1,
+      "VAT": 19,
+      "Total": 1300,
+      "Volume": 0.06,
+      "Weight": 32
+    }
+  ],
+  "Quantity": 1,
+  "Sum": 1300,
+  "Delivery": 104.4,
+  "VAT": 19,
+  "Total": 1404.4,
+  "Volume": 0.06,
+  "Weight": 32,
+  "Shipping": {
+    "ID": 3,
+    "Name": "fedex",
+    "Title": "FedEx",
+    "Thumbnail": "/transports/3-fedex-thumbnail.png",
+    "Services": [
+      {
+        "Name": "service1",
+        "Title": "Service1",
+        "Price": 1,
+        "Selected": true
+      }
+    ],
+    "Profile": {
+      "ID": 26,
+      "Email": "john0035@mail.com",
+      "Name": "John",
+      "Lastname": "Smith",
+      "Phone": "+49123456789",
+      "Address": "First 1/23",
+      "Zip": "12345",
+      "City": "Berlin",
+      "Country": "de"
+    },
+    "Volume": 0.06,
+    "Weight": 32,
+    "Value": 104.4,
+    "Total": 104.4
+  }
+}
+`), &orderView); err == nil {
+			orderView.ID = 0
+			orderView.CreatedAt = time.Now()
+			orderView.Status = "new"
+			vars.Order = orderView
+		}
+		if bts, err := json.Marshal(vars); err == nil {
+			logger.Infof("Bts: %+v", string(bts))
 		}
 		//
 		if err = common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), mail.NewEmail(request.Name, request.Email), emailTemplate.Topic, emailTemplate.Message, vars); err != nil {
@@ -5535,18 +5608,6 @@ type UserView struct {
 	Login string
 	Email string
 	EmailConfirmed bool
-	//
-	Name string
-	Lastname string
-	Company string
-	Phone string
-	Address string
-	Zip string
-	City string
-	Region string
-	Country string
-	ITN string
-	//
 	Role int `json:",omitempty"`
 	Notification bool
 }
@@ -6061,593 +6122,6 @@ func postPublishHandler(c *fiber.Ctx) error {
 	return c.JSON(view)
 }
 
-type AccountView struct {
-	Admin bool
-	Profiles []ProfileView `json:",omitempty"`
-	ProfileId uint `json:",omitempty"`
-	UserView
-}
-
-// @security BasicAuth
-// @Summary Get account
-// @Description get account
-// @Accept json
-// @Produce json
-// @Success 200 {object} AccountView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account [get]
-// @Tags account
-// @Tags frontend
-func getAccountHandler(c *fiber.Ctx) error {
-	if v := c.Locals("user"); v != nil {
-		if user, ok := v.(*models.User); ok {
-			var err error
-			if user, err = models.GetUserFull(common.Database, user.ID); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			var view AccountView
-			if bts, err := json.Marshal(user); err == nil {
-				if err = json.Unmarshal(bts, &view); err == nil {
-					view.Admin = user.Role < models.ROLE_USER
-					if len(user.Profiles) > 0 {
-						view.ProfileId = user.Profiles[len(user.Profiles) - 1].ID
-					}
-					return c.JSON(view)
-				}else{
-					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{err.Error()})
-				}
-			}else{
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-		}
-	}
-	return c.JSON(HTTPError{"Something went wrong"})
-}
-
-type NewAccount struct {
-	Email string
-	CSRF string
-	//
-	Name string
-	Lastname string
-	Company string
-	Phone string
-	Address string
-	Zip string
-	City string
-	Region string
-	Country string
-	ITN string
-	//
-	Profile NewProfile
-	//
-	OtherShipping bool
-}
-
-type Account2View struct {
-	AccountView
-	Token string `json:",omitempty"`
-	Expiration *time.Time `json:",omitempty"`
-}
-
-// CreateAccout godoc
-// @Summary Create account
-// @Accept json
-// @Produce json
-// @Param profile body NewAccount true "body"
-// @Success 200 {object} Account2View
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account [post]
-// @Tags account
-// @Tags frontend
-func postAccountHandler(c *fiber.Ctx) error {
-	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(c.Request().Header.Header())))
-	if err != nil {
-		logger.Errorf("%+v", err)
-		return c.JSON(HTTPError{err.Error()})
-	}
-	//
-	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		//var email string
-		var request NewAccount
-		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
-			if err := c.BodyParser(&request); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-		/*} else if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
-			data, err := c.Request().MultipartForm()
-			if err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			for key, values := range data.Value {
-				if strings.ToLower(key) == "email" {
-					email = strings.TrimSpace(values[0])
-				}
-			}
-			if email == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Email is empty"})
-			}*/
-		} else {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Unsupported Content-Type"})
-		}
-		logger.Infof("Profile1: %+v", request)
-		//
-		if request.Email == "" {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Email is empty"})
-		}
-		email := request.Email
-		//
-		if _, err := models.GetUserByEmail(common.Database, email); err == nil {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Account already exists"})
-		}
-		//
-		var login string
-		if res := regexp.MustCompile(`^([^@]+)@`).FindAllStringSubmatch(email, 1); len(res) > 0 && len(res[0]) > 1 {
-			login = fmt.Sprintf("%v-%d", res[0][1], rand.New(rand.NewSource(time.Now().UnixNano())).Intn(8999) + 1000)
-		}
-		password := NewPassword(12)
-		logger.Infof("Create new user %v %v by email %v", login, password, email)
-		user := &models.User{
-			Enabled: true,
-			Email: email,
-			EmailConfirmed: true,
-			Login: login,
-			Password: models.MakeUserPassword(password),
-			Role: models.ROLE_USER,
-			Notification: true,
-		}
-		//
-		var name = strings.TrimSpace(request.Name)
-		if name == "" {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Name is empty"})
-		}
-		var lastname = strings.TrimSpace(request.Lastname)
-		if lastname == "" {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Lastname is empty"})
-		}
-		var company = strings.TrimSpace(request.Company)
-		var phone = strings.TrimSpace(request.Phone)
-		if len(phone) > 64 {
-			phone = ""
-		}
-		var address = strings.TrimSpace(request.Address)
-		if address == "" {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Address is empty"})
-		}
-		var zip = strings.TrimSpace(request.Zip)
-		if zip == "" {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Zip is empty"})
-		}
-		var city = strings.TrimSpace(request.City)
-		if city == "" {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"City is empty"})
-		}
-		var region = strings.TrimSpace(request.Region)
-		if region == "" {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Region is empty"})
-		}
-		var country = strings.TrimSpace(request.Country)
-		if country == "" {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Country is empty"})
-		}
-		var itn = strings.TrimSpace(request.ITN)
-		if len(itn) > 32 {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"ITN is incorrect"})
-		}
-		//
-		user.Name = name
-		user.Lastname = lastname
-		user.Company = company
-		user.Phone = phone
-		user.Address = address
-		user.Zip = zip
-		user.City = city
-		user.Region = region
-		user.Country = country
-		user.ITN = itn
-		id, err := models.CreateUser(common.Database, user)
-		if err != nil {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-		user.ID = id
-		// How to create profile?
-		var profileId uint
-		if request.Profile.Name != "" {
-			logger.Infof("Profile2: %+v", request.Profile)
-			// create profile from shipping data
-			var name = strings.TrimSpace(request.Profile.Name)
-			if name == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Name is empty"})
-			}
-			var lastname = strings.TrimSpace(request.Profile.Lastname)
-			if lastname == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Lastname is empty"})
-			}
-			var company = strings.TrimSpace(request.Profile.Company)
-			var phone = strings.TrimSpace(request.Profile.Phone)
-			if len(phone) > 64 {
-				phone = ""
-			}
-			var address = strings.TrimSpace(request.Profile.Address)
-			if address == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Address is empty"})
-			}
-			var zip = strings.TrimSpace(request.Profile.Zip)
-			if zip == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Zip is empty"})
-			}
-			var city = strings.TrimSpace(request.Profile.City)
-			if city == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"City is empty"})
-			}
-			var region = strings.TrimSpace(request.Profile.Region)
-			if region == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Region is empty"})
-			}
-			var country = strings.TrimSpace(request.Profile.Country)
-			if country == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Country is empty"})
-			}
-			var itn = strings.TrimSpace(request.Profile.ITN)
-			if len(itn) > 32 {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"ITN is incorrect"})
-			}
-			profile := &models.Profile{
-				Name:     name,
-				Lastname: lastname,
-				Company:  company,
-				Phone:    phone,
-				Address:  address,
-				Zip:      zip,
-				City:     city,
-				Region:   region,
-				Country:  country,
-				ITN:      itn,
-				UserId:   user.ID,
-			}
-			if profileId, err = models.CreateProfile(common.Database, profile); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			user.Profiles = []*models.Profile{profile}
-		}else{
-			// create profile from billing
-			profile := &models.Profile{
-				Name:     name,
-				Lastname: lastname,
-				Company:  company,
-				Phone:    phone,
-				Address:  address,
-				Zip:      zip,
-				City:     city,
-				Region:   region,
-				Country:  country,
-				ITN:      itn,
-				UserId:   user.ID,
-				Billing:  true,
-			}
-			if profileId, err = models.CreateProfile(common.Database, profile); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			user.Profiles = []*models.Profile{profile}
-		}
-		var view AccountView
-		if bts, err := json.Marshal(user); err == nil {
-			if err = json.Unmarshal(bts, &view); err == nil {
-				view.Admin = user.Role < models.ROLE_USER
-				view.ProfileId = profileId
-			}else{
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-		//
-		if v := req.Header.Get("Accept"); strings.EqualFold(v, "application/jwt") {
-			expiration := time.Now().AddDate(1, 0, 0)
-			claims := &JWTClaims{
-				Login: user.Login,
-				Password: user.Password,
-				StandardClaims: jwt.StandardClaims{
-					ExpiresAt: expiration.Unix(),
-				},
-			}
-			token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-			if str, err := token.SignedString(JWTSecret); err == nil {
-				c.Status(http.StatusOK)
-				return c.JSON(Account2View{
-					AccountView: view,
-					Token: str,
-					Expiration: &expiration,
-				})
-			}else{
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-		}else{
-			credentials := map[string]string{
-				"email": email,
-				"login": login,
-				"password": password,
-			}
-			if encoded, err := cookieHandler.Encode(COOKIE_NAME, credentials); err == nil {
-				cookie := &fiber.Cookie{
-					Name:  COOKIE_NAME,
-					Value: encoded,
-					Path:  "/",
-					Expires: time.Now().AddDate(1, 0, 0),
-					SameSite: authMultipleConfig.SameSite,
-				}
-				c.Cookie(cookie)
-			}
-			c.Status(http.StatusOK)
-			return c.JSON(view)
-		}
-	}else{
-		return c.JSON(HTTPError{"Unsupported Content-Type"})
-	}
-}
-
-type User2View struct {
-	OldPassword string
-	NewPassword string
-	NewPassword2 string
-}
-
-// @security BasicAuth
-// UpdateAccount godoc
-// @Summary update account
-// @Accept json
-// @Produce json
-// @Param account body AccountView true "body"
-// @Success 200 {object} User2View
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account [put]
-// @Tags order
-func putAccountHandler(c *fiber.Ctx) error {
-	if v := c.Locals("user"); v != nil {
-		var user *models.User
-		var ok bool
-		if user, ok = v.(*models.User); ok {
-			//
-			var request User2View
-			if err := c.BodyParser(&request); err != nil {
-				return err
-			}
-			request.OldPassword = strings.TrimSpace(request.OldPassword)
-			request.NewPassword = strings.TrimSpace(request.NewPassword)
-			request.NewPassword2 = strings.TrimSpace(request.NewPassword2)
-			//
-			if models.MakeUserPassword(request.OldPassword) != user.Password {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Incorrect password"})
-			}
-			if len(request.NewPassword) < 6 {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Too short password"})
-			}
-			if len(request.NewPassword) > 32 {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Too long password"})
-			}
-			if request.NewPassword != request.NewPassword2 {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Passwords mismatch"})
-			}
-			user.Password = models.MakeUserPassword(request.NewPassword2)
-			if err := models.UpdateUser(common.Database, user); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			c.Status(http.StatusOK)
-			return c.JSON(HTTPMessage{"OK"})
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"User not found"})
-		}
-	}
-	c.Status(http.StatusInternalServerError)
-	return c.JSON(HTTPError{"Something went wrong"})
-}
-
-// @security BasicAuth
-// @Summary Get account profiles
-// @Description get account profiles
-// @Accept json
-// @Produce json
-// @Success 200 {object} []ProfileView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account/profiles [get]
-// @Tags account
-// @Tags frontend
-func getAccountProfilesHandler(c *fiber.Ctx) error {
-	if v := c.Locals("user"); v != nil {
-		if user, ok := v.(*models.User); ok {
-			if profiles, err := models.GetProfilesByUser(common.Database, user.ID); err == nil {
-				var views []ProfileView
-				if bts, err := json.Marshal(profiles); err == nil {
-					if err = json.Unmarshal(bts, &views); err == nil {
-						return c.JSON(views)
-					}else{
-						c.Status(http.StatusInternalServerError)
-						return c.JSON(HTTPError{err.Error()})
-					}
-				}else{
-					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{err.Error()})
-				}
-			}else{
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-		}
-	}
-	return c.JSON(HTTPError{"Something went wrong"})
-}
-
-type NewProfile struct {
-	Email string
-	Name string
-	Lastname string
-	Company string
-	Phone string
-	Address string
-	Zip string
-	City string
-	Region string
-	Country string
-	ITN string
-}
-
-// @security BasicAuth
-// CreateProfile godoc
-// @Summary Create profile in existing account
-// @Accept json
-// @Produce json
-// @Param profile body NewProfile true "body"
-// @Success 200 {object} ProfileView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account/profiles [post]
-// @Tags profile
-// @Tags frontend
-func postAccountProfileHandler(c *fiber.Ctx) error {
-	var view ProfileView
-	//
-	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
-			var request NewProfile
-			if err := c.BodyParser(&request); err != nil {
-				return err
-			}
-			logger.Infof("request: %+v", request)
-			//
-			var userId uint
-			if v := c.Locals("user"); v != nil {
-				logger.Infof("v: %+v", v)
-				var user *models.User
-				var ok bool
-				if user, ok = v.(*models.User); ok {
-					userId = user.ID
-				}else{
-					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{"User not found"})
-				}
-			}
-			//
-			var name = strings.TrimSpace(request.Name)
-			if name == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Name is empty"})
-			}
-			var lastname = strings.TrimSpace(request.Lastname)
-			if lastname == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Lastname is empty"})
-			}
-			var company = strings.TrimSpace(request.Company)
-			var phone = strings.TrimSpace(request.Phone)
-			if len(phone) > 64 {
-				phone = ""
-			}
-			var address = strings.TrimSpace(request.Address)
-			if address == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Address is empty"})
-			}
-			var zip = strings.TrimSpace(request.Zip)
-			if zip == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Zip is empty"})
-			}
-			var city = strings.TrimSpace(request.City)
-			if city == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"City is empty"})
-			}
-			var region = strings.TrimSpace(request.Region)
-			if region == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Region is empty"})
-			}
-			var country = strings.TrimSpace(request.Country)
-			if country == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Country is empty"})
-			}
-			var itn = strings.TrimSpace(request.ITN)
-			if len(itn) > 32 {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"ITN is incorrect"})
-			}
-			profile := &models.Profile{
-				Name:     name,
-				Lastname: lastname,
-				Company:  company,
-				Phone: phone,
-				Address:  address,
-				Zip:      zip,
-				City:     city,
-				Region:   region,
-				Country:  country,
-				ITN: itn,
-				UserId:   userId,
-			}
-			//
-			if _, err := models.CreateProfile(common.Database, profile); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			//
-			if bts, err := json.Marshal(profile); err == nil {
-				if err = json.Unmarshal(bts, &view); err != nil {
-					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{err.Error()})
-				}
-			}
-			return c.JSON(view)
-		} else {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Unsupported Content-Type"})
-		}
-	}
-	//
-	return c.JSON(view)
-}
-
 type EmailRequest struct {
 	Email string
 }
@@ -6704,157 +6178,10 @@ type ItemProperty struct {
 	PriceId int
 }
 
-// (DEPRECATED) CreateProfile godoc
-// @Summary (DEPRECATED) Create profile without having account
-// @Accept json
-// @Produce json
-// @Param profile body NewProfile true "body"
-// @Success 200 {object} ProfileView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/profiles [post]
-// @Tags profile
-func postProfileHandler(c *fiber.Ctx) error {
-	var view ProfileView
-	//
-	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
-			var request NewProfile
-			if err := c.BodyParser(&request); err != nil {
-				return err
-			}
-			//logger.Infof("request: %+v", request)
-			//
-			var userId uint
-			var email = strings.TrimSpace(request.Email)
-			if email == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Email is empty"})
-			}
-			user, _ := models.GetUserByEmail(common.Database, email)
-			if user != nil && user.ID > 0 {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Email already in use, please try to restore password"})
-			}
-			logger.Infof("create new user")
-			var login string
-			if res := regexp.MustCompile(`^([^@]+)@`).FindAllStringSubmatch(request.Email, 1); len(res) > 0 && len(res[0]) > 1 {
-				login = fmt.Sprintf("%v-%d", res[0][1], rand.New(rand.NewSource(time.Now().UnixNano())).Intn(8999) + 1000)
-			}
-			password := NewPassword(12)
-			logger.Infof("Create new user %v %v by email %v", login, password, email)
-			user = &models.User{
-				Enabled: true,
-				Email: email,
-				EmailConfirmed: true,
-				Login: login,
-				Password: models.MakeUserPassword(password),
-				Role: models.ROLE_USER,
-				Notification: true,
-			}
-			var err error
-			userId, err = models.CreateUser(common.Database, user)
-			if err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			//
-			credentials := map[string]string{
-				"email": email,
-				"login": login,
-				"password": password,
-			}
-			//logger.Infof("credentials: %+v", credentials)
-			if encoded, err := cookieHandler.Encode(COOKIE_NAME, credentials); err == nil {
-				//logger.Infof("encoded: %+v", encoded)
-				cookie := &fiber.Cookie{
-					Name:  COOKIE_NAME,
-					Value: encoded,
-					Path:  "/",
-					Expires: time.Now().AddDate(1, 0, 0),
-					SameSite: authMultipleConfig.SameSite,
-				}
-				c.Cookie(cookie)
-			}
-			//
-			var name = strings.TrimSpace(request.Name)
-			if name == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Country is empty"})
-			}
-			var lastname = strings.TrimSpace(request.Lastname)
-			if lastname == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Lastname is empty"})
-			}
-			var company = strings.TrimSpace(request.Company)
-			var phone = strings.TrimSpace(request.Phone)
-			if len(phone) > 64 {
-				phone = ""
-			}
-			var address = strings.TrimSpace(request.Address)
-			if address == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Address is empty"})
-			}
-			var zip = request.Zip
-			if zip == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Zip is empty"})
-			}
-			var city = strings.TrimSpace(request.City)
-			if city == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"City is empty"})
-			}
-			var region = strings.TrimSpace(request.Region)
-			if region == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Region is empty"})
-			}
-			var country = strings.TrimSpace(request.Country)
-			if country == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Country is empty"})
-			}
-			profile := &models.Profile{
-				Name:     name,
-				Lastname: lastname,
-				Company:  company,
-				Phone:  phone,
-				Address:  address,
-				Zip:      zip,
-				City:     city,
-				Region:   region,
-				Country:  country,
-				UserId:   userId,
-			}
-			//
-			if _, err := models.CreateProfile(common.Database, profile); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			//
-			if bts, err := json.Marshal(profile); err == nil {
-				if err = json.Unmarshal(bts, &view); err != nil {
-					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{err.Error()})
-				}
-			}
-			return c.JSON(view)
-		} else {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Unsupported Content-Type"})
-		}
-	}
-	//
-	return c.JSON(view)
-}
-
 func getTestHandler(c *fiber.Ctx) error {
 	logger.Infof("getTestHandler")
 	time.Sleep(3 * time.Second)
-	return return1(c, http.StatusOK, map[string]interface{}{"MESSAGE": "OK", "Status": "paid"})
+	return sendString(c, http.StatusOK, map[string]interface{}{"MESSAGE": "OK", "Status": "paid"})
 }
 
 type VATRequest struct {
@@ -7139,888 +6466,6 @@ func getAccountOrdersHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
-}
-
-type CheckoutRequest struct {
-	Items []NewItem
-	Comment string
-	ProfileId uint
-	TransportId uint
-	TransportServices []TransportServiceView
-	PaymentMethod string
-	Coupons []string
-}
-
-// GetOrders godoc
-// @Summary Get checkout information
-// @Accept json
-// @Produce json
-// @Param category body CheckoutRequest true "body"
-// @Success 200 {object} OrderShortView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/checkout [post]
-// @Tags frontend
-func postCheckoutHandler(c *fiber.Ctx) error {
-	var request CheckoutRequest
-	if err := c.BodyParser(&request); err != nil {
-		return err
-	}
-	_, view, err := Checkout(request)
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-	return c.JSON(view)
-}
-
-type NewOrder struct {
-	Created time.Time
-	Items []NewItem
-	Comment string
-	ProfileId uint
-	TransportId uint
-	Coupons []string
-}
-
-type NewItem struct {
-	UUID string
-	CategoryId uint
-	Quantity int
-}
-
-/**/
-
-type OrderShortView struct{
-	Items []ItemShortView `json:",omitempty"`
-	Quantity int `json:",omitempty"`
-	Sum float64 `json:",omitempty"`
-	Discount float64 `json:",omitempty"`
-	Delivery float64 `json:",omitempty"`
-	Discount2 float64 `json:",omitempty"`
-	VAT float64
-	Total float64 `json:",omitempty"`
-	Volume float64 `json:",omitempty"`
-	Weight float64 `json:",omitempty"`
-	Comment string `json:",omitempty"`
-	//
-	Deliveries []DeliveryView          `json:",omitempty"`
-	Transport *TransportOrderView      `json:",omitempty"`
-	Coupons []*CouponOrderView         `json:",omitempty"`
-	PaymentMethods *PaymentMethodsView `json:",omitempty"`
-}
-
-type TransportOrderView struct{
-	ID uint
-	Name string
-	Title string
-	Thumbnail string
-	Services []TransportServiceView `json:",omitempty"`
-}
-
-type CouponOrderView struct {
-	ID uint
-	Code string
-	Title string
-	Type string // order, item, shipment
-	Amount string
-}
-
-type DeliveryView struct {
-	ID uint
-	Title string
-	Thumbnail string
-	ByVolume float64
-	ByWeight float64
-	Services []TransportServiceView `json:",omitempty"`
-	Value float64
-}
-
-type TransportServiceView struct {
-	Name string
-	Title string
-	Description string
-	Price float64
-	Selected bool
-}
-
-type ItemShortView struct {
-	Uuid string                    `json:",omitempty"`
-	Title string                   `json:",omitempty"`
-	Path string                    `json:",omitempty"`
-	Thumbnail string               `json:",omitempty"`
-	Variation VariationShortView	`json:",omitempty"`
-	Properties []PropertyShortView `json:",omitempty"`
-	Price float64                  `json:",omitempty"`
-	Discount float64                  `json:",omitempty"`
-	Quantity int                   `json:",omitempty"`
-	VAT        float64
-	Total      float64             `json:",omitempty"`
-	Volume float64 `json:",omitempty"`
-	Weight float64 `json:",omitempty"`
-}
-
-type VariationShortView struct {
-	Title string `json:",omitempty"`
-	Thumbnail string `json:",omitempty"`
-}
-
-type PropertyShortView struct {
-	Title string `json:",omitempty"`
-	Thumbnail string `json:",omitempty"`
-	Value string `json:",omitempty"`
-	Price float64 `json:",omitempty"`
-}
-
-// CreateOrder godoc
-// @Summary Post account order
-// @Accept json
-// @Produce json
-// @Param cart body CheckoutRequest true "body"
-// @Success 200 {object} OrderView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account/orders [post]
-// @Tags account
-// @Tags frontend
-func postAccountOrdersHandler(c *fiber.Ctx) error {
-	var request CheckoutRequest
-	if err := c.BodyParser(&request); err != nil {
-		return err
-	}
-	order, _, err := Checkout(request)
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-	if v := c.Locals("user"); v != nil {
-		if user, ok := v.(*models.User); ok {
-			order.UserId = user.ID
-		}
-	}
-	if _, err := models.CreateOrder(common.Database, order); err != nil {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-	return c.JSON(order)
-}
-
-// CreateOrder godoc
-// @Summary Post account order
-// @Accept json
-// @Produce json
-// @Param cart body NewOrder true "body"
-// @Success 200 {object} OrderView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account/orders2 [post]
-// @Tags account
-// @Tags frontend
-/*func postAccountOrdersHandler2(c *fiber.Ctx) error {
-	var request NewOrder
-	if err := c.BodyParser(&request); err != nil {
-		return err
-	}
-	//logger.Infof("request: %+v", request)
-	if request.ProfileId == 0 {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{"Profile Id is not set"})
-	}
-	profile, err := models.GetProfile(common.Database, request.ProfileId)
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-	//
-	order := &models.Order{
-		Status: models.ORDER_STATUS_NEW,
-		ProfileId: request.ProfileId,
-		TransportId: request.TransportId,
-	}
-	if request.TransportId > 0 {
-		// 1 Get selected transport company
-		transport, err := models.GetTransport(common.Database, int(request.TransportId))
-		if err != nil {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-		// 2 Get Zone by Country and Zip
-		var zoneId uint
-		zone, err := models.GetZoneByCountryAndZIP(common.Database, profile.Country, profile.Zip)
-		if err == nil {
-			zoneId = zone.ID
-		}
-		// 3 Get Tariff by Transport and Zone
-		tariff, _ := models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
-		if cost, err := Delivery(transport, tariff, request.Items); err == nil {
-			order.Delivery = cost.Value
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-	}
-	// //
-	//if v := c.Locals("user"); v != nil {
-	//	if user, ok := v.(*models.User); ok {
-	//		order.User = user
-	//		//
-	//		if orders, err := models.GetOrdersByUserId(common.Database, user.ID); err == nil {
-	//			for _, order := range orders {
-	//				if order.Status == models.ORDER_STATUS_NEW || order.Status == models.ORDER_STATUS_WAITING_FROM_PAYMENT {
-	//					c.Status(http.StatusInternalServerError)
-	//					return c.JSON(HTTPError{"Some orders wait for your payment, please finish it before continuing"})
-	//				}
-	//			}
-	//		}
-	//	}
-	//}
-	var orderShortView OrderShortView
-	for _, item := range request.Items {
-		var arr []int
-		if err := json.Unmarshal([]byte(item.UUID), &arr); err == nil && len(arr) >= 2{
-			//
-			productId := arr[0]
-			var product *models.Product
-			if product, err = models.GetProduct(common.Database, productId); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			variationId := arr[1]
-			var variation *models.Variation
-			if variation, err = models.GetVariation(common.Database, variationId); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			if product.ID != variation.ProductId {
-				err = fmt.Errorf("Products and Variation mismatch")
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-
-			categoryId := item.CategoryId
-
-			orderItem := &models.Item{
-				Uuid:     item.UUID,
-				Title:    product.Title,
-				Price:    variation.BasePrice,
-				Quantity: item.Quantity,
-			}
-			if res := reVolume.FindAllStringSubmatch(variation.Dimensions, 1); len(res) > 0 && len(res[0]) > 1 {
-				var width float64
-				if v, err := strconv.ParseFloat(res[0][1], 10); err == nil {
-					width = v
-				}
-				var height float64
-				if v, err := strconv.ParseFloat(res[0][2], 10); err == nil {
-					height = v
-				}
-				var depth float64
-				if v, err := strconv.ParseFloat(res[0][3], 10); err == nil {
-					depth = v
-				}
-				orderItem.Volume = width * height * depth / 1000000.0
-			}
-			orderItem.Weight = variation.Weight
-			//
-			itemShortView := ItemShortView{
-				Uuid: item.UUID,
-				Title: product.Title,
-				Variation: VariationShortView{
-					Title:variation.Title,
-				},
-				Volume: orderItem.Volume,
-				Weight: orderItem.Weight,
-			}
-			//
-			if breadcrumbs := models.GetBreadcrumbs(common.Database, categoryId); len(breadcrumbs) > 0 {
-				var chunks []string
-				for _, crumb := range breadcrumbs {
-					chunks = append(chunks, crumb.Name)
-				}
-				orderItem.Path = "/" + path.Join(append(chunks, product.Name)...)
-			}
-
-			if cache, err := models.GetCacheProductByProductId(common.Database, product.ID); err == nil {
-				orderItem.Thumbnail = cache.Thumbnail
-			}else{
-				logger.Warningf("%v", err.Error())
-			}
-
-			if cache, err := models.GetCacheVariationByVariationId(common.Database, variation.ID); err == nil {
-				itemShortView.Variation.Thumbnail = cache.Thumbnail
-				if orderItem.Thumbnail == "" {
-					orderItem.Thumbnail = cache.Thumbnail
-				}
-			} else {
-				logger.Warningf("%v", err.Error())
-			}
-
-			if len(arr) > 2 {
-				//
-				//var propertiesShortView []PropertyShortView
-				for _, id := range arr[2:] {
-					if price, err := models.GetPrice(common.Database, id); err == nil {
-						propertyShortView := PropertyShortView{}
-						propertyShortView.Title = price.Property.Title
-						//
-						if cache, err := models.GetCacheValueByValueId(common.Database, price.Value.ID); err == nil {
-							propertyShortView.Thumbnail = cache.Thumbnail
-						}
-						//
-						propertyShortView.Value = price.Value.Value
-						if price.Price > 0 {
-							propertyShortView.Price = price.Price
-						}
-						orderItem.Price += price.Price
-						itemShortView.Properties = append(itemShortView.Properties, propertyShortView)
-					} else {
-						c.Status(http.StatusInternalServerError)
-						return c.JSON(HTTPError{err.Error()})
-					}
-				}
-				if bts, err := json.Marshal(itemShortView); err == nil {
-					orderItem.Description = string(bts)
-				}
-			}
-			orderItem.Total = orderItem.Price * float64(orderItem.Quantity)
-
-			order.Items = append(order.Items, orderItem)
-			order.Sum += orderItem.Price * float64(orderItem.Quantity)
-			//
-			itemShortView.Path = orderItem.Path
-			itemShortView.Thumbnail = orderItem.Thumbnail
-			itemShortView.Price = orderItem.Price
-			itemShortView.Quantity = orderItem.Quantity
-			itemShortView.Total = orderItem.Total
-			//
-			orderShortView.Quantity += itemShortView.Quantity
-			orderShortView.Items = append(orderShortView.Items, itemShortView)
-			//
-			orderShortView.Volume += itemShortView.Volume * float64(itemShortView.Quantity)
-			orderShortView.Weight += itemShortView.Weight * float64(itemShortView.Quantity)
-		}
-	}
-	order.Total = order.Sum + order.Delivery
-	order.Volume = orderShortView.Volume
-	order.Weight = orderShortView.Weight
-	orderShortView.Sum = order.Sum
-	orderShortView.Delivery = order.Delivery
-	orderShortView.Total = order.Total
-	if bts, err := json.Marshal(orderShortView); err == nil {
-		order.Description = string(bts)
-	}
-	//logger.Infof("order: %+v", order)
-	if _, err := models.CreateOrder(common.Database, order); err != nil {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-	return c.JSON(order)
-}*/
-
-func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
-	order := &models.Order{Status: models.ORDER_STATUS_NEW}
-	now := time.Now()
-	vat := common.Config.Payment.VAT
-	tax := 1.0
-	// Profile
-	var profile *models.Profile
-	var err error
-	if request.ProfileId > 0 {
-		order.ProfileId = request.ProfileId
-		profile, err = models.GetProfile(common.Database, request.ProfileId)
-		if err == nil {
-			if profile.Country != common.Config.Payment.Country {
-				var allowed bool
-				switch profile.Country {
-				case "AT":
-					allowed = profile.ITN != ""
-				default:
-					allowed = true
-				}
-				if allowed {
-					tax -= common.Config.Payment.VAT / 100.0
-					vat = 0
-				}
-			}
-		} else {
-			return nil, nil, err
-		}
-	}
-	// Coupons
-	var couponsView []*CouponOrderView
-	var coupons []*models.Coupon
-	for _, code := range request.Coupons {
-		allowed := true
-		for _, coupon := range coupons {
-			if coupon.Code == code {
-				allowed = false
-				break
-			}
-		}
-		if allowed {
-			if coupon, err := models.GetCouponByCode(common.Database, code); err == nil {
-				coupons = append(coupons, coupon)
-			}
-		}
-	}
-	//
-	var itemsShortView []ItemShortView
-	for _, rItem := range request.Items {
-		var arr []int
-		if err := json.Unmarshal([]byte(rItem.UUID), &arr); err == nil && len(arr) >= 2{
-			//
-			productId := arr[0]
-			var product *models.Product
-			if product, err = models.GetProduct(common.Database, productId); err != nil {
-				return nil, nil, err
-			}
-			variationId := arr[1]
-
-			//var variation *models.Variation
-			var vId uint
-			var title string
-			var basePrice, salePrice, weight float64
-			var start, end time.Time
-			//var dimensions string
-			var width, height, depth float64
-			if variationId == 0 {
-				title = "default"
-				basePrice = product.BasePrice
-				salePrice = product.SalePrice
-				start = product.Start
-				end = product.End
-				//dimensions = product.Dimensions
-				width = product.Width
-				height = product.Height
-				depth = product.Depth
-				weight = product.Weight
-			} else {
-				if variation, err := models.GetVariation(common.Database, variationId); err == nil {
-					if product.ID != variation.ProductId {
-						err = fmt.Errorf("Products and Variation mismatch")
-						return nil, nil, err
-					}
-					vId = variation.ID
-					title = variation.Title
-					basePrice = variation.BasePrice
-					salePrice = variation.SalePrice
-					start = variation.Start
-					end = variation.End
-					width = variation.Width
-					height = variation.Height
-					depth = variation.Depth
-					weight = variation.Weight
-				} else {
-					return nil, nil, err
-				}
-			}
-			categoryId := rItem.CategoryId
-			item := &models.Item{
-				Uuid:     rItem.UUID,
-				CategoryId: rItem.CategoryId,
-				Title:    product.Title,
-				BasePrice: basePrice,
-				Quantity: rItem.Quantity,
-			}
-			if salePrice > 0 && start.Before(now) && end.After(now) {
-				item.Price = salePrice * tax
-				item.SalePrice = salePrice * tax
-			}else{
-				item.Price = basePrice * tax
-			}
-			item.VAT = vat
-			item.Volume = width * height * depth / 1000000.0
-			item.Weight = weight
-			//
-			if breadcrumbs := models.GetBreadcrumbs(common.Database, categoryId); len(breadcrumbs) > 0 {
-				var chunks []string
-				for _, crumb := range breadcrumbs {
-					chunks = append(chunks, crumb.Name)
-				}
-				item.Path = "/" + path.Join(append(chunks, product.Name)...)
-			}
-
-			if cache, err := models.GetCacheProductByProductId(common.Database, product.ID); err == nil {
-				item.Thumbnail = cache.Thumbnail
-			}else{
-				logger.Warningf("%v", err.Error())
-			}
-			if cache, err := models.GetCacheVariationByVariationId(common.Database, vId); err == nil {
-				if item.Thumbnail == "" {
-					item.Thumbnail = cache.Thumbnail
-				}
-			} else {
-				logger.Warningf("%v", err.Error())
-			}
-
-			var propertiesShortView []PropertyShortView
-			if len(arr) > 2 {
-				//
-				for _, id := range arr[2:] {
-					if price, err := models.GetPrice(common.Database, id); err == nil {
-						propertyShortView := PropertyShortView{}
-						propertyShortView.Title = price.Property.Title
-						//
-						if cache, err := models.GetCacheValueByValueId(common.Database, price.Value.ID); err == nil {
-							propertyShortView.Thumbnail = cache.Thumbnail
-						}
-						//
-						propertyShortView.Value = price.Value.Value
-						if price.Price > 0 {
-							propertyShortView.Price = price.Price * tax
-						}
-						item.Price += price.Price * tax
-						propertiesShortView = append(propertiesShortView, propertyShortView)
-					} else {
-						return nil, nil, err
-					}
-				}
-			}
-			// Coupons
-			for _, coupon := range coupons {
-				if coupon.Enabled && coupon.Start.Before(now) && coupon.End.After(now) {
-					var allowed bool
-					if coupon.Type == "item" {
-						if coupon.ApplyTo == "all" {
-							allowed = true
-						} else if coupon.ApplyTo == "categories" {
-							allowed = false
-							for _, category := range coupon.Categories{
-								if category.ID == item.CategoryId {
-									allowed = true
-									break
-								}
-							}
-						} else if coupon.ApplyTo == "products" {
-							allowed = false
-							for _, product := range coupon.Products{
-								if int(product.ID) == productId {
-									allowed = true
-									break
-								}
-							}
-						} else {
-							allowed = false
-						}
-					}else if coupon.Type == "order" {
-						allowed = true
-					}
-					if allowed {
-						couponsView = append(couponsView, &CouponOrderView{
-							ID:     coupon.ID,
-							Code:   coupon.Code,
-							Title:  coupon.Title,
-							Type: coupon.Type,
-							Amount: coupon.Amount,
-						})
-						//
-						if res := rePercent.FindAllStringSubmatch(coupon.Amount, 1); len(res) > 0 && len(res[0]) > 1 {
-							// percent
-							if p, err := strconv.ParseFloat(res[0][1], 10); err == nil {
-								item.Discount = item.Price * p / 100.0
-							}
-						}else{
-							if n, err := strconv.ParseFloat(coupon.Amount, 10); err == nil {
-								item.Discount = n
-							}
-						}
-						if item.Discount > item.Price {
-							item.Discount = item.Price
-						}
-						item.Discount = math.Round(item.Discount * 100) / 100
-					}
-				}
-			}
-			// /Coupons
-			item.Total = (item.Price - item.Discount) * float64(item.Quantity)
-			// [Item Description]
-			var itemShortView ItemShortView
-			if bts, err := json.Marshal(item); err == nil {
-				if err = json.Unmarshal(bts, &itemShortView); err != nil {
-					logger.Warningf("%v", err.Error())
-				}
-			}else{
-				logger.Warningf("%v", err.Error())
-			}
-			itemShortView.Variation = VariationShortView{
-				Title: title,
-			}
-			itemShortView.Properties = propertiesShortView
-			if bts, err := json.Marshal(itemShortView); err == nil {
-				item.Description = string(bts)
-			}
-			// [/Item Description]
-			itemsShortView = append(itemsShortView, itemShortView)
-			order.Items = append(order.Items, item)
-			order.Quantity += item.Quantity
-			order.Volume += item.Volume
-			order.Weight += item.Weight
-			order.Sum += item.Total
-			order.Discount += item.Discount
-		}
-	}
-	// Transports
-	var deliveriesShortView []DeliveryView
-	var transportView *TransportOrderView
-	if transports, err := models.GetTransports(common.Database); err == nil {
-		for _, transport := range transports {
-			// All available transports OR selected
-			if transport.Enabled && (order.Volume >= transport.Volume || order.Weight >= transport.Weight) && (transport.ID == request.TransportId || request.TransportId == 0) {
-				//
-				var orderFixed, orderPercent, itemFixed, itemPercent, kg, m3 float64
-				var orderIsPercent, itemIsPercent bool
-				//
-				var tariff *models.Tariff
-				if profile != nil {
-					// 2 Get Zone by Country, Country and Zip
-					var zoneId uint
-					if zone, err := models.GetZoneByCountry(common.Database, profile.Country); err == nil {
-						zoneId = zone.ID
-					}
-					for i := 0; i <= len(profile.Zip); i++ {
-						n := len(profile.Zip) - i
-						zip := profile.Zip[0:n]
-						for j := n; j < len(profile.Zip); j++ {
-							zip += "X"
-						}
-						zone, err := models.GetZoneByCountryAndZIP(common.Database, profile.Country, zip)
-						if err == nil {
-							zoneId = zone.ID
-							break
-						}
-					}
-					// 3 Get Tariff by Transport and Zone
-					tariff, _ = models.GetTariffByTransportIdAndZoneId(common.Database, transport.ID, zoneId)
-				}
-				//
-				if tariff == nil {
-					if res := rePercent.FindAllStringSubmatch(transport.Order, 1); len(res) > 0 && len(res[0]) > 1 {
-						if v, err := strconv.ParseFloat(res[0][1], 10); err == nil {
-							orderPercent = v
-							orderIsPercent = true
-						}
-					}else{
-						if v, err := strconv.ParseFloat(transport.Order, 10); err == nil {
-							orderFixed = v
-						}
-					}
-				}else{
-					if res := rePercent.FindAllStringSubmatch(tariff.Order, 1); len(res) > 0 && len(res[0]) > 1 {
-						if v, err := strconv.ParseFloat(res[0][1], 10); err == nil {
-							orderPercent = v
-							orderIsPercent = true
-						}
-					}else{
-						if v, err := strconv.ParseFloat(tariff.Order, 10); err == nil {
-							orderFixed = v
-						}
-					}
-				}
-				// Item
-				if tariff == nil {
-					if res := rePercent.FindAllStringSubmatch(transport.Item, 1); len(res) > 0 && len(res[0]) > 1 {
-						if v, err := strconv.ParseFloat(res[0][1], 10); err == nil {
-							itemPercent = v
-							itemIsPercent = true
-						}
-					}else{
-						if v, err := strconv.ParseFloat(transport.Item, 10); err == nil {
-							itemFixed = v
-						}
-					}
-				}else{
-					if res := rePercent.FindAllStringSubmatch(tariff.Item, 1); len(res) > 0 && len(res[0]) > 1 {
-						if v, err := strconv.ParseFloat(res[0][1], 10); err == nil {
-							orderPercent = v
-							itemIsPercent = true
-						}
-					}else{
-						if v, err := strconv.ParseFloat(tariff.Item, 10); err == nil {
-							orderFixed = v
-						}
-					}
-				}
-				// Kg
-				if tariff == nil {
-					kg = transport.Kg
-				}else{
-					kg = tariff.Kg
-				}
-				// M3
-				if tariff == nil {
-					m3 = transport.M3
-				}else{
-					m3 = tariff.M3
-				}
-				//
-				// [Delivery]
-				var delivery float64
-				for _, item := range order.Items {
-					if itemIsPercent {
-						delivery += (item.Price * itemPercent / 100.0) * float64(item.Quantity)
-					}else{
-						delivery += itemFixed * tax * float64(item.Quantity)
-					}
-				}
-				// Delivery: fixed
-				if orderIsPercent {
-					delivery += order.Sum * orderPercent / 100.0
-				}else{
-					delivery += orderFixed * tax
-				}
-				// Delivery: dynamic
-				byVolume := delivery + order.Volume * m3
-				byWeight := delivery + order.Weight * kg
-				var value float64
-				if byVolume > byWeight {
-					value = byVolume
-				} else {
-					value = byWeight
-				}
-				//
-				if transport.Free > 0 && order.Sum > transport.Free {
-					value = 0
-				}
-				//
-				var services []TransportServiceView
-				if transport.Services != "" {
-					if err = json.Unmarshal([]byte(transport.Services), &services); err != nil {
-						logger.Warningf("%+v", err)
-					}
-				}
-				//
-				if request.TransportId > 0 {
-					transportView = &TransportOrderView{
-						ID: transport.ID,
-						Name: transport.Name,
-						Title: transport.Title,
-						Thumbnail: transport.Thumbnail,
-						//Services: services,
-					}
-
-					for _, service := range services {
-						for j := 0; j < len(request.TransportServices); j++ {
-							if request.TransportServices[j].Name == service.Name {
-								service.Selected = true
-								break
-							}
-						}
-						if service.Selected {
-							transportView.Services = append(transportView.Services, service)
-							value += service.Price
-						}
-					}
-					//
-					order.TransportId = request.TransportId
-					order.Delivery = math.Round(value * 100) / 100
-				}else{
-					deliveriesShortView = append(deliveriesShortView, DeliveryView{
-						ID:        transport.ID,
-						Title:     transport.Title,
-						Thumbnail: transport.Thumbnail,
-						ByVolume: math.Round(byVolume * 100) / 100,
-						ByWeight: math.Round(byWeight * 100) / 100,
-						Services: services,
-						Value: math.Round(value * 100) / 100,
-					})
-				}
-			}
-		}
-	}
-	sort.Slice(deliveriesShortView[:], func(i, j int) bool {
-		return deliveriesShortView[i].Value < deliveriesShortView[j].Value
-	})
-	// [/Delivery]
-	// [PaymentMethods]
-	var paymentMethodsView *PaymentMethodsView
-	if request.PaymentMethod == "" {
-		paymentMethodsView = &PaymentMethodsView{}
-		if common.Config.Payment.Stripe.Enabled {
-			paymentMethodsView.Stripe.Enabled = true
-			paymentMethodsView.Default = "stripe"
-		}
-		if common.Config.Payment.Mollie.Enabled {
-			paymentMethodsView.Mollie.Enabled = true
-			paymentMethodsView.Mollie.Methods = reCSV.Split(common.Config.Payment.Mollie.Methods, -1)
-			paymentMethodsView.Default = "mollie"
-		}
-		if common.Config.Payment.AdvancePayment.Enabled {
-			paymentMethodsView.AdvancePayment.Enabled = true
-			if tmpl, err := template.New("details").Parse(common.Config.Payment.AdvancePayment.Details); err == nil {
-				var tpl bytes.Buffer
-				vars := map[string]interface{}{
-					/* Something should be here */
-				}
-				if err := tmpl.Execute(&tpl, vars); err == nil {
-					paymentMethodsView.AdvancePayment.Details = tpl.String()
-				}else{
-					logger.Errorf("%v", err)
-				}
-			}else{
-				logger.Errorf("%v", err)
-			}
-		}
-		if common.Config.Payment.OnDelivery.Enabled {
-			paymentMethodsView.OnDelivery.Enabled = true
-		}
-	}else{
-		order.PaymentMethod = request.PaymentMethod
-	}
-	// [/PaymentMethod]
-	// *****************************************************************************************************************
-	// Coupons
-	for _, coupon := range coupons {
-		if coupon.Enabled && coupon.Start.Before(now) && coupon.End.After(now) {
-			if coupon.Type == "shipment" {
-				couponsView = append(couponsView, &CouponOrderView{
-					ID:     coupon.ID,
-					Code:   coupon.Code,
-					Title:  coupon.Title,
-					Type: coupon.Type,
-					Amount: coupon.Amount,
-				})
-				if res := rePercent.FindAllStringSubmatch(coupon.Amount, 1); len(res) > 0 && len(res[0]) > 1 {
-					// percent
-					if p, err := strconv.ParseFloat(res[0][1], 10); err == nil {
-						order.Discount2 = order.Delivery * p / 100.0
-					}
-				} else {
-					if n, err := strconv.ParseFloat(coupon.Amount, 10); err == nil {
-						order.Discount2 = n
-					}
-				}
-				if order.Discount2 > order.Delivery {
-					order.Discount2 = order.Delivery
-				}
-				order.Discount2 = math.Round(order.Discount2 * 100) / 100
-			}
-		}
-	}
-	//
-	order.VAT = vat
-	var view *OrderShortView
-	if bts, err := json.Marshal(order); err == nil {
-		if err = json.Unmarshal(bts, &view); err == nil {
-			view.Items = itemsShortView
-			view.Deliveries = deliveriesShortView
-			//
-			view.Transport = transportView
-			view.Coupons = couponsView
-			//
-			view.PaymentMethods = paymentMethodsView
-		} else {
-			logger.Warningf("%v", err.Error())
-		}
-	}else{
-		logger.Warningf("%v", err.Error())
-	}
-	order.Total = (order.Sum - order.Discount) + (order.Delivery - order.Discount2)
-	// [Order Description]
-	if bts, err := json.Marshal(view); err == nil {
-		order.Description = string(bts)
-	}
-	// [/Order Description]
-	return order, view, nil
 }
 
 // GetOrder godoc
@@ -8355,875 +6800,6 @@ func postAccountOrderOnDeliverySubmitHandler(c *fiber.Ctx) error {
 	}else{
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
-	}
-}
-
-type StripeCustomerView struct {
-
-}
-
-// GetStripeCustomer godoc
-// @Summary Get stripe customer
-// @Accept json
-// @Produce json
-// @Param id path int true "Order ID"
-// @Success 200 {object} StripeCustomerView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account/orders/{id}/stripe/customer [get]
-// @Tags account
-func getAccountOrderStripeCustomerHandler(c *fiber.Ctx) error {
-	var id int
-	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
-	}
-	var user *models.User
-	if v := c.Locals("user"); v != nil {
-		var ok bool
-		if user, ok = v.(*models.User); !ok {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"User not found"})
-		}
-	}
-	if order, err := models.GetOrder(common.Database, id); err == nil {
-		if order.UserId != user.ID {
-			c.Status(http.StatusForbidden)
-			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
-		}
-
-		var payment models.ProfilePayment
-		var customerId string
-		profile, err := models.GetProfile(common.Database, order.ProfileId)
-		if err == nil {
-			if err := json.Unmarshal([]byte(profile.Payment), &payment); err == nil {
-				customerId = payment.Stripe.CustomerId
-			}else{
-				logger.Warningf("%+v", customerId)
-			}
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Profile not found"})
-		}
-
-		var customer *stripe.Customer
-		if customerId == "" {
-			// Create customer
-			if customer, err = common.STRIPE.CreateCustomer(&stripe.CustomerParams{
-				Name: stripe.String(profile.Name + " " + profile.Lastname),
-				Email: stripe.String(user.Email),
-				Description: stripe.String(fmt.Sprintf("User #%d %v profile #%d %v %v", user.ID, user.Email, profile.ID, profile.Name, profile.Lastname)),
-			}); err == nil {
-				customerId = customer.ID
-			} else {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-		}else{
-			// Get customer
-			if customer, err = common.STRIPE.GetCustomer(customerId); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-		}
-
-		if payment.Stripe.CustomerId != customerId {
-			payment.Stripe.CustomerId = customerId
-			if bts, err := json.Marshal(models.ProfilePayment{Stripe:models.ProfilePaymentStripe{CustomerId: customer.ID}}); err == nil {
-				profile.Payment = string(bts)
-				if err = models.UpdateProfile(common.Database, profile); err != nil {
-					logger.Warningf("%+v", err.Error())
-				}
-			}
-		}
-
-		c.Status(http.StatusOK)
-		return c.JSON(customer)
-	} else {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-}
-
-type StripeCardsView struct {
-
-}
-
-
-// GetStripeCards godoc
-// @Summary Get stripe cards
-// @Accept json
-// @Produce json
-// @Param id path int true "Order ID"
-// @Success 200 {object} StripeCardsView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account/orders/{id}/stripe/card [get]
-// @Tags account
-func getAccountOrderStripeCardHandler(c *fiber.Ctx) error {
-	var id int
-	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
-	}
-	var user *models.User
-	if v := c.Locals("user"); v != nil {
-		var ok bool
-		if user, ok = v.(*models.User); !ok {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"User not found"})
-		}
-	}
-	if order, err := models.GetOrder(common.Database, id); err == nil {
-		if order.UserId != user.ID {
-			c.Status(http.StatusForbidden)
-			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
-		}
-
-		var payment models.ProfilePayment
-		var customerId string
-		profile, err := models.GetProfile(common.Database, order.ProfileId)
-		if err == nil {
-			if err := json.Unmarshal([]byte(profile.Payment), &payment); err == nil {
-				customerId = payment.Stripe.CustomerId
-			}else{
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"CustomerId not set"})
-			}
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Profile not found"})
-		}
-
-		cards, err := common.STRIPE.GetCards(customerId)
-		if err != nil {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-
-		var card *stripe.Card
-		if len(cards) > 0 {
-			card = cards[0]
-		}
-
-		c.Status(http.StatusOK)
-		return c.JSON(card)
-	} else {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-}
-
-type NewStripeCard struct {
-	CustomerId string
-	Token string
-}
-
-type StripeCardView struct {
-
-}
-
-/*type StripeCheckoutSessionView struct {
-	SessionID string `json:"id"`
-}*/
-
-// PostOrder godoc
-// @Summary Post order
-// @Description See https://stripe.com/docs/api/cards/create
-// @Accept json
-// @Produce json
-// @Param cart body NewStripeCard true "body"
-// @Success 200 {object} StripeCardView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account/orders/checkout/{id}/stripe/card [post]
-// @Tags account
-func postAccountOrderStripeCardHandler(c *fiber.Ctx) error {
-	var id int
-	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
-	}
-	var userId uint
-	if v := c.Locals("user"); v != nil {
-		if user, ok := v.(*models.User); ok {
-			userId = user.ID
-		}
-	}
-	order, err := models.GetOrder(common.Database, id)
-	if err == nil {
-		if order.UserId != userId {
-			c.Status(http.StatusForbidden)
-			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
-		}
-	}else{
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-
-	var request NewStripeCard
-	if err := c.BodyParser(&request); err != nil {
-		return err
-	}
-	//logger.Infof("request: %+v", request)
-
-	params := &stripe.CardParams{
-		Customer: stripe.String(request.CustomerId),
-		Token: stripe.String(request.Token),
-	}
-
-	if cards, err := common.STRIPE.GetCards(request.CustomerId); err == nil {
-		for i := 0; i < len(cards); i++ {
-			if _, err = common.STRIPE.DeleteCard(request.CustomerId, cards[i].ID); err != nil {
-				logger.Warningf("%+v", err.Error())
-			}
-		}
-	}else{
-		logger.Warningf("%+v", err.Error())
-	}
-
-	card, err := common.STRIPE.CreateCard(params)
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-
-	c.Status(http.StatusOK)
-	return c.JSON(card)
-}
-
-
-type StripeSecretView struct {
-	ClientSecret string
-}
-
-// PostStripePayment godoc
-// @Summary Post stripe payment
-// @Accept json
-// @Produce json
-// @Param id path int true "Order ID"
-// @Success 200 {object} StripeCardsView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account/orders/{id}/stripe/submit [get]
-// @Tags account
-func postAccountOrderStripeSubmitHandler(c *fiber.Ctx) error {
-	var id int
-	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
-	}
-	var user *models.User
-	if v := c.Locals("user"); v != nil {
-		var ok bool
-		if user, ok = v.(*models.User); !ok {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"User not found"})
-		}
-	}
-	if order, err := models.GetOrderFull(common.Database, id); err == nil {
-		if order.UserId != user.ID {
-			c.Status(http.StatusForbidden)
-			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
-		}
-		var profilePayment models.ProfilePayment
-		var customerId string
-		profile, err := models.GetProfile(common.Database, order.ProfileId)
-		if err == nil {
-			if err := json.Unmarshal([]byte(profile.Payment), &profilePayment); err == nil {
-				customerId = profilePayment.Stripe.CustomerId
-			}else{
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"CustomerId not set"})
-			}
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Profile not found"})
-		}
-
-		//logger.Infof("Start")
-		params := &stripe.PaymentIntentParams{
-			Amount: stripe.Int64(int64(math.Round(order.Total * 100))),
-			Currency: stripe.String(common.Config.Currency),
-			Customer: stripe.String(customerId),
-			/*PaymentMethodTypes: []*string{
-				stripe.String("card"),
-			},*/
-			Confirm: stripe.Bool(true),
-			//ReturnURL: stripe.String(fmt.Sprintf(CONFIG.Stripe.ConfirmURL, transactionId)),
-			/*PaymentMethodOptions: &stripe.PaymentIntentPaymentMethodOptionsParams{
-				Card: &stripe.PaymentIntentPaymentMethodOptionsCardParams{
-					RequestThreeDSecure: stripe.String("any"),
-				},
-			},*/
-		}
-		if v := c.Request().Header.Referer(); len(v) > 0 {
-			if u, err := url.Parse(string(v)); err == nil {
-				u.Path = fmt.Sprintf("/api/v1/account/orders/%v/stripe/success", order.ID)
-				u.RawQuery = ""
-				params.ReturnURL = stripe.String(u.String())
-			}
-		}
-		/*if bts, err := json.Marshal(params); err == nil {
-			logger.Infof("params: %+v", string(bts))
-		}*/
-		pi, err := common.STRIPE.CreatePaymentIntent(params)
-		if err != nil {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-
-		if bts, err := json.Marshal(pi); err == nil {
-			logger.Infof("bts: %+v", string(bts))
-		}
-
-		transaction := &models.Transaction{Amount: order.Total, Status: models.TRANSACTION_STATUS_NEW, Order: order}
-		transactionPayment := models.TransactionPayment{Stripe: &models.TransactionPaymentStripe{Id: pi.ID}}
-		if bts, err := json.Marshal(transactionPayment); err == nil {
-			transaction.Payment = string(bts)
-		}
-		if _, err = models.CreateTransaction(common.Database, transaction); err != nil {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-
-		if pi.Status == stripe.PaymentIntentStatusRequiresPaymentMethod {
-			logger.Infof("PaymentIntentStatusRequiresPaymentMethod")
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{pi.LastPaymentError.Error()})
-		} else if pi.Status == stripe.PaymentIntentStatusRequiresAction {
-			logger.Infof("PaymentIntentStatusRequiresAction")
-			transaction.Status = models.TRANSACTION_STATUS_PENDING
-			if err = models.UpdateTransaction(common.Database, transaction); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-		} else if pi.Status == stripe.PaymentIntentStatusSucceeded {
-			logger.Infof("PaymentIntentStatusSucceeded")
-			transaction.Status = models.TRANSACTION_STATUS_COMPLETE
-			if err = models.UpdateTransaction(common.Database, transaction); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			order.Status = models.ORDER_STATUS_PAID
-			if err = models.UpdateOrder(common.Database, order); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			// Notifications
-			if common.Config.Notification.Enabled {
-				if common.Config.Notification.Email.Enabled {
-					// to admin
-					//logger.Infof("Time to send admin email")
-					if users, err := models.GetUsersByRoleLessOrEqualsAndNotification(common.Database, models.ROLE_ADMIN, true); err == nil {
-						//logger.Infof("users found: %v", len(users))
-						template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_ADMIN_ORDER_PAID)
-						if err == nil {
-							//logger.Infof("Template: %+v", template)
-							for _, user := range users {
-								logger.Infof("Send email admin user: %+v", user.Email)
-								if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
-									logger.Errorf("%+v", err)
-								}
-							}
-						}else{
-							logger.Warningf("%+v", err)
-						}
-					}else{
-						logger.Warningf("%+v", err)
-					}
-					// to user
-					//logger.Infof("Time to send user email")
-					template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_USER_ORDER_PAID)
-					if err == nil {
-						//logger.Infof("Template: %+v", template)
-						if user, err := models.GetUser(common.Database, int(order.UserId)); err == nil {
-							if user.EmailConfirmed {
-								logger.Infof("Send email to user: %+v", user.Email)
-								if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
-									logger.Errorf("%+v", err)
-								}
-							}else{
-								logger.Warningf("User's %v email %v is not confirmed", user.Login, user.Email)
-							}
-						} else {
-							logger.Warningf("%+v", err)
-						}
-					}
-				}
-			}
-			//
-		}else{
-			logger.Warningf("Unexpected PaymentIntentStatus: %+v", pi.Status)
-		}
-
-		c.Status(http.StatusOK)
-		return c.JSON(pi)
-	} else {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-}
-
-// GetStripePaymentSuccess godoc
-// @Summary Get stripe payment success
-// @Accept json
-// @Produce html
-// @Param id path int true "Order ID"
-// @Success 200 {object} StripeCardsView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account/orders/{id}/stripe/success [get]
-// @Tags account
-func getAccountOrderStripeSuccessHandler(c *fiber.Ctx) error {
-	// TODO: Here you can have some business logic
-	c.Response().Header.Set("Content-Type", "text/html")
-	/*
-	EXAMPLE:
-	id: 1
-	payment_intent: pi_1I0qfWLxvolFmsmRpQATpaRE
-	payment_intent_client_secret: pi_1I0qfWLxvolFmsmRpQATpaRE_secret_RkC4BWzSbdOWi31TsHtReNByc
-	source_type: card
-	*/
-	var id int
-	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
-	}
-	if order, err := models.GetOrderFull(common.Database, id); err == nil {
-		paymentIntentClientSecret := c.Query("payment_intent_client_secret")
-		if paymentIntentClientSecret != "" {
-			if res := regexp.MustCompile(`^(pi_[A-Za-z0-9]+)_secret`).FindAllStringSubmatch(paymentIntentClientSecret, 1); len(res) > 0 && len(res[0]) > 1 {
-				paymentIntentId := res[0][1]
-				logger.Infof("Success payment callback received, PaymentIntentClientSecret: %s", paymentIntentClientSecret)
-				if pi, err := common.STRIPE.GetPaymentIntent(paymentIntentId); err == nil {
-					logger.Infof("PaymentIntent ID: %s, Amount: %+v, Currency: %+v, Status: %+v, Customer: %+v", pi.ID, pi.Amount, pi.Currency, pi.Status, pi.Customer)
-						if transactions, err := models.GetTransactionsByOrderId(common.Database, id); err == nil {
-							for _, transaction := range transactions {
-								var payment models.TransactionPayment
-								if err = json.Unmarshal([]byte(transaction.Payment), &payment); err == nil {
-									if payment.Stripe != nil && payment.Stripe.Id == paymentIntentId {
-										if pi.Status == stripe.PaymentIntentStatusSucceeded {
-											transaction.Status = models.TRANSACTION_STATUS_COMPLETE
-											if err = models.UpdateTransaction(common.Database, transaction); err != nil {
-												c.Status(http.StatusInternalServerError)
-												return c.JSON(HTTPError{err.Error()})
-											}
-											order.Status = models.ORDER_STATUS_PAID
-											if err = models.UpdateOrder(common.Database, order); err != nil {
-												c.Status(http.StatusInternalServerError)
-												return c.JSON(HTTPError{err.Error()})
-											}
-											// Notifications
-											if common.Config.Notification.Enabled {
-												if common.Config.Notification.Email.Enabled {
-													// to admin
-													//logger.Infof("Time to send admin email")
-													if users, err := models.GetUsersByRoleLessOrEqualsAndNotification(common.Database, models.ROLE_ADMIN, true); err == nil {
-														//logger.Infof("users found: %v", len(users))
-														template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_ADMIN_ORDER_PAID)
-														if err == nil {
-															//logger.Infof("Template: %+v", template)
-															for _, user := range users {
-																logger.Infof("Send email admin user: %+v", user.Email)
-																if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
-																	logger.Errorf("%+v", err)
-																}
-															}
-														}else{
-															logger.Warningf("%+v", err)
-														}
-													}else{
-														logger.Warningf("%+v", err)
-													}
-													// to user
-													//logger.Infof("Time to send user email")
-													template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_USER_ORDER_PAID)
-													if err == nil {
-														//logger.Infof("Template: %+v", template)
-														if user, err := models.GetUser(common.Database, int(order.UserId)); err == nil {
-															if user.EmailConfirmed {
-																logger.Infof("Send email to user: %+v", user.Email)
-																if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
-																	logger.Errorf("%+v", err)
-																}
-															}else{
-																logger.Warningf("User's %v email %v is not confirmed", user.Login, user.Email)
-															}
-														} else {
-															logger.Warningf("%+v", err)
-														}
-													}
-												}
-											}
-											c.Status(http.StatusOK)
-											return c.SendString("OK<script>window.top.postMessage('3DS-authentication-complete:" + c.Query("payment_intent_client_secret") + "');</script>")
-										} else {
-											payment.Stripe.Error = fmt.Sprintf("RequestID: %v, ChargeID: %v, Msg: %v", pi.LastPaymentError.RequestID, pi.LastPaymentError.ChargeID, pi.LastPaymentError.Msg)
-											if bts, err := json.Marshal(payment); err == nil {
-												transaction.Payment = string(bts)
-											}
-											transaction.Status = models.TRANSACTION_STATUS_REJECT
-											if err = models.UpdateTransaction(common.Database, transaction); err != nil {
-												c.Status(http.StatusInternalServerError)
-												return c.JSON(HTTPError{err.Error()})
-											}
-											err = fmt.Errorf("%v", pi.LastPaymentError.Msg)
-											logger.Errorf("%+v", err)
-											c.Status(http.StatusInternalServerError)
-											return c.SendString("<b>ERROR:</b> " + err.Error())
-										}
-									}
-								}else{
-									logger.Errorf("%+v", err)
-									c.Status(http.StatusInternalServerError)
-									return c.SendString("<b>ERROR:</b> " + err.Error())
-								}
-							}
-							err = fmt.Errorf("no corresponding transaction entity found")
-							logger.Errorf("%+v", err)
-							c.Status(http.StatusInternalServerError)
-							return c.SendString("<b>ERROR:</b> " + err.Error())
-						}else{
-							logger.Errorf("%+v", err)
-							c.Status(http.StatusInternalServerError)
-							return c.SendString("<b>ERROR:</b> " + err.Error())
-						}
-				} else {
-					logger.Errorf("%+v", err)
-					c.Status(http.StatusInternalServerError)
-					return c.SendString("<b>ERROR:</b> " + err.Error())
-				}
-			}else{
-				err = fmt.Errorf("incorrect payment_intent_client_secret")
-				logger.Errorf("%+v", err)
-				c.Status(http.StatusInternalServerError)
-				return c.SendString("<b>ERROR:</b> " + err.Error())
-			}
-		}else{
-			err = fmt.Errorf("missed payment_intent_client_secret")
-			logger.Errorf("%+v", err)
-			c.Status(http.StatusInternalServerError)
-			return c.SendString("<b>ERROR:</b> " + err.Error())
-		}
-	}else{
-		logger.Errorf("%+v", err)
-		c.Status(http.StatusInternalServerError)
-		return c.SendString("<b>ERROR:</b> " + err.Error())
-	}
-}
-
-type MollieOrderView struct {
-	Id string
-	ProfileId string `json:",omitempty"`
-	Checkout string `json:",omitempty"`
-}
-
-type MollieSubmitRequest struct {
-	Language string `json:"language"`
-	Method string
-}
-
-// PostMollieOrder godoc
-// @Summary Post mollie order
-// @Accept json
-// @Produce json
-// @Param id path int true "Order ID"
-// @Query method query string true "for example: postMessage"
-// @Param form body MollieSubmitRequest true "body"
-// @Success 200 {object} MollieOrderView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account/orders/{id}/mollie/submit [post]
-// @Tags account
-// @Tags frontend
-func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
-	logger.Infof("postAccountOrderMollieSubmitHandler")
-	var id int
-	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
-	}
-	var user *models.User
-	if v := c.Locals("user"); v != nil {
-		var ok bool
-		if user, ok = v.(*models.User); !ok {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"User not found"})
-		}
-	}
-	if order, err := models.GetOrder(common.Database, id); err == nil {
-		if order.UserId != user.ID {
-			c.Status(http.StatusForbidden)
-			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
-		}
-		// PAYLOAD
-		//logger.Infof("order: %+v", order)
-
-		var base string
-		var redirectUrl string
-		if v := c.Request().Header.Referer(); len(v) > 0 {
-			if u, err := url.Parse(string(v)); err == nil {
-				u.Path = ""
-				u.RawQuery = ""
-				base = u.String()
-				u.Path = fmt.Sprintf("/api/v1/account/orders/%v/mollie/success", order.ID)
-				values := url.Values{}
-				if v := c.Query("method", ""); v != "" {
-					values.Set("method", v)
-					u.RawQuery = values.Encode()
-				}
-				redirectUrl = u.String()
-			}
-		}
-
-		var request MollieSubmitRequest
-		if err := c.BodyParser(&request); err != nil {
-			return err
-		}
-		//
-		o := &mollie.Order{
-			OrderNumber: fmt.Sprintf("%d", order.ID),
-		}
-		//
-		// Lines
-		var orderShortView OrderShortView
-		if err := json.Unmarshal([]byte(order.Description), &orderShortView); err == nil {
-			re := regexp.MustCompile(`^\[(.*)\]$`)
-			for _, item := range orderShortView.Items {
-				sku := strings.Replace(re.ReplaceAllString(item.Uuid, ""), ",", ".", -1)
-				meta := map[string]string{"variation": item.Variation.Title}
-				line := mollie.Line{
-					Type:           "physical",
-					Category:       "gift",
-					Sku:            sku,
-					Name:           item.Title,
-					ProductUrl:     base + item.Path,
-					Metadata:       meta,
-					Quantity:       item.Quantity,
-					UnitPrice:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Price),
-					DiscountAmount: mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Discount * float64(item.Quantity)),
-					TotalAmount:    mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Total),
-					VatAmount:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Total * (common.Config.Payment.VAT / 100.0) / ((100.0 + common.Config.Payment.VAT) / 100.0)),
-					VatRate:        fmt.Sprintf("%.2f", common.Config.Payment.VAT),
-				}
-				/*total := item.Total
-				if item.Discount > 0 {
-					total = item.Total
-					line.DiscountAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Discount * float64(item.Quantity))
-				}else if order.Discount > 0 {
-					discount := 1 - (order.Discount / order.Sum)
-					total = (item.Price * discount) * float64(item.Quantity)
-					line.DiscountAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Price * (1 - discount) * float64(item.Quantity))
-				}else{
-					line.DiscountAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), 0)
-				}
-				line.TotalAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), total)
-				line.VatAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), total * (common.Config.Payment.ITN / 100.0) / ((100.0 + common.Config.Payment.ITN) / 100.0))*/
-				if item.Thumbnail != "" {
-					line.ImageUrl = base + strings.Split(item.Thumbnail, ",")[0]
-				}
-				o.Lines = append(o.Lines, line)
-			}
-		}
-		if order.Delivery > 0 {
-			o.Lines = append(o.Lines, mollie.Line{
-				Type: "shipping_fee",
-				Name: "Shipping Fee",
-				Quantity:       1,
-				VatRate:        fmt.Sprintf("%.2f", common.Config.Payment.VAT),
-				UnitPrice:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), order.Delivery),
-				TotalAmount:    mollie.NewAmount(strings.ToUpper(common.Config.Currency), order.Delivery - order.Discount2),
-				DiscountAmount: mollie.NewAmount(strings.ToUpper(common.Config.Currency), order.Discount2),
-				VatAmount:      mollie.NewAmount(strings.ToUpper(common.Config.Currency), (order.Delivery - order.Discount2) * (common.Config.Payment.VAT / 100.0) / ((100.0 + common.Config.Payment.VAT) / 100.0)),
-			})
-		}
-		//
-		o.Amount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), order.Total)
-		o.RedirectUrl = redirectUrl
-		bts, _ := json.Marshal(o)
-		logger.Infof("Bts: %+v", string(bts))
-		// Address
-		address := mollie.Address{
-			Email: user.Email,
-		}
-		if profile, err := models.GetProfile(common.Database, order.ProfileId); err == nil {
-			address.GivenName = profile.Name
-			address.FamilyName = profile.Lastname
-			address.OrganizationName = profile.Company
-			address.StreetAndNumber = profile.Address
-			address.Phone = profile.Phone
-			address.City = profile.City
-			address.PostalCode = profile.Zip
-			address.Country = profile.Country
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-		o.BillingAddress = address
-		o.ShippingAddress = address
-		o.Locale = "en_US"
-		// Locale
-		if request.Language != "" {
-			if request.Language == "de" {
-				o.Locale = "de_DE"
-			}
-		}
-		// Method
-		if request.Method != "" {
-			o.Method = request.Method
-		}
-		if bts, err := json.Marshal(o); err == nil {
-			logger.Infof("Bts: %+v", string(bts))
-		}
-
-		if o, links, err := common.MOLLIE.CreateOrder(o); err == nil {
-			logger.Infof("o: %+v", o)
-			transaction := &models.Transaction{Amount: order.Total, Status: models.TRANSACTION_STATUS_NEW, Order: order}
-			transactionPayment := models.TransactionPayment{Mollie: &models.TransactionPaymentMollie{Id: o.Id}}
-			if bts, err := json.Marshal(transactionPayment); err == nil {
-				transaction.Payment = string(bts)
-			}
-			if _, err = models.CreateTransaction(common.Database, transaction); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-
-			var response MollieOrderView
-
-			response.Id = o.Id
-			if link, found := links["checkout"]; found {
-				response.Checkout = link.Href
-			}
-
-			c.Status(http.StatusOK)
-			return c.JSON(response)
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-	} else {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-}
-
-// GetMolliePaymentSuccess godoc
-// @Summary Get mollie payment success
-// @Accept json
-// @Produce html
-// @Param id path int true "Order ID"
-// @Success 200 {object} StripeCardsView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account/orders/{id}/mollie/success [get]
-// @Tags account
-// @Tags frontend
-func getAccountOrderMollieSuccessHandler(c *fiber.Ctx) error {
-	c.Response().Header.Set("Content-Type", "text/html")
-	var id int
-	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
-	}
-	if order, err := models.GetOrderFull(common.Database, id); err == nil {
-		if transactions, err := models.GetTransactionsByOrderId(common.Database, id); err == nil {
-			for _, transaction := range transactions {
-				var payment models.TransactionPayment
-				if err = json.Unmarshal([]byte(transaction.Payment), &payment); err == nil {
-					if payment.Mollie != nil && payment.Mollie.Id != "" {
-						if o, err := common.MOLLIE.GetOrder(payment.Mollie.Id); err == nil {
-							if o.Status == "paid" {
-								transaction.Status = models.TRANSACTION_STATUS_COMPLETE
-								if err = models.UpdateTransaction(common.Database, transaction); err != nil {
-									c.Status(http.StatusInternalServerError)
-									return c.JSON(HTTPError{err.Error()})
-								}
-								order.Status = models.ORDER_STATUS_PAID
-								if err = models.UpdateOrder(common.Database, order); err != nil {
-									c.Status(http.StatusInternalServerError)
-									return c.JSON(HTTPError{err.Error()})
-								}
-								// Notifications
-								if common.Config.Notification.Enabled {
-									if common.Config.Notification.Email.Enabled {
-										// to admin
-										//logger.Infof("Time to send admin email")
-										if users, err := models.GetUsersByRoleLessOrEqualsAndNotification(common.Database, models.ROLE_ADMIN, true); err == nil {
-											//logger.Infof("users found: %v", len(users))
-											template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_ADMIN_ORDER_PAID)
-											if err == nil {
-												//logger.Infof("Template: %+v", template)
-												for _, user := range users {
-													logger.Infof("Send email admin user: %+v", user.Email)
-													if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
-														logger.Errorf("%+v", err)
-													}
-												}
-											}else{
-												logger.Warningf("%+v", err)
-											}
-										}else{
-											logger.Warningf("%+v", err)
-										}
-										// to user
-										//logger.Infof("Time to send user email")
-										template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_USER_ORDER_PAID)
-										if err == nil {
-											//logger.Infof("Template: %+v", template)
-											if user, err := models.GetUser(common.Database, int(order.UserId)); err == nil {
-												if user.EmailConfirmed {
-													logger.Infof("Send email to user: %+v", user.Email)
-													if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
-														logger.Errorf("%+v", err)
-													}
-												}else{
-													logger.Warningf("User's %v email %v is not confirmed", user.Login, user.Email)
-												}
-											} else {
-												logger.Warningf("%+v", err)
-											}
-										}
-									}
-								}
-								return return1(c, http.StatusOK, map[string]interface{}{"MESSAGE": "OK", "Status": o.Status})
-							}else{
-								return return1(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": "Unknown status: " + o.Status, "Status": o.Status})
-							}
-						}else{
-							logger.Errorf("%+v", err)
-							return return1(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": err.Error()})
-						}
-					}
-				}else{
-					logger.Errorf("%+v", err)
-					return return1(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": err.Error()})
-				}
-			}
-		}else{
-			logger.Errorf("%+v", err)
-			return return1(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": err.Error()})
-		}
-	}else{
-		logger.Errorf("%+v", err)
-		return return1(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": err.Error()})
-	}
-	err := fmt.Errorf("something wrong")
-	logger.Errorf("%+v", err)
-	return return1(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": err.Error()})
-}
-
-func return1(c *fiber.Ctx, status int, raw map[string]interface{}) error {
-	c.Set(fiber.HeaderContentType, fiber.MIMETextHTML)
-	switch c.Query("method", "") {
-	case "postMessage":
-		if bts, err := json.Marshal(raw); err == nil {
-			c.Status(status)
-			return c.SendString("<script>window.opener.postMessage(JSON.stringify(" + string(bts) + "),'*');</script>")
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.SendString("<b>ERROR:</b> " + err.Error())
-		}
-	default:
-		c.Status(status)
-		if status == http.StatusOK {
-			return c.SendString(fmt.Sprintf("%+v<script>window.close()</script>", raw["MESSAGE"]))
-		}else{
-			return c.SendString(fmt.Sprintf("<b>ERROR:</b> %+v", raw["ERROR"]))
-		}
 	}
 }
 
@@ -9715,27 +7291,26 @@ type DiscountCost struct {
 func SendOrderPaidEmail(to *mail.Email, orderId int, template *models.EmailTemplate) error {
 	vars := &common.NotificationTemplateVariables{ }
 	if order, err := models.GetOrderFull(common.Database, orderId); err == nil {
+		vars = &common.NotificationTemplateVariables{
+			Url: common.Config.Url,
+			Symbol: "$",
+		}
+		if common.Config.Symbol != "" {
+			vars.Symbol = common.Config.Symbol
+		}
 		var orderView struct {
-			models.Order
-			Items []struct {
-				ItemShortView
-				Description string
-			}
+			ID uint
+			CreatedAt time.Time
+			OrderShortView
+			Status string
 		}
-		if bts, err := json.Marshal(order); err == nil {
-			if err = json.Unmarshal(bts, &orderView); err == nil {
-				for i := 0; i < len(orderView.Items); i++ {
-					var itemView ItemShortView
-					if err = json.Unmarshal([]byte(orderView.Items[i].Description), &itemView); err == nil {
-						orderView.Items[i].Variation = itemView.Variation
-						orderView.Items[i].Properties = itemView.Properties
-					}
-				}
-				vars.Order = orderView
-			} else {
-				logger.Infof("%+v", err)
-			}
+		if err = json.Unmarshal([]byte(order.Description), &orderView); err == nil {
+			orderView.ID = order.ID
+			orderView.CreatedAt = order.CreatedAt
+			orderView.Status = order.Status
+			vars.Order = orderView
 		}
+		logger.Infof("View: %+v", orderView)
 	}
 	//
 	return common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), to, template.Topic, template.Message, vars)

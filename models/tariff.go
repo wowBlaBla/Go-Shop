@@ -4,7 +4,7 @@ import "gorm.io/gorm"
 
 type Tariff struct {
 	gorm.Model
-	Transport   *Transport `gorm:"foreignKey:TransportId"`
+	Transport   *Transport `gorm:"foreignKey:ID"`
 	TransportId uint
 	Zone        *Zone `gorm:"foreignKey:ZoneId"`
 	ZoneId      uint

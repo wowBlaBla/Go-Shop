@@ -294,7 +294,10 @@ var RootCmd = &cobra.Command{
 			logger.Warningf("%+v", err)
 		}
 		//
-		if err := common.Database.AutoMigrate(&models.Profile{}); err != nil {
+		if err := common.Database.AutoMigrate(&models.BillingProfile{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.ShippingProfile{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
 		//
@@ -424,58 +427,1290 @@ var RootCmd = &cobra.Command{
 					if _, err = models.CreateEmailTemplate(common.Database, &models.EmailTemplate{
 						Enabled: false,
 						Type:    common.NOTIFICATION_TYPE_ADMIN_ORDER_PAID,
-						Topic:   "New order id {{.Order.ID}} paid",
-						Message: `<div>
-<h1><a href="http://example.com/admin/sales/orders?id={{.Order.ID}}">Order #{{.Order.ID}}</a></h1>
-<table>
-<tbody>
-<tr><th style="text-align: left">Created</th><td>{{.Order.CreatedAt.Format "2006-01-02 15:04:05"}}</td></tr>
-<tr><th style="text-align: left">Volume</th><td>{{printf "%.3f" .Order.Volume}}</td>
-<tr><th style="text-align: left">Weight</th><td>{{printf "%.1f" .Order.Weight}}</td>
-<tr><th style="text-align: left">Status</th><td>{{.Order.Status}}</td>
-<tr><th style="text-align: left">Sum</th><td>{{printf "%.2f" .Order.Sum}}</td>
-<tr><th style="text-align: left">Delivery</th><td>{{printf "%.2f" .Order.Delivery}}</td>
-<tr><th style="text-align: left">Total</th><td>{{printf "%.2f" .Order.Total}}</td></tr>
-</tbody>
+						Topic:   "New order #{{.Order.ID}} paid",
+						Message: `<!DOCTYPE HTML PUBLIC "-//W3C//DTD XHTML 1.0 Transitional //EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml"
+      xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <!--[if gte mso 9]>
+  <xml>
+    <o:OfficeDocumentSettings>
+      <o:AllowPNG/>
+      <o:PixelsPerInch>96</o:PixelsPerInch>
+    </o:OfficeDocumentSettings>
+  </xml>
+  <![endif]-->
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="x-apple-disable-message-reformatting">
+  <!--[if !mso]><!-->
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"><!--<![endif]-->
+  <title>Order #{{.Order.ID}}</title>
+
+  <style type="text/css">
+    a {
+      color: #6d6d6d;
+      text-decoration: none;
+    }
+
+    @media (max-width: 480px) {
+      #u_content_image_1 .v-src-width {
+        width: auto !important;
+      }
+
+      #u_content_image_1 .v-src-max-width {
+        max-width: 50% !important;
+      }
+
+      #u_content_text_1 .v-text-align {
+        text-align: center !important;
+      }
+
+      #u_content_text_14 .v-text-align {
+        text-align: center !important;
+      }
+
+      #u_content_text_15 .v-text-align {
+        text-align: center !important;
+      }
+    }
+
+    @media only screen and (min-width: 620px) {
+      .u-row {
+        width: 600px !important;
+      }
+
+      .u-row .u-col {
+        vertical-align: top;
+      }
+
+      .u-row .u-col-33p33 {
+        width: 199.98px !important;
+      }
+
+      .u-row .u-col-50 {
+        width: 300px !important;
+      }
+
+      .u-row .u-col-66p67 {
+        width: 400.02px !important;
+      }
+
+      .u-row .u-col-100 {
+        width: 600px !important;
+      }
+
+    }
+
+    @media (max-width: 620px) {
+      .u-row-container {
+        max-width: 100% !important;
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+      }
+
+      .u-row .u-col {
+        min-width: 320px !important;
+        max-width: 100% !important;
+        display: block !important;
+      }
+
+      .u-row {
+        width: calc(100% - 40px) !important;
+      }
+
+      .u-col {
+        width: 100% !important;
+      }
+
+      .u-col > div {
+        margin: 0 auto;
+      }
+
+      .no-stack .u-col {
+        min-width: 0 !important;
+        display: table-cell !important;
+      }
+
+      .no-stack .u-col-50 {
+        width: 50% !important;
+      }
+
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    table,
+    tr,
+    td {
+      vertical-align: top;
+      border-collapse: collapse;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .ie-container table,
+    .mso-container table {
+      table-layout: fixed;
+    }
+
+    * {
+      line-height: inherit;
+    }
+
+    a[x-apple-data-detectors='true'] {
+      color: inherit !important;
+      text-decoration: none !important;
+    }
+
+    @media (max-width: 480px) {
+      .hide-mobile {
+        display: none !important;
+        max-height: 0px;
+        overflow: hidden;
+      }
+
+    }
+  </style>
+
+
+  <!--[if !mso]><!-->
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,700&display=swap" rel="stylesheet" type="text/css">
+  <!--<![endif]-->
+
+</head>
+
+{{$url := .Url}}
+{{$symbol := .Symbol}}
+
+<body class="clean-body" style="margin: 0;padding: 0;-webkit-text-size-adjust: 100%;background-color: #eeeeee">
+<!--[if IE]>
+<div class="ie-container"><![endif]-->
+<!--[if mso]>
+<div class="mso-container"><![endif]-->
+<table
+  style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;min-width: 320px;Margin: 0 auto;background-color: #eeeeee;width:100%"
+  cellpadding="0" cellspacing="0">
+  <tbody>
+  <tr style="vertical-align: top">
+    <td style="word-break: break-word;border-collapse: collapse !important;vertical-align: top">
+      <!--[if (mso)|(IE)]>
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td align="center" style="background-color: #eeeeee;"><![endif]-->
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;">
+          <div
+            style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;border-bottom: 1px solid lightgray;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style=""><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="200"
+                style="width: 200px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-33p33"
+                 style="max-width: 320px;min-width: 200px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table id="u_content_image_1" style="font-family:'Open Sans',sans-serif;" role="presentation"
+                         cellpadding="0" cellspacing="0" width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:31px 10px 25px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td class="v-text-align" style="padding-right: 0px;padding-left: 0px;" align="center">
+
+                              <img align="center" border="0" src="https://shop.servhost.org/img/logo.png" alt="Image"
+                                   title="Image"
+                                   style="outline: none;text-decoration: none;-ms-interpolation-mode: bicubic;clear: both;display: inline-block !important;border: none;height: auto;float: none;width: 84%;max-width: 151.2px;"
+                                   width="151.2" class="v-src-width v-src-max-width"/>
+
+                            </td>
+                          </tr>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="400"
+                style="width: 400px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-66p67"
+                 style="max-width: 320px;min-width: 400px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table class="hide-mobile" style="font-family:'Open Sans',sans-serif;" role="presentation"
+                         cellpadding="0" cellspacing="0" width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table height="0px" align="center" border="0" cellpadding="0" cellspacing="0" width="100%"
+                               style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                          <tbody>
+                          <tr style="vertical-align: top">
+                            <td
+                              style="word-break: break-word;border-collapse: collapse !important;vertical-align: top;font-size: 0px;line-height: 0px;mso-line-height-rule: exactly;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                              <span>&#160;</span>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <table id="u_content_text_1" style="font-family:'Open Sans',sans-serif;" role="presentation"
+                         cellpadding="0" cellspacing="0" width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:13px 26px 16px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #ffffff; line-height: 140%; text-align: right; word-wrap: break-word;">
+                          <!--p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">SHOP</span></p-->
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="600"
+                style="width: 600px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-100"
+                 style="max-width: 320px;min-width: 600px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:40px 10px 10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td class="v-text-align" style="padding-right: 0px;padding-left: 0px;" align="center">
+
+                              <!--img align="center" border="0" src="images/image-1.png" alt="Image" title="Image" style="outline: none;text-decoration: none;-ms-interpolation-mode: bicubic;clear: both;display: inline-block !important;border: none;height: auto;float: none;width: 17%;max-width: 98.6px;" width="98.6" class="v-src-width v-src-max-width"/-->
+
+                            </td>
+                          </tr>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #47484b; line-height: 140%; text-align: center; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 30px; line-height: 42px;">New order <a href="{{$url}}/admin/sales/orders/{{$item.Path}}">#{{.Order.ID}}</a> paid!</span></strong></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:2px 40px 25px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #7a7676; line-height: 170%; text-align: left; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 170%; text-align: center;"><span
+                            style="font-size: 16px; line-height: 27.2px;"></span>
+                          </p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:0px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table height="0px" align="center" border="0" cellpadding="0" cellspacing="0" width="90%"
+                               style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;border-top: 1px solid #BBBBBB;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                          <tbody>
+                          <tr style="vertical-align: top">
+                            <td
+                              style="word-break: break-word;border-collapse: collapse !important;vertical-align: top;font-size: 0px;line-height: 0px;mso-line-height-rule: exactly;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                              <span>&#160;</span>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table id="u_content_text_14" style="font-family:'Open Sans',sans-serif;" role="presentation"
+                         cellpadding="0" cellspacing="0" width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: left; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">ITEMS</span></strong></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table id="u_content_text_15" style="font-family:'Open Sans',sans-serif;" role="presentation"
+                         cellpadding="0" cellspacing="0" width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: right; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">#{{.Order.ID}}</span></strong></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="600"
+                style="width: 600px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-100"
+                 style="max-width: 320px;min-width: 600px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:0px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table height="0px" align="center" border="0" cellpadding="0" cellspacing="0" width="90%"
+                               style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;border-top: 1px solid #BBBBBB;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                          <tbody>
+                          <tr style="vertical-align: top">
+                            <td
+                              style="word-break: break-word;border-collapse: collapse !important;vertical-align: top;font-size: 0px;line-height: 0px;mso-line-height-rule: exactly;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                              <span>&#160;</span>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+      {{range $index, $item := .Order.Items}}
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row no-stack"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: left; word-wrap: break-word;">
+                          {{if $item.Thumbnail}}
+                          {{$arr := split $item.Thumbnail ","}}
+                          <p style="font-size: 14px; line-height: 140%;">
+                          <img align="center" border="0" src="{{$url}}{{index $arr 0}}" alt="Image"
+                               title="Image"
+                               style="outline: none;text-decoration: none;-ms-interpolation-mode: bicubic;clear: both;display: inline-block !important;border: none;height: auto;float: none;width: 84%;max-width: 151.2px;"
+                               width="151.2" class="v-src-width v-src-max-width"/>
+                          </p>
+                          {{ end }}
+                          <p style="font-size: 14px; line-height: 140%;">
+                            <a href="{{$url}}{{$item.Path}}?uuid={{toUuid $item.Uuid}}">
+                              <span style="font-size: 14px; line-height: 19.6px;">
+                              {{.Title}}
+                              </span>
+                            </a>
+                            <ul style="padding: 0 20px;">{{range $item.Properties}}<li><span>{{.Title}}:&nbsp;</span><span>{{.Value}}</span></li>{{end}}</ul>
+                          </p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: right; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;">
+                            <span style="font-size: 14px; line-height: 19.6px;">
+                              {{$symbol}}{{printf "%.2f" $item.Price}} x {{$item.Quantity}} = {{$symbol}}{{printf "%.2f" $item.Total}}
+                            </span>
+                          </p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+      {{end}}
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="600"
+                style="width: 600px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-100"
+                 style="max-width: 320px;min-width: 600px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:0px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table height="0px" align="center" border="0" cellpadding="0" cellspacing="0" width="90%"
+                               style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;border-top: 1px solid #BBBBBB;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                          <tbody>
+                          <tr style="vertical-align: top">
+                            <td
+                              style="word-break: break-word;border-collapse: collapse !important;vertical-align: top;font-size: 0px;line-height: 0px;mso-line-height-rule: exactly;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                              <span>&#160;</span>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row no-stack"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: left; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">Shipping</span></strong></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: right; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">{{$symbol}}{{printf "%.2f" .Order.Delivery}}</span></strong></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="600"
+                style="width: 600px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-100"
+                 style="max-width: 320px;min-width: 600px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:0px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table height="0px" align="center" border="0" cellpadding="0" cellspacing="0" width="90%"
+                               style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;border-top: 1px solid #BBBBBB;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                          <tbody>
+                          <tr style="vertical-align: top">
+                            <td
+                              style="word-break: break-word;border-collapse: collapse !important;vertical-align: top;font-size: 0px;line-height: 0px;mso-line-height-rule: exactly;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                              <span>&#160;</span>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row no-stack"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: left; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">Total</span></strong></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: right; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">{{$symbol}}{{printf "%.2f" .Order.Total}}</span></strong></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="600"
+                style="width: 600px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-100"
+                 style="max-width: 320px;min-width: 600px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:0px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table height="0px" align="center" border="0" cellpadding="0" cellspacing="0" width="90%"
+                               style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;border-top: 1px solid #BBBBBB;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                          <tbody>
+                          <tr style="vertical-align: top">
+                            <td
+                              style="word-break: break-word;border-collapse: collapse !important;vertical-align: top;font-size: 0px;line-height: 0px;mso-line-height-rule: exactly;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                              <span>&#160;</span>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="600"
+                style="width: 600px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-100"
+                 style="max-width: 320px;min-width: 600px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:14px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table height="0px" align="center" border="0" cellpadding="0" cellspacing="0" width="90%"
+                               style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;border-top: 1px solid #ffffff;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                          <tbody>
+                          <tr style="vertical-align: top">
+                            <td
+                              style="word-break: break-word;border-collapse: collapse !important;vertical-align: top;font-size: 0px;line-height: 0px;mso-line-height-rule: exactly;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                              <span>&#160;</span>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #5c5757; line-height: 140%; text-align: left; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">Billing:</span></strong></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">{{.Order.Billing.Profile.Name}}&nbsp;{{.Order.Billing.Profile.Lastname}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">{{.Order.Billing.Profile.Address}}&nbsp;{{.Order.Billing.Profile.City}}&nbsp;{{.Order.Billing.Profile.Country}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">ZIP: {{.Order.Billing.Profile.Zip}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">Payment: {{.Order.Billing.Title}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">Method: {{.Order.Billing.Method}}</span></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #5c5757; line-height: 140%; text-align: left; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">Shipping:</span></strong></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">{{.Order.Shipping.Profile.Name}}&nbsp;{{.Order.Shipping.Profile.Lastname}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">{{.Order.Shipping.Profile.Address}}&nbsp;{{.Order.Shipping.Profile.City}}&nbsp;{{.Order.Shipping.Profile.Country}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">ZIP: {{.Order.Shipping.Profile.Zip}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">Transport: {{.Order.Shipping.Title}}</span></p>
+                          {{if .Order.Shipping.Services}}
+                          <p style="font-size: 14px; line-height: 140%;">
+                            <span style="font-size: 14px; line-height: 19.6px;">Services:
+                            {{range .Order.Shipping.Services}}{{.Title}}{{end}}
+                            </span>
+                          </p>
+                          {{end}}
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">Volume: {{.Order.Volume}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">Weight: {{.Order.Weight}}</span></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #fc4d42;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #fc4d42;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="600"
+                style="width: 600px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-100"
+                 style="max-width: 320px;min-width: 600px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:16px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #ecf7ff; line-height: 140%; text-align: center; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;">&copy; Shop. All Rights Reserved</p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <!--[if (mso)|(IE)]></td></tr></table><![endif]-->
+    </td>
+  </tr>
+  </tbody>
 </table>
-</div>
-<div>
-<h2>Items</h2>
-<table>
-<thead><tr style="background-color: lightgray;"><th style="min-width: 50px;">#</th><th>UUID</th><th>Products</th><th>Variation</th><th>Properties</th><th>Volume</th><th>Weight</th><th>Price</th><th>Quantity</th><th>Total</th></tr></thead>
-<tbody>
-{{range $index, $item := .Order.Items}}
-<tr style="background-color: {{if even $index}}#fff{{else}}#f5f5f5{{end}}">
-<td style="text-align: center;">{{add $index 1}}</td>
-<td style="padding: 0 10px;">{{toUuid .Uuid}}</td>
-<td style="padding: 0 10px;"><a href="http://example.com{{$item.Path}}?uuid={{toUuid $item.Uuid}}">{{.Title}}</a></td>
-<td style="padding: 0 10px;">{{$item.Variation.Title}}</td>
-<td><ul style="padding: 0 20px;">{{range $item.Properties}}<li><span>{{.Title}}:&nbsp;</span><span>{{.Value}}</span></li>{{end}}</ul></td>
-<td style="padding: 0 10px;">{{printf "%.3f" $item.Volume}}</td>
-<td style="padding: 0 10px;">{{printf "%.1f" $item.Weight}}</td>
-<td style="padding: 0 10px;">{{printf "%.2f" $item.Price}}</td>
-<td style="text-align: center;">{{$item.Quantity}}</td>
-<td style="padding: 0 10px;">{{printf "%.2f" $item.Total}}</td>
-</tr>
-{{end}}
-</tbody>
-</table>
-</div>
-<div>
-<h2>Delivery</h2>
-<table>
-<tbody>
-<tr><th style="text-align: left">Name</th><td>{{.Order.Profile.Name}}</td></tr>
-<tr><th style="text-align: left">Lastname</th><td>{{.Order.Profile.Lastname}}</td></tr>
-<tr><th style="text-align: left">Address</th><td>{{.Order.Profile.Address}}</td></tr>
-<tr><th style="text-align: left">Zip</th><td>{{.Order.Profile.Zip}}</td></tr>
-<tr><th style="text-align: left">City</th><td>{{.Order.Profile.City}}</td></tr>
-<tr><th style="text-align: left">Region</th><td>{{.Order.Profile.Region}}</td></tr>
-<tr><th style="text-align: left">Country</th><td>{{.Order.Profile.Country}}</td></tr>
-<tr><th style="text-align: left">Transport</th><td>{{.Order.Profile.Transport.Title}}</td></tr>
-</tbody>
-</table>
-</div>`,
+<!--[if mso]></div><![endif]-->
+<!--[if IE]></div><![endif]-->
+</body>
+
+</html>
+`,
 					}); err != nil {
 						logger.Warningf("%v", err)
 					}
@@ -484,60 +1719,1288 @@ var RootCmd = &cobra.Command{
 						Enabled: false,
 						Type:    common.NOTIFICATION_TYPE_USER_ORDER_PAID,
 						Topic:   "You order #{{.Order.ID}}",
-						Message: `<div>
-<h1><a href="http://example.com/orders/">Order #{{.Order.ID}}</a></h1>
-<table>
-<tbody>
-<tr><th style="text-align: left">Created</th><td>{{.Order.CreatedAt.Format "2006-01-02 15:04:05"}}</td></tr>
-<tr><th style="text-align: left">Volume</th><td>{{printf "%.3f" .Order.Volume}}</td>
-<tr><th style="text-align: left">Weight</th><td>{{printf "%.1f" .Order.Weight}}</td>
-<tr><th style="text-align: left">Status</th><td>{{.Order.Status}}</td>
-<tr><th style="text-align: left">Sum</th><td>{{printf "%.2f" .Order.Sum}}</td>
-<tr><th style="text-align: left">Delivery</th><td>{{printf "%.2f" .Order.Delivery}}</td>
-<tr><th style="text-align: left">Total</th><td>{{printf "%.2f" .Order.Total}}</td></tr>
-</tbody>
+						Message: `<!DOCTYPE HTML PUBLIC "-//W3C//DTD XHTML 1.0 Transitional //EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml"
+      xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <!--[if gte mso 9]>
+  <xml>
+    <o:OfficeDocumentSettings>
+      <o:AllowPNG/>
+      <o:PixelsPerInch>96</o:PixelsPerInch>
+    </o:OfficeDocumentSettings>
+  </xml>
+  <![endif]-->
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="x-apple-disable-message-reformatting">
+  <!--[if !mso]><!-->
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"><!--<![endif]-->
+  <title>Order #{{.Order.ID}}</title>
+
+  <style type="text/css">
+    a {
+      color: #6d6d6d;
+      text-decoration: none;
+    }
+
+    @media (max-width: 480px) {
+      #u_content_image_1 .v-src-width {
+        width: auto !important;
+      }
+
+      #u_content_image_1 .v-src-max-width {
+        max-width: 50% !important;
+      }
+
+      #u_content_text_1 .v-text-align {
+        text-align: center !important;
+      }
+
+      #u_content_text_14 .v-text-align {
+        text-align: center !important;
+      }
+
+      #u_content_text_15 .v-text-align {
+        text-align: center !important;
+      }
+    }
+
+    @media only screen and (min-width: 620px) {
+      .u-row {
+        width: 600px !important;
+      }
+
+      .u-row .u-col {
+        vertical-align: top;
+      }
+
+      .u-row .u-col-33p33 {
+        width: 199.98px !important;
+      }
+
+      .u-row .u-col-50 {
+        width: 300px !important;
+      }
+
+      .u-row .u-col-66p67 {
+        width: 400.02px !important;
+      }
+
+      .u-row .u-col-100 {
+        width: 600px !important;
+      }
+
+    }
+
+    @media (max-width: 620px) {
+      .u-row-container {
+        max-width: 100% !important;
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+      }
+
+      .u-row .u-col {
+        min-width: 320px !important;
+        max-width: 100% !important;
+        display: block !important;
+      }
+
+      .u-row {
+        width: calc(100% - 40px) !important;
+      }
+
+      .u-col {
+        width: 100% !important;
+      }
+
+      .u-col > div {
+        margin: 0 auto;
+      }
+
+      .no-stack .u-col {
+        min-width: 0 !important;
+        display: table-cell !important;
+      }
+
+      .no-stack .u-col-50 {
+        width: 50% !important;
+      }
+
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    table,
+    tr,
+    td {
+      vertical-align: top;
+      border-collapse: collapse;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .ie-container table,
+    .mso-container table {
+      table-layout: fixed;
+    }
+
+    * {
+      line-height: inherit;
+    }
+
+    a[x-apple-data-detectors='true'] {
+      color: inherit !important;
+      text-decoration: none !important;
+    }
+
+    @media (max-width: 480px) {
+      .hide-mobile {
+        display: none !important;
+        max-height: 0px;
+        overflow: hidden;
+      }
+
+    }
+  </style>
+
+
+  <!--[if !mso]><!-->
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,700&display=swap" rel="stylesheet" type="text/css">
+  <!--<![endif]-->
+
+</head>
+
+{{$url := .Url}}
+{{$symbol := .Symbol}}
+
+<body class="clean-body" style="margin: 0;padding: 0;-webkit-text-size-adjust: 100%;background-color: #eeeeee">
+<!--[if IE]>
+<div class="ie-container"><![endif]-->
+<!--[if mso]>
+<div class="mso-container"><![endif]-->
+<table
+  style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;min-width: 320px;Margin: 0 auto;background-color: #eeeeee;width:100%"
+  cellpadding="0" cellspacing="0">
+  <tbody>
+  <tr style="vertical-align: top">
+    <td style="word-break: break-word;border-collapse: collapse !important;vertical-align: top">
+      <!--[if (mso)|(IE)]>
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td align="center" style="background-color: #eeeeee;"><![endif]-->
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;">
+          <div
+            style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;border-bottom: 1px solid lightgray;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style=""><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="200"
+                style="width: 200px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-33p33"
+                 style="max-width: 320px;min-width: 200px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table id="u_content_image_1" style="font-family:'Open Sans',sans-serif;" role="presentation"
+                         cellpadding="0" cellspacing="0" width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:31px 10px 25px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td class="v-text-align" style="padding-right: 0px;padding-left: 0px;" align="center">
+
+                              <img align="center" border="0" src="https://shop.servhost.org/img/logo.png" alt="Image"
+                                   title="Image"
+                                   style="outline: none;text-decoration: none;-ms-interpolation-mode: bicubic;clear: both;display: inline-block !important;border: none;height: auto;float: none;width: 84%;max-width: 151.2px;"
+                                   width="151.2" class="v-src-width v-src-max-width"/>
+
+                            </td>
+                          </tr>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="400"
+                style="width: 400px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-66p67"
+                 style="max-width: 320px;min-width: 400px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table class="hide-mobile" style="font-family:'Open Sans',sans-serif;" role="presentation"
+                         cellpadding="0" cellspacing="0" width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table height="0px" align="center" border="0" cellpadding="0" cellspacing="0" width="100%"
+                               style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                          <tbody>
+                          <tr style="vertical-align: top">
+                            <td
+                              style="word-break: break-word;border-collapse: collapse !important;vertical-align: top;font-size: 0px;line-height: 0px;mso-line-height-rule: exactly;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                              <span>&#160;</span>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <table id="u_content_text_1" style="font-family:'Open Sans',sans-serif;" role="presentation"
+                         cellpadding="0" cellspacing="0" width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:13px 26px 16px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #ffffff; line-height: 140%; text-align: right; word-wrap: break-word;">
+                          <!--p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">SHOP</span></p-->
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="600"
+                style="width: 600px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-100"
+                 style="max-width: 320px;min-width: 600px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:40px 10px 10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td class="v-text-align" style="padding-right: 0px;padding-left: 0px;" align="center">
+
+                              <!--img align="center" border="0" src="images/image-1.png" alt="Image" title="Image" style="outline: none;text-decoration: none;-ms-interpolation-mode: bicubic;clear: both;display: inline-block !important;border: none;height: auto;float: none;width: 17%;max-width: 98.6px;" width="98.6" class="v-src-width v-src-max-width"/-->
+
+                            </td>
+                          </tr>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #47484b; line-height: 140%; text-align: center; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 30px; line-height: 42px;">Thanks for your order!</span></strong></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:2px 40px 25px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #7a7676; line-height: 170%; text-align: left; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 170%; text-align: center;"><span
+                            style="font-size: 16px; line-height: 27.2px;"></span>
+                          </p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:0px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table height="0px" align="center" border="0" cellpadding="0" cellspacing="0" width="90%"
+                               style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;border-top: 1px solid #BBBBBB;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                          <tbody>
+                          <tr style="vertical-align: top">
+                            <td
+                              style="word-break: break-word;border-collapse: collapse !important;vertical-align: top;font-size: 0px;line-height: 0px;mso-line-height-rule: exactly;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                              <span>&#160;</span>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table id="u_content_text_14" style="font-family:'Open Sans',sans-serif;" role="presentation"
+                         cellpadding="0" cellspacing="0" width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: left; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">ITEMS</span></strong></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table id="u_content_text_15" style="font-family:'Open Sans',sans-serif;" role="presentation"
+                         cellpadding="0" cellspacing="0" width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: right; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">#{{.Order.ID}}</span></strong></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="600"
+                style="width: 600px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-100"
+                 style="max-width: 320px;min-width: 600px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:0px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table height="0px" align="center" border="0" cellpadding="0" cellspacing="0" width="90%"
+                               style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;border-top: 1px solid #BBBBBB;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                          <tbody>
+                          <tr style="vertical-align: top">
+                            <td
+                              style="word-break: break-word;border-collapse: collapse !important;vertical-align: top;font-size: 0px;line-height: 0px;mso-line-height-rule: exactly;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                              <span>&#160;</span>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+      {{range $index, $item := .Order.Items}}
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row no-stack"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: left; word-wrap: break-word;">
+                          {{if $item.Thumbnail}}
+                          {{$arr := split $item.Thumbnail ","}}
+                          <p style="font-size: 14px; line-height: 140%;">
+                          <img align="center" border="0" src="{{$url}}{{index $arr 0}}" alt="Image"
+                               title="Image"
+                               style="outline: none;text-decoration: none;-ms-interpolation-mode: bicubic;clear: both;display: inline-block !important;border: none;height: auto;float: none;width: 84%;max-width: 151.2px;"
+                               width="151.2" class="v-src-width v-src-max-width"/>
+                          </p>
+                          {{ end }}
+                          <p style="font-size: 14px; line-height: 140%;">
+                            <a href="{{$url}}{{$item.Path}}?uuid={{toUuid $item.Uuid}}">
+                              <span style="font-size: 14px; line-height: 19.6px;">
+                              {{.Title}}
+                              </span>
+                            </a>
+                            <ul style="padding: 0 20px;">{{range $item.Properties}}<li><span>{{.Title}}:&nbsp;</span><span>{{.Value}}</span></li>{{end}}</ul>
+                          </p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: right; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;">
+                            <span style="font-size: 14px; line-height: 19.6px;">
+                              {{$symbol}}{{printf "%.2f" $item.Price}} x {{$item.Quantity}} = {{$symbol}}{{printf "%.2f" $item.Total}}
+                            </span>
+                          </p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+      {{end}}
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="600"
+                style="width: 600px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-100"
+                 style="max-width: 320px;min-width: 600px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:0px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table height="0px" align="center" border="0" cellpadding="0" cellspacing="0" width="90%"
+                               style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;border-top: 1px solid #BBBBBB;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                          <tbody>
+                          <tr style="vertical-align: top">
+                            <td
+                              style="word-break: break-word;border-collapse: collapse !important;vertical-align: top;font-size: 0px;line-height: 0px;mso-line-height-rule: exactly;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                              <span>&#160;</span>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row no-stack"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: left; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">Shipping</span></strong></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: right; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">{{$symbol}}{{printf "%.2f" .Order.Delivery}}</span></strong></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="600"
+                style="width: 600px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-100"
+                 style="max-width: 320px;min-width: 600px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:0px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table height="0px" align="center" border="0" cellpadding="0" cellspacing="0" width="90%"
+                               style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;border-top: 1px solid #BBBBBB;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                          <tbody>
+                          <tr style="vertical-align: top">
+                            <td
+                              style="word-break: break-word;border-collapse: collapse !important;vertical-align: top;font-size: 0px;line-height: 0px;mso-line-height-rule: exactly;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                              <span>&#160;</span>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row no-stack"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: left; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">Total</span></strong></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #615e5e; line-height: 140%; text-align: right; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">{{$symbol}}{{printf "%.2f" .Order.Total}}</span></strong></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="600"
+                style="width: 600px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-100"
+                 style="max-width: 320px;min-width: 600px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:0px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table height="0px" align="center" border="0" cellpadding="0" cellspacing="0" width="90%"
+                               style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;border-top: 1px solid #BBBBBB;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                          <tbody>
+                          <tr style="vertical-align: top">
+                            <td
+                              style="word-break: break-word;border-collapse: collapse !important;vertical-align: top;font-size: 0px;line-height: 0px;mso-line-height-rule: exactly;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                              <span>&#160;</span>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="600"
+                style="width: 600px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-100"
+                 style="max-width: 320px;min-width: 600px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:14px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <table height="0px" align="center" border="0" cellpadding="0" cellspacing="0" width="90%"
+                               style="border-collapse: collapse;table-layout: fixed;border-spacing: 0;mso-table-lspace: 0pt;mso-table-rspace: 0pt;vertical-align: top;border-top: 1px solid #ffffff;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                          <tbody>
+                          <tr style="vertical-align: top">
+                            <td
+                              style="word-break: break-word;border-collapse: collapse !important;vertical-align: top;font-size: 0px;line-height: 0px;mso-line-height-rule: exactly;-ms-text-size-adjust: 100%;-webkit-text-size-adjust: 100%">
+                              <span>&#160;</span>
+                            </td>
+                          </tr>
+                          </tbody>
+                        </table>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #ffffff;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #ffffff;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #5c5757; line-height: 140%; text-align: left; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">Billing:</span></strong></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">{{.Order.Billing.Profile.Name}}&nbsp;{{.Order.Billing.Profile.Lastname}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">{{.Order.Billing.Profile.Address}}&nbsp;{{.Order.Billing.Profile.City}}&nbsp;{{.Order.Billing.Profile.Country}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">ZIP: {{.Order.Billing.Profile.Zip}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">Payment: {{.Order.Billing.Title}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">Method: {{.Order.Billing.Method}}</span></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="300"
+                style="width: 300px;padding: 0px 30px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-50"
+                 style="max-width: 320px;min-width: 300px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px 30px 30px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:10px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #5c5757; line-height: 140%; text-align: left; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;"><strong><span
+                            style="font-size: 14px; line-height: 19.6px;">Shipping:</span></strong></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">{{.Order.Shipping.Profile.Name}}&nbsp;{{.Order.Shipping.Profile.Lastname}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">{{.Order.Shipping.Profile.Address}}&nbsp;{{.Order.Shipping.Profile.City}}&nbsp;{{.Order.Shipping.Profile.Country}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">ZIP: {{.Order.Shipping.Profile.Zip}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">Transport: {{.Order.Shipping.Title}}</span></p>
+                          {{if .Order.Shipping.Services}}
+                          <p style="font-size: 14px; line-height: 140%;">
+                            <span style="font-size: 14px; line-height: 19.6px;">Services:
+                            {{range .Order.Shipping.Services}}{{.Title}}{{end}}
+                            </span>
+                          </p>
+                          {{end}}
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">Volume: {{.Order.Volume}}</span></p>
+                          <p style="font-size: 14px; line-height: 140%;"><span style="font-size: 14px; line-height: 19.6px;">Weight: {{.Order.Weight}}</span></p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <div class="u-row-container" style="padding: 0px;background-color: transparent">
+        <div class="u-row"
+             style="Margin: 0 auto;min-width: 320px;max-width: 600px;overflow-wrap: break-word;word-wrap: break-word;word-break: break-word;background-color: #fc4d42;">
+          <div style="border-collapse: collapse;display: table;width: 100%;background-color: transparent;">
+            <!--[if (mso)|(IE)]>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding: 0px;background-color: transparent;" align="center">
+                  <table cellpadding="0" cellspacing="0" border="0" style="width:600px;">
+                    <tr style="background-color: #fc4d42;"><![endif]-->
+
+            <!--[if (mso)|(IE)]>
+            <td align="center" width="600"
+                style="width: 600px;padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;"
+                valign="top"><![endif]-->
+            <div class="u-col u-col-100"
+                 style="max-width: 320px;min-width: 600px;display: table-cell;vertical-align: top;">
+              <div style="width: 100% !important;">
+                <!--[if (!mso)&(!IE)]><!-->
+                <div
+                  style="padding: 0px;border-top: 0px solid transparent;border-left: 0px solid transparent;border-right: 0px solid transparent;border-bottom: 0px solid transparent;">
+                  <!--<![endif]-->
+
+
+                  <table style="font-family:'Open Sans',sans-serif;" role="presentation" cellpadding="0" cellspacing="0"
+                         width="100%" border="0">
+                    <tbody>
+                    <tr>
+                      <td
+                        style="overflow-wrap:break-word;word-break:break-word;padding:16px;font-family:'Open Sans',sans-serif;"
+                        align="left">
+
+                        <div class="v-text-align"
+                             style="color: #ecf7ff; line-height: 140%; text-align: center; word-wrap: break-word;">
+                          <p style="font-size: 14px; line-height: 140%;">&copy; Shop. All Rights Reserved</p>
+                        </div>
+
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+
+
+                  <!--[if (!mso)&(!IE)]><!--></div><!--<![endif]-->
+              </div>
+            </div>
+            <!--[if (mso)|(IE)]></td><![endif]-->
+            <!--[if (mso)|(IE)]></tr></table></td></tr></table><![endif]-->
+          </div>
+        </div>
+      </div>
+
+
+      <!--[if (mso)|(IE)]></td></tr></table><![endif]-->
+    </td>
+  </tr>
+  </tbody>
 </table>
-</div>
-<div>
-<h2>Items</h2>
-<table>
-<thead><tr style="background-color: lightgray;"><th style="min-width: 50px;">#</th><th>UUID</th><th>Products</th><th>Variation</th><th>Properties</th><th>Volume</th><th>Weight</th><th>Price</th><th>Quantity</th><th>Total</th></tr></thead>
-<tbody>
-{{range $index, $item := .Order.Items}}
-<tr style="background-color: {{if even $index}}#fff{{else}}#f5f5f5{{end}}">
-<td style="text-align: center;">{{add $index 1}}</td>
-<td style="padding: 0 10px;">{{toUuid .Uuid}}</td>
-<td style="padding: 0 10px;"><a href="http://example.com{{$item.Path}}?uuid={{toUuid $item.Uuid}}">{{.Title}}</a></td>
-<td style="padding: 0 10px;">{{$item.Variation.Title}}</td>
-<td><ul style="padding: 0 20px;">{{range $item.Properties}}<li><span>{{.Title}}:&nbsp;</span><span>{{.Value}}</span></li>{{end}}</ul></td>
-<td style="padding: 0 10px;">{{printf "%.3f" $item.Volume}}</td>
-<td style="padding: 0 10px;">{{printf "%.1f" $item.Weight}}</td>
-<td style="padding: 0 10px;">{{printf "%.2f" $item.Price}}</td>
-<td style="text-align: center;">{{$item.Quantity}}</td>
-<td style="padding: 0 10px;">{{printf "%.2f" $item.Total}}</td>
-</tr>
-{{end}}
-</tbody>
-</table>
-</div>
-<div>
-<h2>Delivery</h2>
-<table>
-<tbody>
-<tr><th style="text-align: left">Name</th><td>{{.Order.Profile.Name}}</td></tr>
-<tr><th style="text-align: left">Lastname</th><td>{{.Order.Profile.Lastname}}</td></tr>
-<tr><th style="text-align: left">Address</th><td>{{.Order.Profile.Address}}</td></tr>
-<tr><th style="text-align: left">Zip</th><td>{{.Order.Profile.Zip}}</td></tr>
-<tr><th style="text-align: left">City</th><td>{{.Order.Profile.City}}</td></tr>
-<tr><th style="text-align: left">Region</th><td>{{.Order.Profile.Region}}</td></tr>
-<tr><th style="text-align: left">Country</th><td>{{.Order.Profile.Country}}</td></tr>
-<tr><th style="text-align: left">Transport</th><td>{{.Order.Profile.Transport.Title}}</td></tr>
-</tbody>
-</table>
-</div>
-<div>
-<h1>Thank you for your purchase!</h1>
-</div>`,
+<!--[if mso]></div><![endif]-->
+<!--[if IE]></div><![endif]-->
+</body>
+
+</html>`,
 					}); err != nil {
 						logger.Warningf("%v", err)
 					}

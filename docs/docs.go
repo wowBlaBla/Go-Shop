@@ -165,6 +165,50 @@ var doc = `{
                 }
             }
         },
+        "/api/v1/account/billing_profiles": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "get account billing profiles",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account",
+                    "frontend"
+                ],
+                "summary": "Get account billing profiles",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handler.ProfileView"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/account/orders": {
             "get": {
                 "consumes": [
@@ -272,52 +316,6 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handler.StripeCheckoutSessionView"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/account/orders/checkout/{id}/stripe/card": {
-            "post": {
-                "description": "See https://stripe.com/docs/api/cards/create",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "account"
-                ],
-                "summary": "Post order",
-                "parameters": [
-                    {
-                        "description": "body",
-                        "name": "cart",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.NewStripeCard"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.StripeCardView"
                         }
                     },
                     "404": {
@@ -557,7 +555,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.StripeCardsView"
+                            "$ref": "#/definitions/handler.HTTPMessage"
                         }
                     },
                     "404": {
@@ -619,221 +617,7 @@ var doc = `{
                 }
             }
         },
-        "/api/v1/account/orders/{id}/stripe/card": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "account"
-                ],
-                "summary": "Get stripe cards",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Order ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.StripeCardsView"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/account/orders/{id}/stripe/customer": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "account"
-                ],
-                "summary": "Get stripe customer",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Order ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.StripeCustomerView"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/account/orders/{id}/stripe/submit": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "account"
-                ],
-                "summary": "Post stripe payment",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Order ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.StripeCardsView"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/account/orders/{id}/stripe/success": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "text/html"
-                ],
-                "tags": [
-                    "account"
-                ],
-                "summary": "Get stripe payment success",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Order ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.StripeCardsView"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/account/profiles": {
-            "get": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "get account profiles",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "account",
-                    "frontend"
-                ],
-                "summary": "Get account profiles",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/handler.ProfileView"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
-            },
             "post": {
                 "security": [
                     {
@@ -850,7 +634,7 @@ var doc = `{
                     "profile",
                     "frontend"
                 ],
-                "summary": "Create profile in existing account",
+                "summary": "Create shipping profile in existing account",
                 "parameters": [
                     {
                         "description": "body",
@@ -867,6 +651,50 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handler.ProfileView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/account/shipping_profiles": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "get account shipping profiles",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account",
+                    "frontend"
+                ],
+                "summary": "Get account shipping profiles",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handler.ProfileView"
+                            }
                         }
                     },
                     "404": {
@@ -4292,51 +4120,6 @@ var doc = `{
                 }
             }
         },
-        "/api/v1/profiles": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "profile"
-                ],
-                "summary": "(DEPRECATED) Create profile without having account",
-                "parameters": [
-                    {
-                        "description": "body",
-                        "name": "profile",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.NewProfile"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.ProfileView"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/properties/list": {
             "post": {
                 "security": [
@@ -5887,7 +5670,7 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Transport ID",
+                        "description": "Shipping ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -5942,7 +5725,7 @@ var doc = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Transport ID",
+                        "description": "Shipping ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -5988,7 +5771,7 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Transport ID",
+                        "description": "Shipping ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -7945,20 +7728,17 @@ var doc = `{
         "handler.Account2View": {
             "type": "object",
             "properties": {
-                "address": {
-                    "type": "string"
-                },
                 "admin": {
                     "type": "boolean"
                 },
-                "city": {
-                    "type": "string"
+                "billingProfileId": {
+                    "type": "integer"
                 },
-                "company": {
-                    "type": "string"
-                },
-                "country": {
-                    "type": "string"
+                "billingProfiles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.ProfileView"
+                    }
                 },
                 "email": {
                     "type": "string"
@@ -7975,43 +7755,25 @@ var doc = `{
                 "id": {
                     "type": "integer"
                 },
-                "itn": {
-                    "type": "string"
-                },
-                "lastname": {
-                    "type": "string"
-                },
                 "login": {
-                    "type": "string"
-                },
-                "name": {
                     "type": "string"
                 },
                 "notification": {
                     "type": "boolean"
                 },
-                "phone": {
-                    "type": "string"
-                },
-                "profileId": {
+                "role": {
                     "type": "integer"
                 },
-                "profiles": {
+                "shippingProfileId": {
+                    "type": "integer"
+                },
+                "shippingProfiles": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handler.ProfileView"
                     }
                 },
-                "region": {
-                    "type": "string"
-                },
-                "role": {
-                    "type": "integer"
-                },
                 "token": {
-                    "type": "string"
-                },
-                "zip": {
                     "type": "string"
                 }
             }
@@ -8019,20 +7781,17 @@ var doc = `{
         "handler.AccountView": {
             "type": "object",
             "properties": {
-                "address": {
-                    "type": "string"
-                },
                 "admin": {
                     "type": "boolean"
                 },
-                "city": {
-                    "type": "string"
+                "billingProfileId": {
+                    "type": "integer"
                 },
-                "company": {
-                    "type": "string"
-                },
-                "country": {
-                    "type": "string"
+                "billingProfiles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.ProfileView"
+                    }
                 },
                 "email": {
                     "type": "string"
@@ -8046,41 +7805,23 @@ var doc = `{
                 "id": {
                     "type": "integer"
                 },
-                "itn": {
-                    "type": "string"
-                },
-                "lastname": {
-                    "type": "string"
-                },
                 "login": {
-                    "type": "string"
-                },
-                "name": {
                     "type": "string"
                 },
                 "notification": {
                     "type": "boolean"
                 },
-                "phone": {
-                    "type": "string"
-                },
-                "profileId": {
+                "role": {
                     "type": "integer"
                 },
-                "profiles": {
+                "shippingProfileId": {
+                    "type": "integer"
+                },
+                "shippingProfiles": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handler.ProfileView"
                     }
-                },
-                "region": {
-                    "type": "string"
-                },
-                "role": {
-                    "type": "integer"
-                },
-                "zip": {
-                    "type": "string"
                 }
             }
         },
@@ -8130,11 +7871,73 @@ var doc = `{
                 },
                 "symbol": {
                     "type": "string"
+                },
+                "url": {
+                    "type": "string"
                 }
             }
         },
         "handler.BasicWranglerView": {
             "$ref": "#/definitions/config.WranglerConfig"
+        },
+        "handler.BillingOrderView": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "profile": {
+                    "type": "object",
+                    "$ref": "#/definitions/handler.BillingProfileOrderView"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.BillingProfileOrderView": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "company": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "lastname": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "zip": {
+                    "type": "string"
+                }
+            }
         },
         "handler.CategoriesAutocompleteItem": {
             "type": "object",
@@ -8273,6 +8076,9 @@ var doc = `{
         "handler.CheckoutRequest": {
             "type": "object",
             "properties": {
+                "billingProfileId": {
+                    "type": "integer"
+                },
                 "comment": {
                     "type": "string"
                 },
@@ -8288,10 +8094,13 @@ var doc = `{
                         "$ref": "#/definitions/handler.NewItem"
                     }
                 },
+                "paymentId": {
+                    "type": "integer"
+                },
                 "paymentMethod": {
                     "type": "string"
                 },
-                "profileId": {
+                "shippingProfileId": {
                     "type": "integer"
                 },
                 "transportId": {
@@ -8394,6 +8203,30 @@ var doc = `{
                 },
                 "type": {
                     "type": "string"
+                }
+            }
+        },
+        "handler.CouponOrderView": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "order, item, shipment",
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
                 }
             }
         },
@@ -9103,6 +8936,12 @@ var doc = `{
         "handler.ItemShortView": {
             "type": "object",
             "properties": {
+                "coupons": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.CouponOrderView"
+                    }
+                },
                 "discount": {
                     "type": "number"
                 },
@@ -9331,17 +9170,9 @@ var doc = `{
         "handler.NewAccount": {
             "type": "object",
             "properties": {
-                "address": {
-                    "type": "string"
-                },
-                "city": {
-                    "type": "string"
-                },
-                "company": {
-                    "type": "string"
-                },
-                "country": {
-                    "type": "string"
+                "billingProfile": {
+                    "type": "object",
+                    "$ref": "#/definitions/handler.NewProfile"
                 },
                 "csrf": {
                     "type": "string"
@@ -9349,30 +9180,9 @@ var doc = `{
                 "email": {
                     "type": "string"
                 },
-                "itn": {
-                    "type": "string"
-                },
-                "lastname": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "otherShipping": {
-                    "type": "boolean"
-                },
-                "phone": {
-                    "type": "string"
-                },
-                "profile": {
+                "shippingProfile": {
                     "type": "object",
                     "$ref": "#/definitions/handler.NewProfile"
-                },
-                "region": {
-                    "type": "string"
-                },
-                "zip": {
-                    "type": "string"
                 }
             }
         },
@@ -9618,17 +9428,6 @@ var doc = `{
                     "type": "string"
                 },
                 "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "handler.NewStripeCard": {
-            "type": "object",
-            "properties": {
-                "customerId": {
-                    "type": "string"
-                },
-                "token": {
                     "type": "string"
                 }
             }
@@ -9996,6 +9795,10 @@ var doc = `{
         "handler.OrderShortView": {
             "type": "object",
             "properties": {
+                "billing": {
+                    "type": "object",
+                    "$ref": "#/definitions/handler.BillingOrderView"
+                },
                 "comment": {
                     "type": "string"
                 },
@@ -10024,18 +9827,24 @@ var doc = `{
                     "type": "object",
                     "$ref": "#/definitions/handler.PaymentMethodsView"
                 },
+                "payments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.PaymentView"
+                    }
+                },
                 "quantity": {
                     "type": "integer"
+                },
+                "shipping": {
+                    "type": "object",
+                    "$ref": "#/definitions/handler.ShippingOrderView"
                 },
                 "sum": {
                     "type": "number"
                 },
                 "total": {
                     "type": "number"
-                },
-                "transport": {
-                    "type": "object",
-                    "$ref": "#/definitions/handler.TransportShortView"
                 },
                 "vat": {
                     "type": "number"
@@ -10239,6 +10048,29 @@ var doc = `{
                             "type": "boolean"
                         }
                     }
+                }
+            }
+        },
+        "handler.PaymentView": {
+            "type": "object",
+            "properties": {
+                "details": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "methods": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
                 }
             }
         },
@@ -10691,6 +10523,9 @@ var doc = `{
                 "country": {
                     "type": "string"
                 },
+                "email": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -10768,11 +10603,91 @@ var doc = `{
                 }
             }
         },
-        "handler.StripeCardView": {
-            "type": "object"
+        "handler.ShippingOrderView": {
+            "type": "object",
+            "properties": {
+                "coupons": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.CouponOrderView"
+                    }
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "profile": {
+                    "type": "object",
+                    "$ref": "#/definitions/handler.ShippingProfileOrderView"
+                },
+                "services": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.TransportServiceView"
+                    }
+                },
+                "thumbnail": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "number"
+                },
+                "value": {
+                    "type": "number"
+                },
+                "volume": {
+                    "type": "number"
+                },
+                "weight": {
+                    "type": "number"
+                }
+            }
         },
-        "handler.StripeCardsView": {
-            "type": "object"
+        "handler.ShippingProfileOrderView": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "company": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "lastname": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "zip": {
+                    "type": "string"
+                }
+            }
         },
         "handler.StripeCheckoutSessionView": {
             "type": "object",
@@ -10781,9 +10696,6 @@ var doc = `{
                     "type": "string"
                 }
             }
-        },
-        "handler.StripeCustomerView": {
-            "type": "object"
         },
         "handler.TagView": {
             "type": "object",
@@ -11087,29 +10999,6 @@ var doc = `{
                 }
             }
         },
-        "handler.TransportShortView": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "services": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handler.TransportServiceView"
-                    }
-                },
-                "thumbnail": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
         "handler.TransportView": {
             "type": "object",
             "properties": {
@@ -11229,18 +11118,6 @@ var doc = `{
         "handler.UserView": {
             "type": "object",
             "properties": {
-                "address": {
-                    "type": "string"
-                },
-                "city": {
-                    "type": "string"
-                },
-                "company": {
-                    "type": "string"
-                },
-                "country": {
-                    "type": "string"
-                },
                 "email": {
                     "type": "string"
                 },
@@ -11253,32 +11130,14 @@ var doc = `{
                 "id": {
                     "type": "integer"
                 },
-                "itn": {
-                    "type": "string"
-                },
-                "lastname": {
-                    "type": "string"
-                },
                 "login": {
-                    "type": "string"
-                },
-                "name": {
                     "type": "string"
                 },
                 "notification": {
                     "type": "boolean"
                 },
-                "phone": {
-                    "type": "string"
-                },
-                "region": {
-                    "type": "string"
-                },
                 "role": {
                     "type": "integer"
-                },
-                "zip": {
-                    "type": "string"
                 }
             }
         },

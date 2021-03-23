@@ -31,14 +31,40 @@ type Order struct {
 	Volume float64 `sql:"type:decimal(8,3);"`
 	Weight float64 `sql:"type:decimal(8,3);"`
 	//
-	Discounts []*Discount `gorm:"foreignKey:OrderId"`
-	User *User `gorm:"foreignKey:UserId"`
-	UserId uint
-	Profile *Profile `gorm:"foreignKey:ProfileId"`
-	ProfileId uint
-	Transport *Transport `gorm:"foreignKey:TransportId"`
-	TransportId uint
-	PaymentMethod string
+	Discounts       []*Discount `gorm:"foreignKey:OrderId"`
+	User            *User `gorm:"foreignKey:UserId"`
+	UserId          uint
+	BillingProfile *ShippingProfile `gorm:"foreignKey:BillingProfileId"`
+	BillingProfileId       uint
+	BillingProfileEmail string
+	BillingProfileName     string
+	BillingProfileLastname string
+	BillingProfileCompany  string
+	BillingProfilePhone    string
+	BillingProfileAddress  string
+	BillingProfileZip      string
+	BillingProfileCity     string
+	BillingProfileRegion   string
+	BillingProfileCountry  string
+	BillingProfilePayment  string
+	BillingProfileMethod  string
+	ShillingProfile *ShippingProfile `gorm:"foreignKey:ShippingProfileId"`
+	ShippingProfileId       uint
+	ShippingProfileEmail string
+	ShippingProfileName     string
+	ShippingProfileLastname string
+	ShippingProfileCompany  string
+	ShippingProfilePhone    string
+	ShippingProfileAddress  string
+	ShippingProfileZip      string
+	ShippingProfileCity     string
+	ShippingProfileRegion   string
+	ShippingProfileCountry  string
+	ShippingProfileTransport string
+	ShippingProfileServices string
+	Transport       *Transport `gorm:"foreignKey:ID"`
+	TransportId     uint
+	PaymentMethod   string
 }
 
 func CreateOrder(connector *gorm.DB, order *Order) (uint, error) {
@@ -73,7 +99,7 @@ func GetOrder(connector *gorm.DB, id int) (*Order, error) {
 func GetOrderFull(connector *gorm.DB, id int) (*Order, error) {
 	db := connector
 	var order Order
-	db.Debug().Preload("Items").Preload("Profile").Preload("Transport").Preload("User").Find(&order, id)
+	db.Debug().Preload("Items").Preload("BillingProfile").Preload("ShillingProfile").Preload("Transport").Preload("User").Find(&order, id)
 	if err := db.Error; err != nil {
 		return nil, err
 	}

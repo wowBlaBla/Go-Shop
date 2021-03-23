@@ -28,7 +28,7 @@ type User struct {
 	ResetCode      string
 	ResetAttempt   time.Time
 	//
-	Name          string
+	/*Name          string
 	Lastname      string
 	Company       string
 	Phone         string
@@ -38,9 +38,10 @@ type User struct {
 	Region        string
 	Country       string
 	ITN           string
-	OtherShipping bool
+	OtherShipping bool*/
 	//
-	Profiles       []*Profile `gorm:"foreignKey:UserId"`
+	BillingProfiles       []*BillingProfile `gorm:"foreignKey:UserId"`
+	ShippingProfiles       []*ShippingProfile `gorm:"foreignKey:UserId"`
 	//
 	UpdatedAt time.Time
 }
@@ -73,7 +74,7 @@ func GetUser(connector *gorm.DB, id int) (*User, error){
 func GetUserFull(connector *gorm.DB, id uint) (*User, error) {
 	db := connector
 	var user User
-	if err := db.Preload("Profiles").First(&user, id).Error; err != nil {
+	if err := db.Preload("BillingProfiles").Preload("ShippingProfiles").First(&user, id).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil

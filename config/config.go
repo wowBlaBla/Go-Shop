@@ -47,6 +47,7 @@ func NewConfig(file string) *Config {
 type Config struct {
 	path string
 	//
+	Url string
 	Base  string
 	Host  string
 	Port  int
@@ -123,6 +124,10 @@ type PaymentConfig struct {
 		Enabled bool
 	}
 	VAT float64
+}
+
+type PaymentMethod struct {
+
 }
 
 type ResizeConfig struct {

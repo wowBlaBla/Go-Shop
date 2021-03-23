@@ -60,11 +60,11 @@ func GetZoneByCountryAndZIP(connector *gorm.DB, country, zip string) (*Zone, err
 	db := connector
 	var zone Zone
 	if zip == "" {
-		if err := db.Debug().Where("country = ? and (zip = '' or zip is null)", country).First(&zone).Error; err != nil {
+		if err := db.Where("country = ? and (zip = '' or zip is null)", country).First(&zone).Error; err != nil {
 			return nil, err
 		}
 	}else{
-		if err := db.Debug().Where("country = ? and zip = ?", country, zip).First(&zone).Error; err != nil {
+		if err := db.Where("country = ? and zip = ?", country, zip).First(&zone).Error; err != nil {
 			return nil, err
 		}
 	}

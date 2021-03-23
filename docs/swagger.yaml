@@ -97,16 +97,14 @@ definitions:
     type: object
   handler.Account2View:
     properties:
-      address:
-        type: string
       admin:
         type: boolean
-      city:
-        type: string
-      company:
-        type: string
-      country:
-        type: string
+      billingProfileId:
+        type: integer
+      billingProfiles:
+        items:
+          $ref: '#/definitions/handler.ProfileView'
+        type: array
       email:
         type: string
       emailConfirmed:
@@ -117,45 +115,31 @@ definitions:
         type: string
       id:
         type: integer
-      itn:
-        type: string
-      lastname:
-        type: string
       login:
-        type: string
-      name:
         type: string
       notification:
         type: boolean
-      phone:
-        type: string
-      profileId:
+      role:
         type: integer
-      profiles:
+      shippingProfileId:
+        type: integer
+      shippingProfiles:
         items:
           $ref: '#/definitions/handler.ProfileView'
         type: array
-      region:
-        type: string
-      role:
-        type: integer
       token:
-        type: string
-      zip:
         type: string
     type: object
   handler.AccountView:
     properties:
-      address:
-        type: string
       admin:
         type: boolean
-      city:
-        type: string
-      company:
-        type: string
-      country:
-        type: string
+      billingProfileId:
+        type: integer
+      billingProfiles:
+        items:
+          $ref: '#/definitions/handler.ProfileView'
+        type: array
       email:
         type: string
       emailConfirmed:
@@ -164,30 +148,18 @@ definitions:
         type: boolean
       id:
         type: integer
-      itn:
-        type: string
-      lastname:
-        type: string
       login:
-        type: string
-      name:
         type: string
       notification:
         type: boolean
-      phone:
-        type: string
-      profileId:
+      role:
         type: integer
-      profiles:
+      shippingProfileId:
+        type: integer
+      shippingProfiles:
         items:
           $ref: '#/definitions/handler.ProfileView'
         type: array
-      region:
-        type: string
-      role:
-        type: integer
-      zip:
-        type: string
     type: object
   handler.AutocompleteRequest:
     properties:
@@ -221,9 +193,50 @@ definitions:
         type: object
       symbol:
         type: string
+      url:
+        type: string
     type: object
   handler.BasicWranglerView:
     $ref: '#/definitions/config.WranglerConfig'
+  handler.BillingOrderView:
+    properties:
+      id:
+        type: integer
+      method:
+        type: string
+      name:
+        type: string
+      profile:
+        $ref: '#/definitions/handler.BillingProfileOrderView'
+        type: object
+      title:
+        type: string
+    type: object
+  handler.BillingProfileOrderView:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      company:
+        type: string
+      country:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      lastname:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      region:
+        type: string
+      zip:
+        type: string
+    type: object
   handler.CategoriesAutocompleteItem:
     properties:
       id:
@@ -314,6 +327,8 @@ definitions:
     type: object
   handler.CheckoutRequest:
     properties:
+      billingProfileId:
+        type: integer
       comment:
         type: string
       coupons:
@@ -324,9 +339,11 @@ definitions:
         items:
           $ref: '#/definitions/handler.NewItem'
         type: array
+      paymentId:
+        type: integer
       paymentMethod:
         type: string
-      profileId:
+      shippingProfileId:
         type: integer
       transportId:
         type: integer
@@ -395,6 +412,22 @@ definitions:
         type: string
       type:
         type: string
+    type: object
+  handler.CouponOrderView:
+    properties:
+      amount:
+        type: string
+      code:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+      type:
+        description: order, item, shipment
+        type: string
+      value:
+        type: number
     type: object
   handler.CouponShortView:
     properties:
@@ -857,6 +890,10 @@ definitions:
     type: object
   handler.ItemShortView:
     properties:
+      coupons:
+        items:
+          $ref: '#/definitions/handler.CouponOrderView'
+        type: array
       discount:
         type: number
       path:
@@ -1009,35 +1046,16 @@ definitions:
     type: object
   handler.NewAccount:
     properties:
-      address:
-        type: string
-      city:
-        type: string
-      company:
-        type: string
-      country:
-        type: string
+      billingProfile:
+        $ref: '#/definitions/handler.NewProfile'
+        type: object
       csrf:
         type: string
       email:
         type: string
-      itn:
-        type: string
-      lastname:
-        type: string
-      name:
-        type: string
-      otherShipping:
-        type: boolean
-      phone:
-        type: string
-      profile:
+      shippingProfile:
         $ref: '#/definitions/handler.NewProfile'
         type: object
-      region:
-        type: string
-      zip:
-        type: string
     type: object
   handler.NewCategory:
     properties:
@@ -1197,13 +1215,6 @@ definitions:
       title:
         type: string
       type:
-        type: string
-    type: object
-  handler.NewStripeCard:
-    properties:
-      customerId:
-        type: string
-      token:
         type: string
     type: object
   handler.NewStripePayment:
@@ -1443,6 +1454,9 @@ definitions:
     type: object
   handler.OrderShortView:
     properties:
+      billing:
+        $ref: '#/definitions/handler.BillingOrderView'
+        type: object
       comment:
         type: string
       deliveries:
@@ -1462,15 +1476,19 @@ definitions:
       paymentMethods:
         $ref: '#/definitions/handler.PaymentMethodsView'
         type: object
+      payments:
+        items:
+          $ref: '#/definitions/handler.PaymentView'
+        type: array
       quantity:
         type: integer
+      shipping:
+        $ref: '#/definitions/handler.ShippingOrderView'
+        type: object
       sum:
         type: number
       total:
         type: number
-      transport:
-        $ref: '#/definitions/handler.TransportShortView'
-        type: object
       vat:
         type: number
       volume:
@@ -1603,6 +1621,21 @@ definitions:
           enabled:
             type: boolean
         type: object
+    type: object
+  handler.PaymentView:
+    properties:
+      details:
+        type: string
+      id:
+        type: integer
+      methods:
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+      title:
+        type: string
     type: object
   handler.PriceView:
     properties:
@@ -1899,6 +1932,8 @@ definitions:
         type: string
       country:
         type: string
+      email:
+        type: string
       id:
         type: integer
       itn:
@@ -1949,16 +1984,67 @@ definitions:
       id:
         type: integer
     type: object
-  handler.StripeCardView:
+  handler.ShippingOrderView:
+    properties:
+      coupons:
+        items:
+          $ref: '#/definitions/handler.CouponOrderView'
+        type: array
+      discount:
+        type: number
+      id:
+        type: integer
+      name:
+        type: string
+      profile:
+        $ref: '#/definitions/handler.ShippingProfileOrderView'
+        type: object
+      services:
+        items:
+          $ref: '#/definitions/handler.TransportServiceView'
+        type: array
+      thumbnail:
+        type: string
+      title:
+        type: string
+      total:
+        type: number
+      value:
+        type: number
+      volume:
+        type: number
+      weight:
+        type: number
     type: object
-  handler.StripeCardsView:
+  handler.ShippingProfileOrderView:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      company:
+        type: string
+      country:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      lastname:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      region:
+        type: string
+      zip:
+        type: string
     type: object
   handler.StripeCheckoutSessionView:
     properties:
       id:
         type: string
-    type: object
-  handler.StripeCustomerView:
     type: object
   handler.TagView:
     properties:
@@ -2157,21 +2243,6 @@ definitions:
       title:
         type: string
     type: object
-  handler.TransportShortView:
-    properties:
-      id:
-        type: integer
-      name:
-        type: string
-      services:
-        items:
-          $ref: '#/definitions/handler.TransportServiceView'
-        type: array
-      thumbnail:
-        type: string
-      title:
-        type: string
-    type: object
   handler.TransportView:
     properties:
       enabled:
@@ -2250,14 +2321,6 @@ definitions:
     type: object
   handler.UserView:
     properties:
-      address:
-        type: string
-      city:
-        type: string
-      company:
-        type: string
-      country:
-        type: string
       email:
         type: string
       emailConfirmed:
@@ -2266,24 +2329,12 @@ definitions:
         type: boolean
       id:
         type: integer
-      itn:
-        type: string
-      lastname:
-        type: string
       login:
-        type: string
-      name:
         type: string
       notification:
         type: boolean
-      phone:
-        type: string
-      region:
-        type: string
       role:
         type: integer
-      zip:
-        type: string
     type: object
   handler.UsersListItem:
     properties:
@@ -2809,6 +2860,34 @@ paths:
       summary: update account
       tags:
       - order
+  /api/v1/account/billing_profiles:
+    get:
+      consumes:
+      - application/json
+      description: get account billing profiles
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.ProfileView'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get account billing profiles
+      tags:
+      - account
+      - frontend
   /api/v1/account/orders:
     get:
       consumes:
@@ -3005,7 +3084,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.StripeCardsView'
+            $ref: '#/definitions/handler.HTTPMessage'
         "404":
           description: Not Found
           schema:
@@ -3047,118 +3126,6 @@ paths:
       tags:
       - account
       - frontend
-  /api/v1/account/orders/{id}/stripe/card:
-    get:
-      consumes:
-      - application/json
-      parameters:
-      - description: Order ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.StripeCardsView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      summary: Get stripe cards
-      tags:
-      - account
-  /api/v1/account/orders/{id}/stripe/customer:
-    get:
-      consumes:
-      - application/json
-      parameters:
-      - description: Order ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.StripeCustomerView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      summary: Get stripe customer
-      tags:
-      - account
-  /api/v1/account/orders/{id}/stripe/submit:
-    get:
-      consumes:
-      - application/json
-      parameters:
-      - description: Order ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.StripeCardsView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      summary: Post stripe payment
-      tags:
-      - account
-  /api/v1/account/orders/{id}/stripe/success:
-    get:
-      consumes:
-      - application/json
-      parameters:
-      - description: Order ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - text/html
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.StripeCardsView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      summary: Get stripe payment success
-      tags:
-      - account
   /api/v1/account/orders/checkout/{id}/stripe:
     post:
       consumes:
@@ -3188,64 +3155,7 @@ paths:
       summary: Post order
       tags:
       - account
-  /api/v1/account/orders/checkout/{id}/stripe/card:
-    post:
-      consumes:
-      - application/json
-      description: See https://stripe.com/docs/api/cards/create
-      parameters:
-      - description: body
-        in: body
-        name: cart
-        required: true
-        schema:
-          $ref: '#/definitions/handler.NewStripeCard'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.StripeCardView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      summary: Post order
-      tags:
-      - account
   /api/v1/account/profiles:
-    get:
-      consumes:
-      - application/json
-      description: get account profiles
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/handler.ProfileView'
-            type: array
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Get account profiles
-      tags:
-      - account
-      - frontend
     post:
       consumes:
       - application/json
@@ -3273,9 +3183,37 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Create profile in existing account
+      summary: Create shipping profile in existing account
       tags:
       - profile
+      - frontend
+  /api/v1/account/shipping_profiles:
+    get:
+      consumes:
+      - application/json
+      description: get account shipping profiles
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.ProfileView'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get account shipping profiles
+      tags:
+      - account
       - frontend
   /api/v1/categories:
     get:
@@ -5418,35 +5356,6 @@ paths:
       summary: Search products
       tags:
       - product
-  /api/v1/profiles:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: body
-        in: body
-        name: profile
-        required: true
-        schema:
-          $ref: '#/definitions/handler.NewProfile'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.ProfileView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      summary: (DEPRECATED) Create profile without having account
-      tags:
-      - profile
   /api/v1/properties/{id}:
     delete:
       consumes:
@@ -6382,7 +6291,7 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Transport ID
+      - description: Shipping ID
         in: path
         name: id
         required: true
@@ -6411,7 +6320,7 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Transport ID
+      - description: Shipping ID
         in: path
         name: id
         required: true
@@ -6446,7 +6355,7 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/handler.TransportView'
-      - description: Transport ID
+      - description: Shipping ID
         in: path
         name: id
         required: true

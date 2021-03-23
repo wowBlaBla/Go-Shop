@@ -19,7 +19,7 @@ const MOLLIE_API = "https://api.mollie.com/v2"
 /*
 Test API key: test_t42DxbEjtNCq7P4SD3KEUMCmSQw5rD
 Partner ID: 11120627
-Profile ID: pfl_qcRqsdFUKm
+ShillingProfile ID: pfl_qcRqsdFUKm
 */
 
 func NewMollie(key string) *Mollie {

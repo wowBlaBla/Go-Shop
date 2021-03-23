@@ -363,6 +363,7 @@ func putCouponHandler(c *fiber.Ctx) error {
 	coupon.Limit = request.Limit
 	coupon.Count = request.Count
 	coupon.ApplyTo = request.ApplyTo
+	models.DeleteAllCategoriesFromCoupon(common.Database, coupon)
 	for _, v := range strings.Split(request.Categories, ",") {
 		if id, err := strconv.Atoi(v); err == nil {
 			if category, err := models.GetCategory(common.Database, id); err == nil {
@@ -373,6 +374,7 @@ func putCouponHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
+	models.DeleteAllProductsFromCoupon(common.Database, coupon)
 	for _, v := range strings.Split(request.Products, ",") {
 		if id, err := strconv.Atoi(v); err == nil {
 			if product, err := models.GetProduct(common.Database, id); err == nil {

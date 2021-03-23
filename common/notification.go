@@ -17,7 +17,9 @@ var (
 	funcMap = template.FuncMap{
 		"add": add,
 		"even": even,
+		"index": index,
 		"odd": odd,
+		"split": split,
 		"toUuid":  toUuid,
 	}
 )
@@ -30,8 +32,19 @@ func even(i int) bool {
 	return i % 2 == 0
 }
 
+func index(arr []string, i int) string{
+	if len(arr) > i {
+		return arr[i]
+	}
+	return ""
+}
+
 func odd(i int) bool {
 	return !even(i)
+}
+
+func split(s, sep string) []string{
+	return strings.Split(s, sep)
 }
 
 func toUuid(raw string) string {
@@ -48,6 +61,8 @@ type Notification struct {
 }
 
 type NotificationTemplateVariables struct {
+	Url string
+	Symbol string
 	Order interface{}
 }
 
