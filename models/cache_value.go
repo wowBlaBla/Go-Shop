@@ -30,7 +30,7 @@ func GetCacheValueByValueId(connector *gorm.DB, valueId uint) (*CacheValue, erro
 	return &cacheValue, db.Error
 }
 
-func HasCacheVariationByValueId(connector *gorm.DB, valueId uint) bool {
+func HasCacheValueByValueId(connector *gorm.DB, valueId uint) bool {
 	db := connector
 	var count int64
 	db.Model(CacheValue{}).Where("value_id = ?", valueId).Count(&count)

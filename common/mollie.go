@@ -3,6 +3,7 @@ package common
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"github.com/google/logger"
 	"github.com/yonnic/goshop/common/mollie"
 	"io"
@@ -91,15 +92,30 @@ func (m Mollie) CreateOrder(params *mollie.Order) (*mollie.Order, map[string]*mo
 			return nil, nil, err
 		}
 		logger.Infof("Bts: %+v", string(bts))
-		var response struct {
-			*mollie.Order
-			Links map[string]*mollie.Link `json:"_links,omitempty"` // dashboard, documentation, checkout, self
+		logger.Infof("Status: %+v", resp.StatusCode)
+		if resp.StatusCode > http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+			var response struct {
+				*mollie.Order
+				Links map[string]*mollie.Link `json:"_links,omitempty"` // dashboard, documentation, checkout, self
+			}
+			if err = json.Unmarshal(bts, &response); err != nil {
+				return nil, nil, err
+			}
+			log.Printf("Response: %+v", response)
+			return response.Order, response.Links, nil
+		}else{
+			var response struct {
+				Title string
+				Detail string
+				Status int
+			}
+			if err = json.Unmarshal(bts, &response); err != nil {
+				return nil, nil, err
+			}
+			log.Printf("Response: %+v", response)
+			return nil, nil, errors.New(response.Detail)
+
 		}
-		if err = json.Unmarshal(bts, &response); err != nil {
-			return nil, nil, err
-		}
-		log.Printf("Response: %+v", response)
-		return response.Order, response.Links, nil
 	}
 	return nil, nil, nil
 }

@@ -8,10 +8,12 @@ require (
 	github.com/aprimadi/imagecomp v0.0.0-20180213055428-8f3098b13c82 // indirect
 	github.com/arsmn/fiber-casbin/v2 v2.0.0 // indirect
 	github.com/arsmn/fiber-swagger/v2 v2.0.0
+	github.com/aws/aws-sdk-go v1.38.2
 	github.com/cloudflare/tableflip v1.2.0
 	github.com/dannyvankooten/vat v0.0.0-20200422095635-741cefddc898
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/disintegration/imaging v1.6.2
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/fasthttp/session/v2 v2.2.3 // indirect
 	github.com/fsnotify/fsnotify v1.4.9
@@ -56,9 +58,9 @@ require (
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/yusukebe/go-pngquant v0.0.0-20200223090257-49b91f11b627
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
-	golang.org/x/net v0.0.0-20200904194848-62affa334b73 // indirect
+	golang.org/x/net v0.0.0-20210316092652-d523dce5a7f4 // indirect
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
-	golang.org/x/sys v0.0.0-20200917073148-efd3b9a0ff20 // indirect
+	golang.org/x/text v0.3.5 // indirect
 	golang.org/x/tools v0.0.0-20200917221617-d56e4e40bc9d // indirect
 	google.golang.org/appengine v1.6.6 // indirect
 	google.golang.org/protobuf v1.25.0 // indirect

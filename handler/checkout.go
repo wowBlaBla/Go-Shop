@@ -649,23 +649,28 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 						Title: transport.Title,
 						Thumbnail: transport.Thumbnail,
 					}
+					if cache, err := models.GetCacheTransportByTransportId(common.Database, transport.ID); err == nil {
+						shippingView.Thumbnail = cache.Thumbnail
+					}
 					if bts, err := json.Marshal(shippingProfile); err == nil {
 						if err = json.Unmarshal(bts, &shippingView.Profile); err != nil {
 							logger.Warningf("%+v", err)
 						}
 					}
 					//
-					order.ShippingProfileEmail = shippingProfile.Email
-					order.ShippingProfileName = shippingProfile.Name
-					order.ShippingProfileLastname = shippingProfile.Lastname
-					order.ShippingProfileCompany = shippingProfile.Company
-					order.ShippingProfilePhone = shippingProfile.Phone
-					order.ShippingProfileAddress = shippingProfile.Address
-					order.ShippingProfileZip = shippingProfile.Zip
-					order.ShippingProfileCity = shippingProfile.City
-					order.ShippingProfileRegion = shippingProfile.Region
-					order.ShippingProfileCountry = shippingProfile.Country
-					order.ShippingProfileTransport = transport.Title
+					if shippingProfile != nil {
+						order.ShippingProfileEmail = shippingProfile.Email
+						order.ShippingProfileName = shippingProfile.Name
+						order.ShippingProfileLastname = shippingProfile.Lastname
+						order.ShippingProfileCompany = shippingProfile.Company
+						order.ShippingProfilePhone = shippingProfile.Phone
+						order.ShippingProfileAddress = shippingProfile.Address
+						order.ShippingProfileZip = shippingProfile.Zip
+						order.ShippingProfileCity = shippingProfile.City
+						order.ShippingProfileRegion = shippingProfile.Region
+						order.ShippingProfileCountry = shippingProfile.Country
+						order.ShippingProfileTransport = transport.Title
+					}
 					//
 					var selectedServices []string
 					for _, service := range services {

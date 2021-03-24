@@ -92,6 +92,7 @@ type Config struct {
 		Enabled bool
 		Url string
 	}
+	Storage StorageConfig
 	Modified time.Time
 }
 
@@ -141,6 +142,19 @@ type ResizeConfig struct {
 		Size string // 128x0,256x0
 	}
 	Quality int
+}
+
+type StorageConfig struct {
+	Enabled bool
+	S3 struct {
+		Enabled bool
+		AccessKeyID string
+		SecretAccessKey string
+		Region string
+		Bucket string
+		Prefix string
+		Rewrite string // /bla/bla:path
+	}
 }
 
 type NotificationConfig struct {

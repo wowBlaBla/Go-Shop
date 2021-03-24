@@ -26,6 +26,7 @@ import (
 	"github.com/yonnic/goshop/common"
 	"github.com/yonnic/goshop/config"
 	"github.com/yonnic/goshop/models"
+	"github.com/yonnic/goshop/storage"
 	"gorm.io/gorm"
 	"html/template"
 	_ "image/gif"
@@ -765,6 +766,7 @@ type BasicSettingsView struct {
 	Preview      string
 	Payment      config.PaymentConfig
 	Resize       config.ResizeConfig
+	Storage       config.StorageConfig
 	Notification config.NotificationConfig
 }
 
@@ -789,6 +791,7 @@ func getBasicSettingsHandler(c *fiber.Ctx) error {
 	conf.Preview = common.Config.Preview
 	conf.Payment = common.Config.Payment
 	conf.Resize = common.Config.Resize
+	conf.Storage = common.Config.Storage
 	conf.Notification = common.Config.Notification
 	return c.JSON(conf)
 }
@@ -880,7 +883,15 @@ func putBasicSettingsHandler(c *fiber.Ctx) error {
 	if (request.Resize.Enabled && !common.Config.Resize.Enabled) ||
 		(request.Resize.Enabled && common.Config.Resize.Quality != request.Resize.Quality) ||
 		(request.Resize.Enabled && request.Resize.Thumbnail.Enabled && common.Config.Resize.Thumbnail.Size != request.Resize.Thumbnail.Size) ||
-		(request.Resize.Enabled && request.Resize.Image.Enabled && common.Config.Resize.Image.Size != request.Resize.Image.Size) {
+		(request.Resize.Enabled && request.Resize.Image.Enabled && common.Config.Resize.Image.Size != request.Resize.Image.Size){
+		render = true
+	}
+	if (request.Storage.Enabled && !common.Config.Storage.Enabled) ||
+		(request.Storage.S3.Enabled && !common.Config.Storage.S3.Enabled) ||
+		(common.Config.Storage.S3.Enabled && request.Storage.S3.AccessKeyID != common.Config.Storage.S3.AccessKeyID) ||
+		(common.Config.Storage.S3.Enabled && request.Storage.S3.SecretAccessKey != common.Config.Storage.S3.SecretAccessKey) ||
+		(common.Config.Storage.S3.Enabled && request.Storage.S3.Region != common.Config.Storage.S3.Region) ||
+		(common.Config.Storage.S3.Enabled && request.Storage.S3.Bucket != common.Config.Storage.S3.Bucket) {
 		render = true
 	}
 	if render {
@@ -936,6 +947,32 @@ func putBasicSettingsHandler(c *fiber.Ctx) error {
 		}()
 	}
 	common.Config.Resize = request.Resize
+	if request.Storage.Enabled && request.Storage.S3.Enabled {
+		if !common.Config.Storage.Enabled || !common.Config.Storage.S3.Enabled ||
+			(common.Config.Storage.S3.Enabled && request.Storage.S3.AccessKeyID != common.Config.Storage.S3.AccessKeyID) ||
+			(common.Config.Storage.S3.Enabled && request.Storage.S3.SecretAccessKey != common.Config.Storage.S3.SecretAccessKey) ||
+			(common.Config.Storage.S3.Enabled && request.Storage.S3.Region != common.Config.Storage.S3.Region) ||
+			(common.Config.Storage.S3.Enabled && request.Storage.S3.Bucket != common.Config.Storage.S3.Bucket){
+			if storage, err := storage.NewAWSS3Storage(request.Storage.S3.AccessKeyID,request.Storage.S3.SecretAccessKey, request.Storage.S3.Region, request.Storage.S3.Bucket, request.Storage.S3.Prefix, path.Join(dir, "temp", "s3"), common.Config.Resize.Quality, common.Config.Storage.S3.Rewrite); err == nil {
+				filename := fmt.Sprintf("file-%d.txt", rand.Intn(899999) + 100000)
+				if err = ioutil.WriteFile(path.Join(dir, "temp", filename), []byte(time.Now().Format(time.RFC3339)), 0755); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+				if _, err = storage.PutFile(path.Join(dir, "temp", filename), path.Join("temp", filename)); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+				if err = storage.DeleteFile(path.Join("temp", filename)); err != nil {
+					return c.JSON(HTTPError{err.Error()})
+				}
+			} else {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}
+	}
+	common.Config.Storage = request.Storage
 	// Notification
 	common.Config.Notification = request.Notification
 	//

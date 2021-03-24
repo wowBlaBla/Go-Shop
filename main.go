@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/yonnic/goshop/common"
-	"github.com/yonnic/goshop/cmd"
 	"fmt"
 	"github.com/google/logger"
+	"github.com/yonnic/goshop/cmd"
+	"github.com/yonnic/goshop/common"
 	"io/ioutil"
 	"time"
 )
@@ -21,6 +21,13 @@ import (
 // @securityDefinitions.basic BasicAuth
 func main() {
 	logger.Init(fmt.Sprintf("[INF] [APP] %v v%v %v", common.APPLICATION, common.VERSION, common.COMPILED), true, false, ioutil.Discard)
+	/*if session := common.GetS3Session(); session != nil {
+		src := "/home/brain/Pictures/accessories.jpg"
+		common.PostS3File(session, src, "images/" + path.Base(src))
+	}else{
+		logger.Warningf("session is nil")
+	}*/
+
 	common.Started = time.Now()
 	cmd.Execute()
 }
