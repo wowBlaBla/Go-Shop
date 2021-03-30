@@ -3,7 +3,6 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/logger"
 	"github.com/yonnic/goshop/common"
@@ -210,52 +209,6 @@ func postCheckoutHandler(c *fiber.Ctx) error {
 	return c.JSON(view)
 }
 
-// CreateOrder godoc
-// @Summary Post account order
-// @Accept json
-// @Produce json
-// @Param cart body CheckoutRequest true "body"
-// @Success 200 {object} OrderView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/account/orders [post]
-// @Tags account
-// @Tags frontend
-func postAccountOrdersHandler(c *fiber.Ctx) error {
-	var request CheckoutRequest
-	if err := c.BodyParser(&request); err != nil {
-		return err
-	}
-	order, view, err := Checkout(request)
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-	if v := c.Locals("user"); v != nil {
-		if user, ok := v.(*models.User); ok {
-			order.UserId = user.ID
-		}
-	}
-	if _, err := models.CreateOrder(common.Database, order); err != nil {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-	var orderView struct {
-		*OrderShortView
-		ID uint
-		CreatedAt time.Time
-		PaymentMethod string `json:",omitempty"`
-		Status string
-	}
-	orderView.ID = order.ID
-	orderView.CreatedAt = order.CreatedAt
-	orderView.PaymentMethod = view.Billing.Method
-	orderView.Status = order.Status
-	orderView.OrderShortView = view
-	c.Status(http.StatusOK)
-	return c.JSON(orderView)
-}
-
 func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 	order := &models.Order{Status: models.ORDER_STATUS_NEW}
 	now := time.Now()
@@ -313,12 +266,13 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 	var itemsShortView []ItemShortView
 	for _, rItem := range request.Items {
 		var arr []int
-		if err := json.Unmarshal([]byte(rItem.UUID), &arr); err == nil && len(arr) >= 2{
+		if err := json.Unmarshal([]byte(rItem.UUID), &arr); err == nil && len(arr) >= 2 {
 			//
 			productId := arr[0]
 			var product *models.Product
-			if product, err = models.GetProduct(common.Database, productId); err != nil {
-				return nil, nil, err
+			if product, err = models.GetProduct(common.Database, productId); err != nil || !product.Enabled {
+				logger.Warningf("Product #%+v not exists", productId)
+				continue
 			}
 			variationId := arr[1]
 
@@ -343,8 +297,8 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 			} else {
 				if variation, err := models.GetVariation(common.Database, variationId); err == nil {
 					if product.ID != variation.ProductId {
-						err = fmt.Errorf("Products and Variation mismatch")
-						return nil, nil, err
+						logger.Warningf("Product #%+v and Variation #%+v mismatch", productId, variationId)
+						continue
 					}
 					vId = variation.ID
 					title = variation.Title
@@ -357,7 +311,8 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 					depth = variation.Depth
 					weight = variation.Weight
 				} else {
-					return nil, nil, err
+					logger.Warningf("Variation #%+v not exists", variationId)
+					continue
 				}
 			}
 			categoryId := rItem.CategoryId
@@ -691,7 +646,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 					order.TransportId = request.TransportId
 					order.Delivery = math.Round(value * 100) / 100
 				}else{
-					deliveriesShortView = append(deliveriesShortView, DeliveryView{
+					deliveryView := DeliveryView{
 						ID:        transport.ID,
 						Title:     transport.Title,
 						Thumbnail: transport.Thumbnail,
@@ -699,7 +654,11 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 						ByWeight: math.Round(byWeight * 100) / 100,
 						Services: services,
 						Value: math.Round(value * 100) / 100,
-					})
+					}
+					if cache, err := models.GetCacheTransportByTransportId(common.Database, transport.ID); err == nil {
+						deliveryView.Thumbnail = cache.Thumbnail
+					}
+					deliveriesShortView = append(deliveriesShortView, deliveryView)
 				}
 			}
 		}

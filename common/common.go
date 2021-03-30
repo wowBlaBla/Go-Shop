@@ -29,7 +29,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210325155023"
+	COMPILED = "20210330154431"
 	//
 	Started          time.Time
 	Config           *config.Config
@@ -52,8 +52,6 @@ type CategoryFile struct {
 	Aliases    []string `json:",omitempty"`
 	Thumbnail    string
 	Path         string
-	BasePriceMin float64
-	BasePriceMax float64
 	Properties   []*PropertyCF
 	Options      []*OptionCF
 	Price        MiniMaxCF
@@ -115,8 +113,6 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		Description string `json:",omitempty"`
 		Thumbnail string
 		Path string
-		BasePriceMin float64
-		BasePriceMax float64
 		Price MiniMaxCF
 		Options []*OptionCF
 		Dimensions DimensionsCF
@@ -131,8 +127,6 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		Aliases: p.Aliases,
 		Thumbnail: p.Thumbnail,
 		Path: p.Path,
-		BasePriceMin: p.BasePriceMin,
-		BasePriceMax: p.BasePriceMax,
 		Options: p.Options,
 		Price: p.Price,
 		Dimensions: p.Dimensions,

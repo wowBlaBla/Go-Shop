@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -472,7 +473,7 @@ func getAccountBillingProfilesHandler(c *fiber.Ctx) error {
 // @Success 200 {object} ProfileView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
-// @Router /api/v1/account/profiles [post]
+// @Router /api/v1/account/billing_profiles [post]
 // @Tags profile
 // @Tags frontend
 func postAccountBillingProfileHandler(c *fiber.Ctx) error {
@@ -529,6 +530,126 @@ func postAccountBillingProfileHandler(c *fiber.Ctx) error {
 }
 
 // @security BasicAuth
+// UpdateBillingProfile godoc
+// @Summary Update billing profile
+// @Accept json
+// @Produce json
+// @Param id path int true "Profile ID"
+// @Param profile body NewProfile true "body"
+// @Success 200 {object} ProfileView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/billing_profiles/{id} [put]
+// @Tags profile
+// @Tags frontend
+func putAccountBillingProfileHandler(c *fiber.Ctx) error {
+	var view ProfileView
+	//
+	var request NewProfile
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	//
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	profile, err := models.GetBillingProfile(common.Database, uint(id))
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	//
+	if v := c.Locals("user"); v != nil {
+		var user *models.User
+		var ok bool
+		if user, ok = v.(*models.User); ok {
+			if profile.UserId != user.ID {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Access violation"})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"User not found"})
+		}
+	}
+	//
+	if err := sanitizeProfile(&request); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	profile.Name = request.Name
+	profile.Lastname = request.Lastname
+	profile.Email = request.Email
+	profile.Company = request.Company
+	profile.Phone = request.Phone
+	profile.Address = request.Address
+	profile.Zip = request.Zip
+	profile.City = request.City
+	profile.Region = request.Region
+	profile.Country = request.Country
+	//
+	if err := models.UpdateBillingProfile(common.Database, profile); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	//
+	if bts, err := json.Marshal(profile); err == nil {
+		if err = json.Unmarshal(bts, &view); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}
+	//
+	return c.JSON(view)
+}
+
+// @security BasicAuth
+// DelBillingProfile godoc
+// @Summary Delete billing profile
+// @Accept json
+// @Produce json
+// @Param id path int true "Billing Profile ID"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/billing_profile/{id} [delete]
+// @Tags account
+// @Tags frontend
+func delAccountBillingProfileHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	profile, err := models.GetBillingProfile(common.Database, uint(id))
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	//
+	if v := c.Locals("user"); v != nil {
+		var user *models.User
+		var ok bool
+		if user, ok = v.(*models.User); ok {
+			if profile.UserId != user.ID {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Access violation"})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"User not found"})
+		}
+	}
+	//
+	if err = models.DeleteBillingProfile(common.Database, profile); err == nil {
+		return c.JSON(HTTPMessage{"OK"})
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+// @security BasicAuth
 // @Summary Get account shipping profiles
 // @Description get account shipping profiles
 // @Accept json
@@ -573,7 +694,7 @@ func getAccountShippingProfilesHandler(c *fiber.Ctx) error {
 // @Success 200 {object} ProfileView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
-// @Router /api/v1/account/profiles [post]
+// @Router /api/v1/account/billing_profiles [post]
 // @Tags profile
 // @Tags frontend
 func postAccountShippingProfileHandler(c *fiber.Ctx) error {
@@ -627,6 +748,172 @@ func postAccountShippingProfileHandler(c *fiber.Ctx) error {
 	}
 	//
 	return c.JSON(view)
+}
+
+// @security BasicAuth
+// UpdateShippingProfile godoc
+// @Summary Update shipping profile
+// @Accept json
+// @Produce json
+// @Param id path int true "Profile ID"
+// @Param profile body NewProfile true "body"
+// @Success 200 {object} ProfileView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/shipping_profiles/{id} [put]
+// @Tags profile
+// @Tags frontend
+func putAccountShippingProfileHandler(c *fiber.Ctx) error {
+	var view ProfileView
+	//
+	var request NewProfile
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	//
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	profile, err := models.GetShippingProfile(common.Database, uint(id))
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	//
+	if v := c.Locals("user"); v != nil {
+		var user *models.User
+		var ok bool
+		if user, ok = v.(*models.User); ok {
+			if profile.UserId != user.ID {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Access violation"})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"User not found"})
+		}
+	}
+	//
+	if err := sanitizeProfile(&request); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	profile.Name = request.Name
+	profile.Lastname = request.Lastname
+	profile.Email = request.Email
+	profile.Company = request.Company
+	profile.Phone = request.Phone
+	profile.Address = request.Address
+	profile.Zip = request.Zip
+	profile.City = request.City
+	profile.Region = request.Region
+	profile.Country = request.Country
+	//
+	if err := models.UpdateShippingProfile(common.Database, profile); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	//
+	if bts, err := json.Marshal(profile); err == nil {
+		if err = json.Unmarshal(bts, &view); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}
+	//
+	return c.JSON(view)
+}
+
+// @security BasicAuth
+// DelShippingProfile godoc
+// @Summary Delete shipping profile
+// @Accept json
+// @Produce json
+// @Param id path int true "Shipping Profile ID"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/shipping_profile/{id} [delete]
+// @Tags account
+// @Tags frontend
+func delAccountShippingProfileHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	profile, err := models.GetShippingProfile(common.Database, uint(id))
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	//
+	if v := c.Locals("user"); v != nil {
+		var user *models.User
+		var ok bool
+		if user, ok = v.(*models.User); ok {
+			if profile.UserId != user.ID {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Access violation"})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"User not found"})
+		}
+	}
+	//
+	if err = models.DeleteShippingProfile(common.Database, profile); err == nil {
+		return c.JSON(HTTPMessage{"OK"})
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+// CreateOrder godoc
+// @Summary Post account order
+// @Accept json
+// @Produce json
+// @Param cart body CheckoutRequest true "body"
+// @Success 200 {object} OrderView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/orders [post]
+// @Tags account
+// @Tags frontend
+func postAccountOrdersHandler(c *fiber.Ctx) error {
+	var request CheckoutRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	order, view, err := Checkout(request)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	if v := c.Locals("user"); v != nil {
+		if user, ok := v.(*models.User); ok {
+			order.UserId = user.ID
+		}
+	}
+	if _, err := models.CreateOrder(common.Database, order); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	var orderView struct {
+		*OrderShortView
+		ID uint
+		CreatedAt time.Time
+		PaymentMethod string `json:",omitempty"`
+		Status string
+	}
+	orderView.ID = order.ID
+	orderView.CreatedAt = order.CreatedAt
+	orderView.PaymentMethod = view.Billing.Method
+	orderView.Status = order.Status
+	orderView.OrderShortView = view
+	c.Status(http.StatusOK)
+	return c.JSON(orderView)
 }
 
 func sanitizeProfile (p *NewProfile) error {

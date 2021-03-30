@@ -61,8 +61,7 @@ func GetVariationsByProductAndName(connector *gorm.DB, productId uint, name stri
 func GetVariation(connector *gorm.DB, id int) (*Variation, error) {
 	db := connector
 	var variation Variation
-	db.Preload("Properties").Preload("Properties.Option").Preload("Properties.Prices").Preload("Properties.Prices.Value").Preload("Images").Preload("Files").Find(&variation, id)
-	if err := db.Error; err != nil {
+	if err := db.Preload("Properties").Preload("Properties.Option").Preload("Properties.Prices").Preload("Properties.Prices.Value").Preload("Images").Preload("Files").First(&variation, id).Error; err != nil {
 		return nil, err
 	}
 	// Customization

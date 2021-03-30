@@ -11,10 +11,12 @@ import (
 const (
 	NOTIFICATION_TYPE_ADMIN_ORDER_PAID = "admin-order-paid"
 	NOTIFICATION_TYPE_USER_ORDER_PAID = "user-order-paid"
+	NOTIFICATION_TYPE_RESET_PASSWORD = "reset-password"
 )
 
 var (
 	funcMap = template.FuncMap{
+		"absolute": absolute,
 		"add": add,
 		"even": even,
 		"index": index,
@@ -23,6 +25,14 @@ var (
 		"toUuid":  toUuid,
 	}
 )
+
+func absolute(base, url string) string {
+	if regexp.MustCompile(`(?i)^https?:\/\/`).MatchString(url) {
+		return url
+	}else{
+		return base + url
+	}
+}
 
 func add(a, b int) int {
 	return a + b
@@ -64,6 +74,7 @@ type NotificationTemplateVariables struct {
 	Url string
 	Symbol string
 	Order interface{}
+	Code string
 }
 
 func (n *Notification) SendEmail(from, to *mail.Email, topic, message string, vars *NotificationTemplateVariables) error {

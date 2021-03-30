@@ -14,6 +14,7 @@ import (
 	"github.com/BurntSushi/toml"
 	swagger "github.com/arsmn/fiber-swagger/v2"
 	"github.com/dannyvankooten/vat"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -122,6 +123,7 @@ func GetFiber() *fiber.App {
 	//
 	api := app.Group("/api")
 	v1 := api.Group("/v1")
+	v1.Get("/login", getLoginHandler)
 	v1.Post("/login", postLoginHandler)
 	v1.Post("/reset", postResetHandler)
 	v1.Get("/logout", authRequired, getLogoutHandler)
@@ -302,12 +304,14 @@ func GetFiber() *fiber.App {
 	v1.Get("/account", authRequired, getAccountHandler)
 	v1.Post("/account", csrf, postAccountHandler)
 	v1.Put("/account", authRequired, putAccountHandler)
-	//v1.Get("/account/profiles", authRequired, getAccountProfilesHandler)
-	//v1.Post("/account/profiles", authRequired, postAccountProfileHandler)
 	v1.Get("/account/billing_profiles", authRequired, getAccountBillingProfilesHandler)
 	v1.Post("/account/billing_profiles", authRequired, postAccountBillingProfileHandler)
+	v1.Put("/account/billing_profiles/:id", authRequired, putAccountBillingProfileHandler)
+	v1.Delete("/account/billing_profiles/:id", authRequired, delAccountBillingProfileHandler)
 	v1.Get("/account/shipping_profiles", authRequired, getAccountShippingProfilesHandler)
 	v1.Post("/account/shipping_profiles", authRequired, postAccountShippingProfileHandler)
+	v1.Put("/account/shipping_profiles/:id", authRequired, putAccountShippingProfileHandler)
+	v1.Delete("/account/shipping_profiles/:id", authRequired, delAccountShippingProfileHandler)
 	//
 	v1.Get("/account/orders", authRequired, getAccountOrdersHandler)
 	v1.Post("/account/orders", authRequired, postAccountOrdersHandler)
@@ -372,6 +376,94 @@ func GetFiber() *fiber.App {
 	return app
 }
 
+// Login godoc
+// @Summary login
+// @Accept json
+// @Produce json
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/login [get]
+// @Tags auth
+// @Tags frontend
+func getLoginHandler(c *fiber.Ctx) error {
+	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(c.Request().Header.Header())))
+	if err != nil {
+		logger.Errorf("%+v", err)
+	}
+	if code := c.Query("code"); code != "" {
+		if user, err := models.GetUserByCode(common.Database, code); err == nil {
+			if user.Enabled {
+				password := NewPassword(16)
+				user.Password = models.MakeUserPassword(password)
+				user.Code = ""
+				user.Attempt = time.Time{}
+				if err = models.UpdateUser(common.Database, user); err != nil {
+					return c.Render("login", fiber.Map{
+						"Error":    err.Error(),
+					})
+				}
+				// JWT
+				expiration := time.Now().Add(JWTLoginDuration)
+				claims := &JWTClaims{
+					Login: user.Login,
+					Password: user.Password,
+					StandardClaims: jwt.StandardClaims{
+						ExpiresAt: expiration.Unix(),
+					},
+				}
+				token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+				str, err := token.SignedString(JWTSecret);
+				if err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(fiber.Map{"ERROR": err.Error()})
+				}
+				//
+				if v := req.Header.Get("Accept"); strings.EqualFold(v, "application/jwt") {
+					c.JSON(fiber.Map{
+						"MESSAGE": "OK",
+						"Token": str,
+						"Expiration": expiration,
+					})
+				}else{
+					value := map[string]string{
+						"email": user.Email,
+						"login": user.Login,
+						"password": password,
+					}
+					if encoded, err := cookieHandler.Encode(COOKIE_NAME, value); err == nil {
+						expires := time.Time{}
+						if authMultipleConfig.CookieDuration > 0 {
+							expires = time.Now().Add(authMultipleConfig.CookieDuration)
+						}
+						cookie := &fiber.Cookie{
+							Name:  COOKIE_NAME,
+							Value: encoded,
+							Path:  "/",
+							Expires: expires,
+							SameSite: authMultipleConfig.SameSite,
+						}
+						c.Cookie(cookie)
+						c.Status(http.StatusOK)
+						c.Set(fiber.HeaderContentType, fiber.MIMETextHTML)
+						return c.SendString(`<html><body><script>if (localStorage) {localStorage.setItem('goshop.token', '` + str + `');} setTimeout(function(){window.location = '/'}, 100); </script></body></html`)
+					}else{
+						c.Status(http.StatusInternalServerError)
+						return c.SendString(err.Error())
+					}
+				}
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.SendString(err.Error())
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.SendString(err.Error())
+		}
+	}
+	return c.Redirect("/login", http.StatusFound)
+}
+
 // Reset password godoc
 // @Summary reset password
 // @Accept json
@@ -398,18 +490,38 @@ func postResetHandler(c *fiber.Ctx) error {
 	var user *models.User
 	var err error
 	if user, err = models.GetUserByEmail(common.Database, emailOrLogin); err == nil {
-		if user.ResetAttempt.Add(time.Duration(1) * time.Minute).After(time.Now()) {
+		if user.Attempt.Add(time.Duration(15) * time.Minute).After(time.Now()) {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{"Please try again later"})
 		}
-		password := NewPassword(12)
-		logger.Infof("CHANGE ME: User %v restart old password to %v", user.Email, password)
-		user.Password = models.MakeUserPassword(password)
-		user.ResetAttempt = time.Now()
+		code := fmt.Sprintf("%s-%s-%s-%s", NewPassword(8), NewPassword(8), NewPassword(8), NewPassword(8))
+		user.Code = code
+		user.Attempt = time.Now()
 		if err = models.UpdateUser(common.Database, user); err != nil {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
 		}
+		//
+		template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_RESET_PASSWORD)
+		if err == nil {
+			if user, err := models.GetUser(common.Database, int(user.ID)); err == nil {
+				if user.EmailConfirmed {
+					logger.Infof("Send email to user: %+v", user.Email)
+					vars := &common.NotificationTemplateVariables{
+						Url: common.Config.Url,
+						Code: code,
+					}
+					if err := common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), mail.NewEmail(user.Login, user.Email), template.Topic, template.Message, vars); err != nil {
+						logger.Warningf("%+v", err)
+					}
+				}else{
+					logger.Warningf("User's %v email %v is not confirmed", user.Login, user.Email)
+				}
+			} else {
+				logger.Warningf("%+v", err)
+			}
+		}
+		//
 		c.Status(http.StatusOK)
 		return c.JSON(HTTPMessage{"OK"})
 	}else{
@@ -2268,7 +2380,11 @@ func postContentHandler(c *fiber.Ctx) error {
 	}
 	page := NewPage()
 	logger.Infof("Page: %+v", page)
-	page.Type = request.Type
+	if request.Type != "" {
+		page.Type = request.Type
+	}else{
+		page.Type = "post"
+	}
 	page.Title = request.Title
 	page.Description = request.Description
 	page.Draft = request.Draft
@@ -6183,12 +6299,12 @@ func postEmailHandler(c *fiber.Ctx) error {
 	request.Email = strings.TrimSpace(request.Email)
 	if request.Email == "" {
 		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{"Empty email"})
+		return c.JSON(HTTPError{"Email email"})
 	}
 	time.Sleep(1 * time.Second)
 	if _, err := models.GetUserByEmail(common.Database, request.Email); err == nil {
 		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{"Empty already in use"})
+		return c.JSON(HTTPError{"Email already in use"})
 	}
 	c.Status(http.StatusOK)
 	return c.JSON(HTTPMessage{"OK"})
@@ -6316,7 +6432,7 @@ func postFilterHandler(c *fiber.Ctx) error {
 		request.Sort = map[string]string{"ID": "desc"}
 	}
 	if request.Length == 0 {
-		request.Length = 10
+		request.Length = 100
 	}
 	// Filter
 	var keys1 []string
@@ -6330,21 +6446,28 @@ func postFilterHandler(c *fiber.Ctx) error {
 				case "Price", "Width", "Height", "Depth", "Weight":
 					parts := strings.Split(value, "-")
 					if len(parts) == 1 {
-						if v, err := strconv.Atoi(parts[0]); err == nil {
+						if v, err := strconv.ParseFloat(parts[0], 64); err == nil {
 							keys1 = append(keys1, "cache_products." + key + " == ?")
-							values1 = append(values1, v)
+							values1 = append(values1, math.Round(v * 1000) / 1000)
 						}
 					} else {
-						if v, err := strconv.Atoi(parts[0]); err == nil {
-							keys1 = append(keys1, "cache_products." + key + " >= ?")
-							values1 = append(values1, v)
+						if v, err := strconv.ParseFloat(parts[0], 64); err == nil {
+							//keys1 = append(keys1, "cache_products." + key + " >= ?")
+							keys1 = append(keys1, "(cache_products." + key + " >= ? or cache_products." + key + " = ?)")
+							//values1 = append(values1, math.Round(v * 1000) / 1000)
+							values1 = append(values1, math.Round(v * 1000) / 1000, 0)
 						}
-						if v, err := strconv.Atoi(parts[1]); err == nil {
+						if v, err := strconv.ParseFloat(parts[1], 64); err == nil {
 							keys1 = append(keys1, "cache_products." + key + " <= ?")
-							values1 = append(values1, v)
+							values1 = append(values1, math.Round(v * 1000) / 1000)
 						}
 					}
 				case "Search":
+					if v, err := url.QueryUnescape(value); err == nil {
+						value = v
+					}else{
+						logger.Warningf("%+v", err)
+					}
 					keys1 = append(keys1, "(cache_products.Title like ? or cache_products.Description like ?)")
 					values1 = append(values1, "%" + value + "%", "%" + value + "%")
 				default:
@@ -6378,7 +6501,7 @@ func postFilterHandler(c *fiber.Ctx) error {
 	}
 	keys1 = append(keys1, "Path LIKE ?")
 	if common.Config.FlatUrl {
-		if prefix := "/" + strings.ToLower(common.Config.Products); prefix + "/" == relPath {
+		if prefix := "/" + strings.ToLower(common.Config.Products); prefix == relPath || prefix + "/" == relPath {
 			relPath = "/"
 		}else{
 			relPath = "/" + strings.ToLower(common.Config.Products) + relPath
@@ -6394,6 +6517,8 @@ func postFilterHandler(c *fiber.Ctx) error {
 		for key, value := range request.Sort {
 			if key != "" && value != "" {
 				switch key {
+				case "CreatedAt":
+					orders = append(orders, fmt.Sprintf("cache_products.%v %v", "created_at", value))
 				case "Price":
 					orders = append(orders, fmt.Sprintf("cache_products.%v %v", "Price", value))
 				default:
@@ -7352,6 +7477,8 @@ func SendOrderPaidEmail(to *mail.Email, orderId int, template *models.EmailTempl
 	//
 	return common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), to, template.Topic, template.Message, vars)
 }
+
+
 
 func encrypt(key, text []byte) ([]byte, error) {
 	// IMPORTANT: Key should be 32 bytes length, if different make md5sum of key to have exactly 32 bytes!

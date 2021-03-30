@@ -25,20 +25,8 @@ type User struct {
 	EmailConfirmed bool
 	Role           int
 	Notification   bool
-	ResetCode      string
-	ResetAttempt   time.Time
-	//
-	/*Name          string
-	Lastname      string
-	Company       string
-	Phone         string
-	Address       string
-	Zip           string
-	City          string
-	Region        string
-	Country       string
-	ITN           string
-	OtherShipping bool*/
+	Code           string
+	Attempt        time.Time
 	//
 	BillingProfiles       []*BillingProfile `gorm:"foreignKey:UserId"`
 	ShippingProfiles       []*ShippingProfile `gorm:"foreignKey:UserId"`
@@ -110,6 +98,15 @@ func GetUserByEmailAndPassword(connector *gorm.DB, email string, password string
 	return &user, db.Error
 }
 
+func GetUserByEmailOrLogin(connector *gorm.DB, emailOrLogin string) (*User, error){
+	db := connector
+	var user User
+	if err := db.Where("login = ? or email = ?", emailOrLogin, emailOrLogin).First(&user).Error; err != nil {
+		return nil, fmt.Errorf("user not found")
+	}
+	return &user, db.Error
+}
+
 func GetUserByEmailOrLoginAndPassword(connector *gorm.DB, emailOrLogin string, password string) (*User, error){
 	db := connector
 	var user User
@@ -120,7 +117,7 @@ func GetUserByEmailOrLoginAndPassword(connector *gorm.DB, emailOrLogin string, p
 	return &user, db.Error
 }
 
-func GetUserByResetCode(connector *gorm.DB, code string) (*User, error){
+func GetUserByCode(connector *gorm.DB, code string) (*User, error){
 	db := connector
 	var user User
 	db.Where("code = ?", code).First(&user)

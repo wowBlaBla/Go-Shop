@@ -165,6 +165,55 @@ var doc = `{
                 }
             }
         },
+        "/api/v1/account/billing_profile/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account",
+                    "frontend"
+                ],
+                "summary": "Delete billing profile",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Billing Profile ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/account/billing_profiles": {
             "get": {
                 "security": [
@@ -192,6 +241,113 @@ var doc = `{
                             "items": {
                                 "$ref": "#/definitions/handler.ProfileView"
                             }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profile",
+                    "frontend"
+                ],
+                "summary": "Create shipping profile in existing account",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "profile",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.NewProfile"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ProfileView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/account/billing_profiles/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profile",
+                    "frontend"
+                ],
+                "summary": "Update billing profile",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Profile ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "profile",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.NewProfile"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ProfileView"
                         }
                     },
                     "404": {
@@ -617,8 +773,8 @@ var doc = `{
                 }
             }
         },
-        "/api/v1/account/profiles": {
-            "post": {
+        "/api/v1/account/shipping_profile/{id}": {
+            "delete": {
                 "security": [
                     {
                         "BasicAuth": []
@@ -631,26 +787,24 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "profile",
+                    "account",
                     "frontend"
                 ],
-                "summary": "Create shipping profile in existing account",
+                "summary": "Delete shipping profile",
                 "parameters": [
                     {
-                        "description": "body",
-                        "name": "profile",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.NewProfile"
-                        }
+                        "type": "integer",
+                        "description": "Shipping Profile ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.ProfileView"
+                            "$ref": "#/definitions/handler.HTTPMessage"
                         }
                     },
                     "404": {
@@ -695,6 +849,64 @@ var doc = `{
                             "items": {
                                 "$ref": "#/definitions/handler.ProfileView"
                             }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/account/shipping_profiles/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profile",
+                    "frontend"
+                ],
+                "summary": "Update shipping profile",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Profile ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "profile",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.NewProfile"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ProfileView"
                         }
                     },
                     "404": {
@@ -2346,6 +2558,39 @@ var doc = `{
             }
         },
         "/api/v1/login": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth",
+                    "frontend"
+                ],
+                "summary": "login",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
             "post": {
                 "consumes": [
                     "application/json"
@@ -7711,6 +7956,41 @@ var doc = `{
                 }
             }
         },
+        "config.StorageConfig": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "s3": {
+                    "type": "object",
+                    "properties": {
+                        "accessKeyID": {
+                            "type": "string"
+                        },
+                        "bucket": {
+                            "type": "string"
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "prefix": {
+                            "type": "string"
+                        },
+                        "region": {
+                            "type": "string"
+                        },
+                        "rewrite": {
+                            "description": "/bla/bla:path",
+                            "type": "string"
+                        },
+                        "secretAccessKey": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "config.WranglerConfig": {
             "type": "object",
             "properties": {
@@ -7868,6 +8148,10 @@ var doc = `{
                 "resize": {
                     "type": "object",
                     "$ref": "#/definitions/config.ResizeConfig"
+                },
+                "storage": {
+                    "type": "object",
+                    "$ref": "#/definitions/config.StorageConfig"
                 },
                 "symbol": {
                     "type": "string"
@@ -9066,6 +9350,9 @@ var doc = `{
         "handler.LoginRequest": {
             "type": "object",
             "properties": {
+                "code": {
+                    "type": "string"
+                },
                 "email": {
                     "type": "string"
                 },
@@ -9822,10 +10109,6 @@ var doc = `{
                     "items": {
                         "$ref": "#/definitions/handler.ItemShortView"
                     }
-                },
-                "paymentMethods": {
-                    "type": "object",
-                    "$ref": "#/definitions/handler.PaymentMethodsView"
                 },
                 "payments": {
                     "type": "array",

@@ -97,11 +97,11 @@ func GetProductsByCategoryId(connector *gorm.DB, id uint) ([]*Product, error) {
 	return products, nil
 }
 
+// !!!Correct error processing example!!!
 func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 	db := connector
 	var product Product
-	db.Debug().Find(&product, id)
-	if err := db.Error; err != nil {
+	if err := db.Debug().First(&product, id).Error; err != nil {
 		return nil, err
 	}
 	return &product, nil

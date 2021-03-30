@@ -721,6 +721,7 @@ type LoginRequest struct {
 	Email string
 	Login string
 	Password string
+	Code string
 	Remember bool
 }
 
@@ -752,11 +753,54 @@ func postLoginHandler(c *fiber.Ctx) error {
 		emailOrLogin = request.Login
 	}
 	var user *models.User
-	if user, err = models.GetUserByEmailOrLoginAndPassword(common.Database, emailOrLogin, models.MakeUserPassword(request.Password)); err == nil {
+	if request.Code == "" {
+		if user, err = models.GetUserByEmailOrLogin(common.Database, emailOrLogin); err == nil {
+			if user.Password != models.MakeUserPassword(request.Password) {
+				c.Status(http.StatusForbidden)
+				return c.JSON(fiber.Map{"ERROR": "Wrong password"})
+			}
+		} else {
+			if v := req.Header.Get("Content-Type"); v != "" {
+				for _, chunk := range strings.Split(v, ";") {
+					if strings.EqualFold(chunk, "application/json") {
+						c.Status(http.StatusForbidden)
+						return c.JSON(fiber.Map{"ERROR": err.Error()})
+					}
+				}
+			} else {
+				return c.Render("login", fiber.Map{
+					"Error":    err.Error(),
+					"Remember": true,
+				})
+			}
+		}
+	}else{
+		if user, err = models.GetUserByCode(common.Database, request.Code); err != nil {
+			if v := req.Header.Get("Content-Type"); v != "" {
+				for _, chunk := range strings.Split(v, ";") {
+					if strings.EqualFold(chunk, "application/json") {
+						c.Status(http.StatusForbidden)
+						return c.JSON(fiber.Map{"ERROR": err.Error()})
+					}
+				}
+			} else {
+				return c.Render("login", fiber.Map{
+					"Error":    err.Error(),
+					"Remember": true,
+				})
+			}
+		}
+	}
+	//
+	if user, err = models.GetUserByEmailOrLogin(common.Database, emailOrLogin); err == nil {
+		if user.Password != models.MakeUserPassword(request.Password) {
+			c.Status(http.StatusForbidden)
+			return c.JSON(fiber.Map{"ERROR": "Wrong password"})
+		}
 		if v := req.Header.Get("Accept"); strings.EqualFold(v, "application/jwt") {
 			expiration := time.Now().Add(JWTLoginDuration)
 			claims := &JWTClaims{
-				Login: user.Login,
+				Login:    user.Login,
 				Password: user.Password,
 				StandardClaims: jwt.StandardClaims{
 					ExpiresAt: expiration.Unix(),
@@ -765,18 +809,18 @@ func postLoginHandler(c *fiber.Ctx) error {
 			token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 			if str, err := token.SignedString(JWTSecret); err == nil {
 				c.JSON(fiber.Map{
-					"MESSAGE": "OK",
-					"Token": str,
+					"MESSAGE":    "OK",
+					"Token":      str,
 					"Expiration": expiration,
 				})
-			}else{
+			} else {
 				c.Status(http.StatusInternalServerError)
 				c.JSON(fiber.Map{"ERROR": err.Error()})
 			}
 		} else {
 			value := map[string]string{
-				"email": user.Email,
-				"login": user.Login,
+				"email":    user.Email,
+				"login":    user.Login,
 				"password": request.Password,
 			}
 			if encoded, err := cookieHandler.Encode(COOKIE_NAME, value); err == nil {
@@ -789,10 +833,10 @@ func postLoginHandler(c *fiber.Ctx) error {
 					expires = time.Now().AddDate(1, 0, 0)
 				}
 				cookie := &fiber.Cookie{
-					Name:  COOKIE_NAME,
-					Value: encoded,
-					Path:  "/",
-					Expires: expires,
+					Name:     COOKIE_NAME,
+					Value:    encoded,
+					Path:     "/",
+					Expires:  expires,
 					SameSite: authMultipleConfig.SameSite,
 				}
 				c.Cookie(cookie)
@@ -805,28 +849,16 @@ func postLoginHandler(c *fiber.Ctx) error {
 					}
 				}
 				return c.Redirect("/", http.StatusFound)
-			}else{
+			} else {
 				c.Status(http.StatusInternalServerError)
-				c.JSON(fiber.Map{"ERROR": err.Error()})
+				return c.JSON(fiber.Map{"ERROR": err.Error()})
 			}
 		}
 	}else{
-		if v := req.Header.Get("Accept"); strings.EqualFold(v, "application/jwt") {
-			// TODO:
-		} else if v := req.Header.Get("Content-Type"); v != "" {
-			for _, chunk := range strings.Split(v, ";") {
-				if strings.EqualFold(chunk, "application/json") {
-					c.Status(http.StatusForbidden)
-					return c.JSON(fiber.Map{"ERROR": err.Error()})
-				}
-			}
-		} else {
-			return c.Render("login", fiber.Map{
-				"Error":    err.Error(),
-				"Remember": true,
-			})
-		}
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": err.Error()})
 	}
+
 	return nil
 }
 

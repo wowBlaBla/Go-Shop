@@ -86,6 +86,29 @@ definitions:
             type: string
         type: object
     type: object
+  config.StorageConfig:
+    properties:
+      enabled:
+        type: boolean
+      s3:
+        properties:
+          accessKeyID:
+            type: string
+          bucket:
+            type: string
+          enabled:
+            type: boolean
+          prefix:
+            type: string
+          region:
+            type: string
+          rewrite:
+            description: /bla/bla:path
+            type: string
+          secretAccessKey:
+            type: string
+        type: object
+    type: object
   config.WranglerConfig:
     properties:
       apiToken:
@@ -190,6 +213,9 @@ definitions:
         type: string
       resize:
         $ref: '#/definitions/config.ResizeConfig'
+        type: object
+      storage:
+        $ref: '#/definitions/config.StorageConfig'
         type: object
       symbol:
         type: string
@@ -978,6 +1004,8 @@ definitions:
     type: object
   handler.LoginRequest:
     properties:
+      code:
+        type: string
       email:
         type: string
       login:
@@ -1473,9 +1501,6 @@ definitions:
         items:
           $ref: '#/definitions/handler.ItemShortView'
         type: array
-      paymentMethods:
-        $ref: '#/definitions/handler.PaymentMethodsView'
-        type: object
       payments:
         items:
           $ref: '#/definitions/handler.PaymentView'
@@ -2860,6 +2885,37 @@ paths:
       summary: update account
       tags:
       - order
+  /api/v1/account/billing_profile/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Billing Profile ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete billing profile
+      tags:
+      - account
+      - frontend
   /api/v1/account/billing_profiles:
     get:
       consumes:
@@ -2887,6 +2943,74 @@ paths:
       summary: Get account billing profiles
       tags:
       - account
+      - frontend
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: profile
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewProfile'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ProfileView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create shipping profile in existing account
+      tags:
+      - profile
+      - frontend
+  /api/v1/account/billing_profiles/{id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Profile ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: profile
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewProfile'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ProfileView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Update billing profile
+      tags:
+      - profile
       - frontend
   /api/v1/account/orders:
     get:
@@ -3155,24 +3279,23 @@ paths:
       summary: Post order
       tags:
       - account
-  /api/v1/account/profiles:
-    post:
+  /api/v1/account/shipping_profile/{id}:
+    delete:
       consumes:
       - application/json
       parameters:
-      - description: body
-        in: body
-        name: profile
+      - description: Shipping Profile ID
+        in: path
+        name: id
         required: true
-        schema:
-          $ref: '#/definitions/handler.NewProfile'
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.ProfileView'
+            $ref: '#/definitions/handler.HTTPMessage'
         "404":
           description: Not Found
           schema:
@@ -3183,9 +3306,9 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Create shipping profile in existing account
+      summary: Delete shipping profile
       tags:
-      - profile
+      - account
       - frontend
   /api/v1/account/shipping_profiles:
     get:
@@ -3214,6 +3337,43 @@ paths:
       summary: Get account shipping profiles
       tags:
       - account
+      - frontend
+  /api/v1/account/shipping_profiles/{id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Profile ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: profile
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewProfile'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ProfileView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Update shipping profile
+      tags:
+      - profile
       - frontend
   /api/v1/categories:
     get:
@@ -4241,6 +4401,28 @@ paths:
       - BasicAuth: []
       summary: Get info
   /api/v1/login:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: login
+      tags:
+      - auth
+      - frontend
     post:
       consumes:
       - application/json

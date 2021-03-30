@@ -453,16 +453,16 @@ var renderCmd = &cobra.Command{
 										if p2 := path.Join(append(append([]string{output}, arr...), fmt.Sprintf("_index%s.html", language.Suffix))...); len(p2) > 0 {
 											// Update category file
 											if categoryFile, err := common.ReadCategoryFile(p2); err == nil {
-												min := categoryFile.BasePriceMin
-												max := categoryFile.BasePriceMax
-												for _, variation := range product.Variations {
-													// Min Max
-													if min > variation.BasePrice || min == 0 {
-														min = variation.BasePrice
-													}
-													if max < variation.BasePrice {
-														max = variation.BasePrice
-													}
+												variations := append([]*models.Variation{{
+													BasePrice: product.BasePrice,
+													Dimensions: product.Dimensions,
+													Width: product.Width,
+													Height: product.Height,
+													Depth: product.Depth,
+													Weight: product.Weight,
+													Properties: product.Properties,
+												}}, product.Variations...)
+												for _, variation := range variations {
 													// Price
 													if categoryFile.Price.Min > variation.BasePrice || categoryFile.Price.Min == 0 {
 														categoryFile.Price.Min = variation.BasePrice
@@ -902,8 +902,6 @@ var renderCmd = &cobra.Command{
 														}
 													}
 												}
-												categoryFile.BasePriceMin = min
-												categoryFile.BasePriceMax = max
 												// Sort to put Products options above Variation options
 												sort.Slice(categoryFile.Options, func(i, j int) bool {
 													if categoryFile.Options[i].Type == categoryFile.Options[j].Type {
