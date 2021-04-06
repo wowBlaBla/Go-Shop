@@ -7,6 +7,7 @@ import (
 	"github.com/google/logger"
 	"github.com/nfnt/resize"
 	"github.com/yonnic/goshop/config"
+	"github.com/yonnic/goshop/storage"
 	"gorm.io/gorm"
 	"image"
 	"image/jpeg"
@@ -29,7 +30,8 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210330154431"
+	COMPILED = "20210406165749"
+	STORAGE storage.Storage
 	//
 	Started          time.Time
 	Config           *config.Config
@@ -59,6 +61,7 @@ type CategoryFile struct {
 	Weight       MiniMaxCF
 	Widgets      []WidgetCF
 	Type         string
+	Count int
 	//
 	Content string
 }
@@ -119,6 +122,7 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		Weight MiniMaxCF
 		Widgets []WidgetCF
 		Type string
+		Count int
 	}{
 		ID: p.ID,
 		Date: p.Date,
@@ -133,6 +137,7 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		Weight: p.Weight,
 		Widgets: p.Widgets,
 		Type: p.Type,
+		Count: p.Count,
 	}, "", "   "); err == nil {
 		bts = append(bts, "\n\n"...)
 		bts = append(bts, p.Content...)
@@ -205,6 +210,8 @@ type ProductFile struct {
 	Product    ProductPF
 	Related    []string `json:",omitempty"`
 	Widgets    []WidgetCF `json:",omitempty"`
+	Sku string `json:",omitempty"`
+	Sort int
 	//
 	Content string
 }
@@ -281,6 +288,7 @@ type VariationPF struct {
 	//Sending string `json:",omitempty"`
 	Time string `json:",omitempty"`
 	Properties []PropertyPF `json:",omitempty"`
+	Sku string `json:",omitempty"`
 	Selected bool
 }
 
@@ -332,6 +340,8 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Product    ProductPF
 		Related []string `json:",omitempty"`
 		Widgets []WidgetCF `json:",omitempty"`
+		Sku string
+		Sort int
 	}{
 		ID: p.ID,
 		Type: p.Type,
@@ -351,6 +361,8 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Product: p.Product,
 		Related: p.Related,
 		Widgets: p.Widgets,
+		Sku: p.Sku,
+		Sort: p.Sort,
 	}, "", "   "); err == nil {
 		bts = append(bts, "\n\n"...)
 		bts = append(bts, p.Content...)
@@ -643,7 +655,9 @@ func ImageResize(src, sizes string) ([]Image, error) {
 				return images, err
 			}
 			out.Close()
-			os.Chtimes(path.Join(path.Dir(src), "resize", filename), fi1.ModTime(), fi1.ModTime())
+			if err = os.Chtimes(path.Join(path.Dir(src), "resize", filename), fi1.ModTime(), fi1.ModTime()); err != nil {
+				logger.Warningf("%+v", err)
+			}
 		}
 		images = append(images, Image{Filename: filename, Size: fmt.Sprintf("%dw", width)})
 	}

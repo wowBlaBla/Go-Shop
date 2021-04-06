@@ -316,7 +316,7 @@ type CouponRequest struct {
 
 // @security BasicAuth
 // UpdateCoupon godoc
-// @Summary update coupon
+// @Summary Update coupon
 // @Accept json
 // @Produce json
 // @Param option body CouponShortView true "body"
@@ -363,7 +363,9 @@ func putCouponHandler(c *fiber.Ctx) error {
 	coupon.Limit = request.Limit
 	coupon.Count = request.Count
 	coupon.ApplyTo = request.ApplyTo
-	models.DeleteAllCategoriesFromCoupon(common.Database, coupon)
+	if err = models.DeleteAllCategoriesFromCoupon(common.Database, coupon); err != nil {
+		logger.Warningf("%+v", err)
+	}
 	for _, v := range strings.Split(request.Categories, ",") {
 		if id, err := strconv.Atoi(v); err == nil {
 			if category, err := models.GetCategory(common.Database, id); err == nil {
@@ -374,7 +376,9 @@ func putCouponHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
-	models.DeleteAllProductsFromCoupon(common.Database, coupon)
+	if err = models.DeleteAllProductsFromCoupon(common.Database, coupon); err != nil {
+		logger.Warningf("%+v", err)
+	}
 	for _, v := range strings.Split(request.Products, ",") {
 		if id, err := strconv.Atoi(v); err == nil {
 			if product, err := models.GetProduct(common.Database, id); err == nil {

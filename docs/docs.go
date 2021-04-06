@@ -85,9 +85,10 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "order"
+                    "frontend",
+                    "account"
                 ],
-                "summary": "update account",
+                "summary": "Update account",
                 "parameters": [
                     {
                         "description": "body",
@@ -148,55 +149,6 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handler.Account2View"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/account/billing_profile/{id}": {
-            "delete": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "account",
-                    "frontend"
-                ],
-                "summary": "Delete billing profile",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Billing Profile ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPMessage"
                         }
                     },
                     "404": {
@@ -308,6 +260,48 @@ var doc = `{
             }
         },
         "/api/v1/account/billing_profiles/{id}": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account",
+                    "frontend"
+                ],
+                "summary": "Get billing profile",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "BillingProfile ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.OrderView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {
@@ -348,6 +342,53 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handler.ProfileView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account",
+                    "frontend"
+                ],
+                "summary": "Delete billing profile",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Billing Profile ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
                         }
                     },
                     "404": {
@@ -455,7 +496,7 @@ var doc = `{
                 "tags": [
                     "account"
                 ],
-                "summary": "Post order",
+                "summary": "Checkout stripe",
                 "parameters": [
                     {
                         "description": "body",
@@ -547,7 +588,7 @@ var doc = `{
                 "tags": [
                     "order"
                 ],
-                "summary": "update order by user",
+                "summary": "Update order by user",
                 "parameters": [
                     {
                         "description": "body",
@@ -773,7 +814,149 @@ var doc = `{
                 }
             }
         },
-        "/api/v1/account/shipping_profile/{id}": {
+        "/api/v1/account/shipping_profiles": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "description": "get account shipping profiles",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account",
+                    "frontend"
+                ],
+                "summary": "Get account shipping profiles",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handler.ProfileView"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/account/shipping_profiles/{id}": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account",
+                    "frontend"
+                ],
+                "summary": "Get shipping profile",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ShippingProfile ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.OrderView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "profile",
+                    "frontend"
+                ],
+                "summary": "Update shipping profile",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Profile ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "profile",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.NewProfile"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ProfileView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "security": [
                     {
@@ -822,14 +1005,8 @@ var doc = `{
                 }
             }
         },
-        "/api/v1/account/shipping_profiles": {
+        "/api/v1/account/wishes": {
             "get": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "get account shipping profiles",
                 "consumes": [
                     "application/json"
                 ],
@@ -840,15 +1017,61 @@ var doc = `{
                     "account",
                     "frontend"
                 ],
-                "summary": "Get account shipping profiles",
+                "summary": "Get account wishes",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/handler.ProfileView"
-                            }
+                            "$ref": "#/definitions/handler.WishesView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account",
+                    "frontend"
+                ],
+                "summary": "Create account wish",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "option",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.WithRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.WishWrapperView"
                         }
                     },
                     "404": {
@@ -866,8 +1089,8 @@ var doc = `{
                 }
             }
         },
-        "/api/v1/account/shipping_profiles/{id}": {
-            "put": {
+        "/api/v1/account/wishes/{id}": {
+            "get": {
                 "security": [
                     {
                         "BasicAuth": []
@@ -880,33 +1103,71 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "profile",
+                    "account",
                     "frontend"
                 ],
-                "summary": "Update shipping profile",
+                "summary": "Get account wish",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Profile ID",
+                        "description": "Wish ID",
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "profile",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.NewProfile"
-                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.ProfileView"
+                            "$ref": "#/definitions/handler.WishWrapperView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "account",
+                    "frontend"
+                ],
+                "summary": "Delete account wish",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Wish ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
                         }
                     },
                     "404": {
@@ -1252,6 +1513,61 @@ var doc = `{
                 ],
                 "summary": "Delete category",
                 "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "category"
+                ],
+                "summary": "patch category",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "option",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CategoryPatchRequest"
+                        }
+                    },
                     {
                         "type": "integer",
                         "description": "Category ID",
@@ -1703,7 +2019,7 @@ var doc = `{
                 "tags": [
                     "coupon"
                 ],
-                "summary": "update coupon",
+                "summary": "Update coupon",
                 "parameters": [
                     {
                         "description": "body",
@@ -1845,57 +2161,6 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handler.DashboardView"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/delivery": {
-            "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "description": "my description",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "frontend"
-                ],
-                "summary": "(DEPRECATED) Calculate shipping cost",
-                "parameters": [
-                    {
-                        "description": "body",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.DeliveryRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.DeliveriesCosts"
                         }
                     },
                     "404": {
@@ -2121,7 +2386,7 @@ var doc = `{
                 "tags": [
                     "file"
                 ],
-                "summary": "update file",
+                "summary": "Update file",
                 "parameters": [
                     {
                         "description": "body",
@@ -2433,7 +2698,7 @@ var doc = `{
                 "tags": [
                     "image"
                 ],
-                "summary": "update image",
+                "summary": "Update image",
                 "parameters": [
                     {
                         "description": "body",
@@ -2569,7 +2834,7 @@ var doc = `{
                     "auth",
                     "frontend"
                 ],
-                "summary": "login",
+                "summary": "Get login",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -2602,7 +2867,7 @@ var doc = `{
                     "auth",
                     "frontend"
                 ],
-                "summary": "login",
+                "summary": "Lost login",
                 "parameters": [
                     {
                         "description": "body",
@@ -2875,7 +3140,7 @@ var doc = `{
                 "tags": [
                     "notification"
                 ],
-                "summary": "update email template",
+                "summary": "Update email template",
                 "parameters": [
                     {
                         "description": "body",
@@ -3161,7 +3426,7 @@ var doc = `{
                 "tags": [
                     "option"
                 ],
-                "summary": "update option",
+                "summary": "Update option",
                 "parameters": [
                     {
                         "description": "body",
@@ -3355,7 +3620,7 @@ var doc = `{
                 "tags": [
                     "order"
                 ],
-                "summary": "update order",
+                "summary": "Update order",
                 "parameters": [
                     {
                         "description": "body",
@@ -3633,41 +3898,6 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handler.HTTPMessage"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/payment_methods": {
-            "get": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "account",
-                    "frontend"
-                ],
-                "summary": "(DEPRECATED) Get account payment methods",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.PaymentMethodsView"
                         }
                     },
                     "404": {
@@ -4617,6 +4847,52 @@ var doc = `{
                 }
             }
         },
+        "/api/v1/register": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth",
+                    "frontend"
+                ],
+                "summary": "register",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "form",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/render": {
             "post": {
                 "security": [
@@ -4684,7 +4960,7 @@ var doc = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.LoginRequest"
+                            "$ref": "#/definitions/handler.ResetRequest"
                         }
                     }
                 ],
@@ -5477,7 +5753,7 @@ var doc = `{
                 "tags": [
                     "time"
                 ],
-                "summary": "update time",
+                "summary": "Update time",
                 "parameters": [
                     {
                         "description": "body",
@@ -5671,7 +5947,7 @@ var doc = `{
                 "tags": [
                     "transaction"
                 ],
-                "summary": "update transaction",
+                "summary": "Update transaction",
                 "parameters": [
                     {
                         "description": "body",
@@ -5957,7 +6233,7 @@ var doc = `{
                 "tags": [
                     "transport"
                 ],
-                "summary": "update transport",
+                "summary": "Update transport",
                 "parameters": [
                     {
                         "description": "body",
@@ -6197,7 +6473,7 @@ var doc = `{
                 "tags": [
                     "user"
                 ],
-                "summary": "update user",
+                "summary": "Update user",
                 "parameters": [
                     {
                         "description": "body",
@@ -7137,7 +7413,7 @@ var doc = `{
                 "tags": [
                     "vendor"
                 ],
-                "summary": "update vendor",
+                "summary": "Update vendor",
                 "parameters": [
                     {
                         "description": "body",
@@ -7386,7 +7662,7 @@ var doc = `{
                 "tags": [
                     "widget"
                 ],
-                "summary": "update widget",
+                "summary": "Update widget",
                 "parameters": [
                     {
                         "description": "body",
@@ -7672,7 +7948,7 @@ var doc = `{
                 "tags": [
                     "zone"
                 ],
-                "summary": "update zone",
+                "summary": "Update zone",
                 "parameters": [
                     {
                         "description": "body",
@@ -8035,7 +8311,13 @@ var doc = `{
                 "id": {
                     "type": "integer"
                 },
+                "lastname": {
+                    "type": "string"
+                },
                 "login": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "notification": {
@@ -8055,6 +8337,12 @@ var doc = `{
                 },
                 "token": {
                     "type": "string"
+                },
+                "wishes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.WishView"
+                    }
                 }
             }
         },
@@ -8085,7 +8373,13 @@ var doc = `{
                 "id": {
                     "type": "integer"
                 },
+                "lastname": {
+                    "type": "string"
+                },
                 "login": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "notification": {
@@ -8101,6 +8395,12 @@ var doc = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handler.ProfileView"
+                    }
+                },
+                "wishes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.WishView"
                     }
                 }
             }
@@ -8298,6 +8598,9 @@ var doc = `{
                 "content": {
                     "type": "string"
                 },
+                "customization": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -8315,6 +8618,22 @@ var doc = `{
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "handler.CategoryPatchRequest": {
+            "type": "object",
+            "properties": {
+                "product": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "type": "integer"
+                        },
+                        "sort": {
+                            "type": "integer"
+                        }
+                    }
                 }
             }
         },
@@ -8634,81 +8953,6 @@ var doc = `{
                 "transfers": {
                     "type": "object",
                     "$ref": "#/definitions/handler.TransferView"
-                }
-            }
-        },
-        "handler.DeliveriesCosts": {
-            "type": "array",
-            "items": {
-                "$ref": "#/definitions/handler.DeliveryCost"
-            }
-        },
-        "handler.DeliveryCost": {
-            "type": "object",
-            "properties": {
-                "by": {
-                    "type": "string"
-                },
-                "byVolume": {
-                    "type": "number"
-                },
-                "byWeight": {
-                    "type": "number"
-                },
-                "cost": {
-                    "type": "string"
-                },
-                "fees": {
-                    "type": "number"
-                },
-                "id": {
-                    "description": "transport ID",
-                    "type": "integer"
-                },
-                "itemFee": {
-                    "type": "string"
-                },
-                "orderFee": {
-                    "type": "string"
-                },
-                "special": {
-                    "description": "in case of ZIP match",
-                    "type": "boolean"
-                },
-                "sum": {
-                    "type": "number"
-                },
-                "thumbnail": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "number"
-                },
-                "volume": {
-                    "type": "number"
-                },
-                "weight": {
-                    "type": "number"
-                }
-            }
-        },
-        "handler.DeliveryRequest": {
-            "type": "object",
-            "properties": {
-                "country": {
-                    "type": "string"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handler.NewItem"
-                    }
-                },
-                "zip": {
-                    "type": "string"
                 }
             }
         },
@@ -9116,6 +9360,9 @@ var doc = `{
                 "size": {
                     "type": "integer"
                 },
+                "thumbnail": {
+                    "type": "string"
+                },
                 "updated": {
                     "type": "string"
                 },
@@ -9275,7 +9522,6 @@ var doc = `{
             "type": "object",
             "properties": {
                 "comment": {
-                    "description": "Variation VariationShortView ` + "`" + `json:\",omitempty\"` + "`" + `\nProperties []PropertyShortView ` + "`" + `json:\",omitempty\"` + "`" + `",
                     "type": "string"
                 },
                 "description": {
@@ -9289,6 +9535,12 @@ var doc = `{
                 },
                 "price": {
                     "type": "number"
+                },
+                "properties": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.PropertyShortView"
+                    }
                 },
                 "quantity": {
                     "type": "integer"
@@ -9304,6 +9556,10 @@ var doc = `{
                 },
                 "uuid": {
                     "type": "string"
+                },
+                "variation": {
+                    "type": "object",
+                    "$ref": "#/definitions/handler.VariationShortView"
                 }
             }
         },
@@ -9465,6 +9721,15 @@ var doc = `{
                     "type": "string"
                 },
                 "email": {
+                    "type": "string"
+                },
+                "lastname": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "password": {
                     "type": "string"
                 },
                 "shippingProfile": {
@@ -10146,11 +10411,11 @@ var doc = `{
                 "comment": {
                     "type": "string"
                 },
+                "createdAt": {
+                    "type": "string"
+                },
                 "delivery": {
                     "type": "number"
-                },
-                "description": {
-                    "type": "string"
                 },
                 "id": {
                     "type": "integer"
@@ -10282,55 +10547,6 @@ var doc = `{
                 },
                 "valueId": {
                     "type": "integer"
-                }
-            }
-        },
-        "handler.PaymentMethodsView": {
-            "type": "object",
-            "properties": {
-                "advancePayment": {
-                    "type": "object",
-                    "properties": {
-                        "details": {
-                            "type": "string"
-                        },
-                        "enabled": {
-                            "type": "boolean"
-                        }
-                    }
-                },
-                "default": {
-                    "type": "string"
-                },
-                "mollie": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean"
-                        },
-                        "methods": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                },
-                "onDelivery": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean"
-                        }
-                    }
-                },
-                "stripe": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean"
-                        }
-                    }
                 }
             }
         },
@@ -10751,6 +10967,9 @@ var doc = `{
                 "sku": {
                     "type": "string"
                 },
+                "sort": {
+                    "type": "integer"
+                },
                 "thumbnail": {
                     "type": "string"
                 },
@@ -10878,11 +11097,45 @@ var doc = `{
                 }
             }
         },
+        "handler.RegisterRequest": {
+            "type": "object",
+            "properties": {
+                "csrf": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "lastname": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "password2": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.RelatedProduct": {
             "type": "object",
             "properties": {
                 "id": {
                     "type": "integer"
+                }
+            }
+        },
+        "handler.ResetRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "login": {
+                    "type": "string"
                 }
             }
         },
@@ -11387,6 +11640,12 @@ var doc = `{
         "handler.User2View": {
             "type": "object",
             "properties": {
+                "lastname": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
                 "newPassword": {
                     "type": "string"
                 },
@@ -11413,7 +11672,13 @@ var doc = `{
                 "id": {
                     "type": "integer"
                 },
+                "lastname": {
+                    "type": "string"
+                },
                 "login": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "notification": {
@@ -11977,6 +12242,97 @@ var doc = `{
                 },
                 "total": {
                     "type": "integer"
+                }
+            }
+        },
+        "handler.WishView": {
+            "type": "object",
+            "properties": {
+                "categoryId": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "properties": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.PropertyShortView"
+                    }
+                },
+                "thumbnail": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "uuid": {
+                    "type": "string"
+                },
+                "variation": {
+                    "type": "object",
+                    "$ref": "#/definitions/handler.VariationShortView"
+                }
+            }
+        },
+        "handler.WishWrapperView": {
+            "type": "object",
+            "properties": {
+                "categoryId": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "thumbnail": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.WishesView": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/handler.WishView"
+            }
+        },
+        "handler.WithRequest": {
+            "type": "object",
+            "properties": {
+                "categoryId": {
+                    "type": "integer"
+                },
+                "uuid": {
+                    "type": "string"
                 }
             }
         },

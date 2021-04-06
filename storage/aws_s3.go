@@ -14,7 +14,6 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
-	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -60,7 +59,6 @@ func NewAWSS3Storage(accessKeyID, secretAccessKey, region, bucket, prefix string
 }
 
 type AWSS3Storage struct {
-	dir string
 	session *session.Session
 	AccessKeyID string
 	SecretAccessKey string
@@ -77,46 +75,6 @@ type AWSS3StorageItem struct {
 	Url string
 	Size int64
 	Modified time.Time
-}
-
-func (storage *AWSS3Storage) copy(src, dst string) error {
-	fi1, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-	if fi2, err := os.Stat(dst); err == nil {
-		if fi1.ModTime().Equal(fi2.ModTime()) && fi1.Size() == fi2.Size() {
-			//logger.Infof("ModTime and Size are the same, skip")
-			return nil
-		}
-	}
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	if _, err := os.Stat(path.Dir(dst)); err != nil {
-		if err = os.MkdirAll(path.Dir(dst), 0755); err != nil {
-			return err
-		}
-	}
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return err
-	}
-	err = out.Close()
-	if err != nil {
-		return err
-	}
-	return os.Chtimes(dst, fi1.ModTime(), fi1.ModTime())
 }
 
 func (storage *AWSS3Storage) upload(src, location string) (string, error) {
@@ -152,15 +110,14 @@ func (storage *AWSS3Storage) delete(location string) error {
 
 	_, err := svc.DeleteObject(input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
+		if err, ok := err.(awserr.Error); ok {
+			switch err.Code() {
 			default:
 				return err
 			}
 		} else {
 			return err
 		}
-		return err
 	}
 	return nil
 }
@@ -287,7 +244,7 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 				}
 
 				if err = os.Chtimes(dst2, fi1.ModTime(), fi1.ModTime()); err != nil {
-					logger.Warningf("%v")
+					logger.Warningf("%v", err)
 				}
 				//
 				if url, err := storage.upload(dst2, path.Join(path.Dir(location), "resize", filename)); err == nil {
@@ -325,8 +282,11 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 		//logger.Infof("%v: %+v", key, value)
 		if bts, err := json.Marshal(value); err == nil {
 			file := path.Join(storage.temp, key + ".json")
-			ioutil.WriteFile(file, bts, 0755)
-			if err = os.Chtimes(file, value.Modified, value.Modified); err != nil {
+			if err = ioutil.WriteFile(file, bts, 0755); err == nil {
+				if err = os.Chtimes(file, value.Modified, value.Modified); err != nil {
+					logger.Warningf("%v", err)
+				}
+			}else{
 				logger.Warningf("%v", err)
 			}
 		}

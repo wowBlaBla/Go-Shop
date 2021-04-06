@@ -360,7 +360,6 @@ func putValueHandler(c *fiber.Ctx) error {
 			if err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
-				return err
 			}
 			var title string
 			if v, found := data.Value["Title"]; found && len(v) > 0 {

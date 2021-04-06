@@ -7,12 +7,13 @@ import (
 
 type Category struct {
 	gorm.Model
-	Name string
-	Title string
-	Description string
-	Thumbnail string
-	Content string
-	Products []*Product `gorm:"many2many:categories_products;"`
+	Name          string
+	Title         string
+	Description   string
+	Thumbnail     string
+	Content       string
+	Products      []*Product `gorm:"many2many:categories_products;"`
+	Customization string
 	//
 	Parent *Category `gorm:"foreignKey:ParentId"`
 	ParentId uint

@@ -8,6 +8,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/logger"
+	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"github.com/yonnic/goshop/common"
 	"github.com/yonnic/goshop/models"
 	"math/rand"
@@ -24,6 +25,7 @@ type AccountView struct {
 	BillingProfileId uint `json:",omitempty"`
 	ShippingProfiles []ProfileView `json:",omitempty"`
 	ShippingProfileId uint `json:",omitempty"`
+	Wishes []WishView
 	UserView
 }
 
@@ -56,6 +58,32 @@ func getAccountHandler(c *fiber.Ctx) error {
 					if len(user.ShippingProfiles) > 0 {
 						view.ShippingProfileId = user.ShippingProfiles[len(user.ShippingProfiles) - 1].ID
 					}
+					if wishes, err := models.GetWishesByUserId(common.Database, user.ID); err == nil {
+						var views []WishWrapperView
+						if bts, err := json.Marshal(wishes); err == nil {
+							if err = json.Unmarshal(bts, &views); err == nil {
+								view.Wishes = make([]WishView, len(views))
+								for i := 0; i < len(views); i++ {
+									view.Wishes[i].WishWrapperView = views[i]
+									if err = json.Unmarshal([]byte(wishes[i].Description), &view.Wishes[i].WishItemView); err == nil {
+										view.Wishes[i].Description = ""
+									}else{
+										c.Status(http.StatusInternalServerError)
+										return c.JSON(HTTPError{err.Error()})
+									}
+								}
+							}else{
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+						}else{
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+					}else{
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
 					return c.JSON(view)
 				}else{
 					c.Status(http.StatusInternalServerError)
@@ -72,7 +100,10 @@ func getAccountHandler(c *fiber.Ctx) error {
 
 type NewAccount struct {
 	Email string
+	Password string
 	Csrf string
+	Name string
+	Lastname string
 	//
 	BillingProfile NewProfile
 	ShippingProfile NewProfile
@@ -118,7 +149,18 @@ func postAccountHandler(c *fiber.Ctx) error {
 	if res := regexp.MustCompile(`^([^@]+)@`).FindAllStringSubmatch(email, 1); len(res) > 0 && len(res[0]) > 1 {
 		login = fmt.Sprintf("%v-%d", res[0][1], rand.New(rand.NewSource(time.Now().UnixNano())).Intn(8999) + 1000)
 	}
-	password := NewPassword(12)
+	var password = NewPassword(12)
+	if request.Password != "" {
+		password = request.Password
+	}
+	request.Name = strings.TrimSpace(request.Name)
+	if len(request.Name) > 32 {
+		request.Name = request.Name[0:32]
+	}
+	request.Lastname = strings.TrimSpace(request.Lastname)
+	if len(request.Lastname) > 32 {
+		request.Lastname = request.Lastname[0:32]
+	}
 	logger.Infof("Create new user %v %v by email %v", login, password, email)
 	user := &models.User{
 		Enabled: true,
@@ -126,6 +168,8 @@ func postAccountHandler(c *fiber.Ctx) error {
 		EmailConfirmed: true,
 		Login: login,
 		Password: models.MakeUserPassword(password),
+		Name: request.Name,
+		Lastname: request.Lastname,
 		Role: models.ROLE_USER,
 		Notification: true,
 	}
@@ -158,6 +202,27 @@ func postAccountHandler(c *fiber.Ctx) error {
 		return c.JSON(HTTPError{err.Error()})
 	}
 	user.ID = id
+	//
+	template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_CREATE_ACCOUNT)
+	if err == nil {
+		if user, err := models.GetUser(common.Database, int(user.ID)); err == nil {
+			if user.EmailConfirmed {
+				logger.Infof("Send email to user: %+v", user.Email)
+				vars := &common.NotificationTemplateVariables{
+					Url: common.Config.Url,
+					Email: user.Email,
+					Password: password,
+				}
+				if err := common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), mail.NewEmail(user.Login, user.Email), template.Topic, template.Message, vars); err != nil {
+					logger.Warningf("%+v", err)
+				}
+			}else{
+				logger.Warningf("User's %v email %v is not confirmed", user.Login, user.Email)
+			}
+		} else {
+			logger.Warningf("%+v", err)
+		}
+	}
 	// Billing ShillingProfile
 	billingProfile := &models.BillingProfile{
 		Name:     request.BillingProfile.Name,
@@ -355,11 +420,13 @@ type User2View struct {
 	OldPassword string
 	NewPassword string
 	NewPassword2 string
+	Name string
+	Lastname string
 }
 
 // @security BasicAuth
 // UpdateAccount godoc
-// @Summary update account
+// @Summary Update account
 // @Accept json
 // @Produce json
 // @Param account body AccountView true "body"
@@ -367,7 +434,8 @@ type User2View struct {
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/account [put]
-// @Tags order
+// @Tags frontend
+// @Tags account
 func putAccountHandler(c *fiber.Ctx) error {
 	if v := c.Locals("user"); v != nil {
 		var user *models.User
@@ -381,30 +449,112 @@ func putAccountHandler(c *fiber.Ctx) error {
 			request.OldPassword = strings.TrimSpace(request.OldPassword)
 			request.NewPassword = strings.TrimSpace(request.NewPassword)
 			request.NewPassword2 = strings.TrimSpace(request.NewPassword2)
+			request.Name = strings.TrimSpace(request.Name)
+			if len(request.Name) > 32 {
+				request.Name = request.Name[0:32]
+			}
+			request.Lastname = strings.TrimSpace(request.Lastname)
+			if len(request.Lastname) > 32 {
+				request.Lastname = request.Lastname[0:32]
+			}
+			if request.NewPassword != "" {
+				// !!! IMPORTANT !!!
+				/*if models.MakeUserPassword(request.OldPassword) != user.Password {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{"Incorrect password"})
+				}*/
+				if len(request.NewPassword) < 6 {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{"Too short password"})
+				}
+				if len(request.NewPassword) > 32 {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{"Too long password"})
+				}
+				if request.NewPassword != request.NewPassword2 {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{"Passwords mismatch"})
+				}
+				user.Password = models.MakeUserPassword(request.NewPassword2)
+			}
 			//
-			if models.MakeUserPassword(request.OldPassword) != user.Password {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Incorrect password"})
-			}
-			if len(request.NewPassword) < 6 {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Too short password"})
-			}
-			if len(request.NewPassword) > 32 {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Too long password"})
-			}
-			if request.NewPassword != request.NewPassword2 {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Passwords mismatch"})
-			}
-			user.Password = models.MakeUserPassword(request.NewPassword2)
+			user.Name = request.Name
+			user.Lastname = request.Lastname
 			if err := models.UpdateUser(common.Database, user); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
-			c.Status(http.StatusOK)
-			return c.JSON(HTTPMessage{"OK"})
+			//
+			var err error
+			if user, err = models.GetUserFull(common.Database, user.ID); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			var view struct {
+				AccountView
+				Token string
+				Expiration time.Time
+			}
+			expiration := time.Now().Add(JWTLoginDuration)
+			claims := &JWTClaims{
+				Login: user.Login,
+				Password: user.Password,
+				StandardClaims: jwt.StandardClaims{
+					ExpiresAt: expiration.Unix(),
+				},
+			}
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+			str, err := token.SignedString(JWTSecret)
+			if err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(fiber.Map{"ERROR": err.Error()})
+			}
+			view.Token = str
+			view.Expiration = expiration
+			if bts, err := json.Marshal(user); err == nil {
+				if err = json.Unmarshal(bts, &view); err == nil {
+					view.Admin = user.Role < models.ROLE_USER
+					if len(user.BillingProfiles) > 0 {
+						view.BillingProfileId = user.BillingProfiles[len(user.BillingProfiles) - 1].ID
+					}
+					if len(user.ShippingProfiles) > 0 {
+						view.ShippingProfileId = user.ShippingProfiles[len(user.ShippingProfiles) - 1].ID
+					}
+					if wishes, err := models.GetWishesByUserId(common.Database, user.ID); err == nil {
+						var views []WishWrapperView
+						if bts, err := json.Marshal(wishes); err == nil {
+							if err = json.Unmarshal(bts, &views); err == nil {
+								view.Wishes = make([]WishView, len(views))
+								for i := 0; i < len(views); i++ {
+									view.Wishes[i].WishWrapperView = views[i]
+									if err = json.Unmarshal([]byte(wishes[i].Description), &view.Wishes[i].WishItemView); err == nil {
+										view.Wishes[i].Description = ""
+									}else{
+										c.Status(http.StatusInternalServerError)
+										return c.JSON(HTTPError{err.Error()})
+									}
+								}
+							}else{
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+						}else{
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+					}else{
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					return c.JSON(view)
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
 		}else{
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{"User not found"})
@@ -529,6 +679,51 @@ func postAccountBillingProfileHandler(c *fiber.Ctx) error {
 	return c.JSON(view)
 }
 
+// GetBillingProfile godoc
+// @Summary Get billing profile
+// @Accept json
+// @Produce json
+// @Param id path int true "BillingProfile ID"
+// @Success 200 {object} OrderView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/billing_profiles/{id} [get]
+// @Tags account
+// @Tags frontend
+func getAccountBillingProfileHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	var userId uint
+	if v := c.Locals("user"); v != nil {
+		if user, ok := v.(*models.User); ok {
+			userId = user.ID
+		}
+	}
+	if profile, err := models.GetBillingProfile(common.Database, uint(id)); err == nil {
+		if profile.UserId != userId {
+			c.Status(http.StatusForbidden)
+			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
+		}
+		var view BillingProfileOrderView
+		if bts, err := json.MarshalIndent(profile, "", "   "); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
 // @security BasicAuth
 // UpdateBillingProfile godoc
 // @Summary Update billing profile
@@ -613,7 +808,7 @@ func putAccountBillingProfileHandler(c *fiber.Ctx) error {
 // @Success 200 {object} HTTPMessage
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
-// @Router /api/v1/account/billing_profile/{id} [delete]
+// @Router /api/v1/account/billing_profiles/{id} [delete]
 // @Tags account
 // @Tags frontend
 func delAccountBillingProfileHandler(c *fiber.Ctx) error {
@@ -750,6 +945,51 @@ func postAccountShippingProfileHandler(c *fiber.Ctx) error {
 	return c.JSON(view)
 }
 
+// GetShippingProfile godoc
+// @Summary Get shipping profile
+// @Accept json
+// @Produce json
+// @Param id path int true "ShippingProfile ID"
+// @Success 200 {object} OrderView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/shipping_profiles/{id} [get]
+// @Tags account
+// @Tags frontend
+func getAccountShippingProfileHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	var userId uint
+	if v := c.Locals("user"); v != nil {
+		if user, ok := v.(*models.User); ok {
+			userId = user.ID
+		}
+	}
+	if profile, err := models.GetShippingProfile(common.Database, uint(id)); err == nil {
+		if profile.UserId != userId {
+			c.Status(http.StatusForbidden)
+			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
+		}
+		var view ShippingProfileOrderView
+		if bts, err := json.MarshalIndent(profile, "", "   "); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
 // @security BasicAuth
 // UpdateShippingProfile godoc
 // @Summary Update shipping profile
@@ -834,7 +1074,7 @@ func putAccountShippingProfileHandler(c *fiber.Ctx) error {
 // @Success 200 {object} HTTPMessage
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
-// @Router /api/v1/account/shipping_profile/{id} [delete]
+// @Router /api/v1/account/shipping_profiles/{id} [delete]
 // @Tags account
 // @Tags frontend
 func delAccountShippingProfileHandler(c *fiber.Ctx) error {
@@ -864,6 +1104,82 @@ func delAccountShippingProfileHandler(c *fiber.Ctx) error {
 	//
 	if err = models.DeleteShippingProfile(common.Database, profile); err == nil {
 		return c.JSON(HTTPMessage{"OK"})
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+type OrdersView []*OrderView
+
+type OrderView struct {
+	ID uint
+	CreatedAt time.Time
+	Items []*ItemView
+	Status string
+	Sum float64
+	Delivery float64
+	Total float64
+	Comment string `json:",omitempty"`
+}
+
+type ItemView struct{
+	ID uint
+	Uuid string
+	Title string
+	Description string `json:",omitempty"`
+	Path string
+	Thumbnail string
+	Variation VariationShortView `json:",omitempty"`
+	Properties []PropertyShortView `json:",omitempty"`
+	Comment string `json:",omitempty"`
+	Price float64
+	Quantity int
+	Total float64
+}
+
+// GetOrders godoc
+// @Summary Get account orders
+// @Accept json
+// @Produce json
+// @Success 200 {object} OrdersView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/orders [get]
+// @Tags account
+// @Tags frontend
+func getAccountOrdersHandler(c *fiber.Ctx) error {
+	var userId uint
+	if v := c.Locals("user"); v != nil {
+		if user, ok := v.(*models.User); ok {
+			userId = user.ID
+		}
+	}
+	if orders, err := models.GetOrdersByUserId(common.Database, userId); err == nil {
+		var views []*OrderView
+		if bts, err := json.Marshal(orders); err == nil {
+			if err = json.Unmarshal(bts, &views); err == nil {
+				for i := 0; i < len(views); i++ {
+					for j := 0; j < len(views[i].Items); j++ {
+						var itemView ItemShortView
+						if err = json.Unmarshal([]byte(views[i].Items[j].Description), &itemView); err == nil {
+							views[i].Items[j].Description = ""
+							views[i].Items[j].Properties = itemView.Properties
+							views[i].Items[j].Variation = itemView.Variation
+						}else{
+							logger.Warningf("%+v", err)
+						}
+					}
+				}
+				return c.JSON(views)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
 	}else{
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
@@ -914,6 +1230,92 @@ func postAccountOrdersHandler(c *fiber.Ctx) error {
 	orderView.OrderShortView = view
 	c.Status(http.StatusOK)
 	return c.JSON(orderView)
+}
+
+// GetOrder godoc
+// @Summary Get order
+// @Accept json
+// @Produce json
+// @Param id path int true "Order ID"
+// @Success 200 {object} OrderView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/orders/{id} [get]
+// @Tags account
+// @Tags frontend
+func getAccountOrderHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	var userId uint
+	if v := c.Locals("user"); v != nil {
+		if user, ok := v.(*models.User); ok {
+			userId = user.ID
+		}
+	}
+	if order, err := models.GetOrder(common.Database, id); err == nil {
+		if order.UserId != userId {
+			c.Status(http.StatusForbidden)
+			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
+		}
+		var view OrderView
+		if bts, err := json.MarshalIndent(order, "", "   "); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+// @security BasicAuth
+// UpdateOrder godoc
+// @Summary Update order by user
+// @Accept json
+// @Produce json
+// @Param user body ExistingOrder true "body"
+// @Param id path int true "Order ID"
+// @Success 200 {object} UserView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/account/orders/{id} [put]
+// @Tags order
+func putAccountOrderHandler(c *fiber.Ctx) error {
+	var request ExistingOrder
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
+	}
+	var order *models.Order
+	var err error
+	if order, err = models.GetOrder(common.Database, int(id)); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	if (order.Status == models.ORDER_STATUS_NEW || order.Status == models.ORDER_STATUS_WAITING_FROM_PAYMENT) && request.Status == models.ORDER_STATUS_CANCELED {
+		order.Status = models.ORDER_STATUS_CANCELED
+	}
+	if err := models.UpdateOrder(common.Database, order); err == nil {
+		return c.JSON(HTTPMessage{"OK"})
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
 }
 
 func sanitizeProfile (p *NewProfile) error {

@@ -103,7 +103,7 @@ func postImageHandler(c *fiber.Ctx) error {
 														if p1 := path.Join(dir, "storage", image.Path); len(p1) > 0 {
 															if fi, err := os.Stat(p1); err == nil {
 																filename := fmt.Sprintf("%d-image-%d%v", image.ID, fi.ModTime().Unix(), path.Ext(p1))
-																p2 := path.Join(dir, "hugo", "static", "images", "products", filename)
+																/*p2 := path.Join(dir, "hugo", "static", "images", "products", filename)
 																logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
 																if _, err := os.Stat(path.Dir(p2)); err != nil {
 																	if err = os.MkdirAll(path.Dir(p2), 0755); err != nil {
@@ -120,6 +120,19 @@ func postImageHandler(c *fiber.Ctx) error {
 																		} else {
 																			logger.Warningf("%v", err)
 																		}
+																	}
+																} else {
+																	logger.Warningf("%v", err)
+																}*/
+																logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "products", filename), fi.Size())
+																if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "products", filename), common.Config.Resize.Image.Size); err == nil {
+																	// Cache
+																	if _, err = models.CreateCacheImage(common.Database, &models.CacheImage{
+																		ImageId:   image.ID,
+																		Name: image.Name,
+																		Thumbnail: strings.Join(thumbnails, ","),
+																	}); err != nil {
+																		logger.Warningf("%v", err)
 																	}
 																} else {
 																	logger.Warningf("%v", err)
@@ -155,7 +168,7 @@ func postImageHandler(c *fiber.Ctx) error {
 																		logger.Warningf("%v", err)
 																	}
 																}
-																if err = common.Copy(p1, p2); err == nil {
+																/*if err = common.Copy(p1, p2); err == nil {
 																	images2 := []string{fmt.Sprintf("/%s/%s", strings.Join([]string{"images", "variations"}, "/"), filename)}
 																	if common.Config.Resize.Enabled && common.Config.Resize.Image.Enabled {
 																		if images, err := common.ImageResize(p2, common.Config.Resize.Image.Size); err == nil {
@@ -168,7 +181,7 @@ func postImageHandler(c *fiber.Ctx) error {
 																	}
 																} else {
 																	logger.Warningf("%v", err)
-																}
+																}*/
 															}
 														}
 													}
@@ -385,6 +398,7 @@ type ImageView struct {
 	ID uint
 	CreatedAt time.Time `json:",omitempty"`
 	Name string `json:",omitempty"`
+	Thumbnail string `json:",omitempty"`
 	Path string `json:",omitempty"`
 	Url string `json:",omitempty"`
 	Height int `json:",omitempty"`
@@ -434,7 +448,7 @@ type ExistingImage struct {
 
 // @security BasicAuth
 // UpdateImage godoc
-// @Summary update image
+// @Summary Update image
 // @Accept json
 // @Produce json
 // @Param image body ExistingImage true "body"
@@ -543,8 +557,8 @@ func delImageHandler(c *fiber.Ctx) error {
 				logger.Errorf("%v", err.Error())
 			}
 			name := fmt.Sprintf("%d-", image.ID)
-			filepath.Walk(path.Join(dir, "hugo", "static", "images", "products"), func(p string, fi os.FileInfo, _ error) error {
-				if !fi.IsDir() {
+			if err = filepath.Walk(path.Join(dir, "hugo", "static", "images", "products"), func(p string, fi os.FileInfo, err error) error {
+				if err == nil && !fi.IsDir() {
 					if strings.Index(fi.Name(), name) == 0 {
 						if err = os.Remove(p); err != nil {
 							logger.Warningf("%+v", err)
@@ -552,7 +566,9 @@ func delImageHandler(c *fiber.Ctx) error {
 					}
 				}
 				return nil
-			})
+			}); err != nil {
+				logger.Warningf("%+v", err)
+			}
 			if err = models.DeleteImage(common.Database, image); err == nil {
 				return c.JSON(HTTPMessage{MESSAGE: "OK"})
 			}else{

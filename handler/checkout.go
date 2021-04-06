@@ -168,7 +168,7 @@ type ItemShortView struct {
 	Price float64                  `json:",omitempty"`
 	Discount float64                  `json:",omitempty"`
 	Quantity int                   `json:",omitempty"`
-	VAT        float64
+	VAT        float64 `json:",omitempty"`
 	Total      float64             `json:",omitempty"`
 	Volume float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
@@ -220,6 +220,9 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 	if request.BillingProfileId > 0 {
 		order.BillingProfileId = request.BillingProfileId
 		billingProfile, err = models.GetBillingProfile(common.Database, request.BillingProfileId)
+		if err != nil {
+			logger.Warningf("%+v", err)
+		}
 	}
 	// Shipping ShillingProfile
 	var shippingProfile *models.ShippingProfile
@@ -275,7 +278,6 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 				continue
 			}
 			variationId := arr[1]
-
 			//var variation *models.Variation
 			var vId uint
 			var title string
@@ -716,9 +718,9 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 		}
 		for _, payment := range payments {
 			//if payment.ID == request.PaymentId || request.PaymentId == 0 {
-			if (payment.ID == request.PaymentId || strings.Index(request.PaymentMethod, payment.Name) >= 0) || (request.PaymentId == 0 && request.PaymentMethod == "") {
+			if (payment.ID == request.PaymentId || strings.Contains(request.PaymentMethod, payment.Name)) || (request.PaymentId == 0 && request.PaymentMethod == "") {
 				// if request.PaymentId > 0 {
-				if request.PaymentId > 0 || strings.Index(request.PaymentMethod, payment.Name) >= 0 {
+				if request.PaymentId > 0 || strings.Contains(request.PaymentMethod, payment.Name) {
 					billingView = &BillingOrderView{
 						ID:    payment.ID,
 						Name:  payment.Name,

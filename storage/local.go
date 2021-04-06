@@ -210,7 +210,9 @@ func (local *LocalStorage) ImageResize(src, sizes string) ([]Image, error) {
 				return images, err
 			}
 			out.Close()
-			os.Chtimes(path.Join(path.Dir(src), "resize", filename), fi1.ModTime(), fi1.ModTime())
+			if err = os.Chtimes(path.Join(path.Dir(src), "resize", filename), fi1.ModTime(), fi1.ModTime()); err != nil {
+				logger.Warningf("%+v", err)
+			}
 		}
 		images = append(images, Image{Filename: filename, Size: fmt.Sprintf("%dw", width)})
 	}

@@ -377,7 +377,7 @@ func patchOptionHandler(c *fiber.Ctx) error {
 
 // @security BasicAuth
 // UpdateOption godoc
-// @Summary update option
+// @Summary Update option
 // @Accept json
 // @Produce json
 // @Param option body OptionShortView true "body"

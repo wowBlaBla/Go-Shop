@@ -23,6 +23,8 @@ type User struct {
 	Password       string
 	Email          string
 	EmailConfirmed bool
+	Name string
+	Lastname string
 	Role           int
 	Notification   bool
 	Code           string

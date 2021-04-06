@@ -138,7 +138,11 @@ definitions:
         type: string
       id:
         type: integer
+      lastname:
+        type: string
       login:
+        type: string
+      name:
         type: string
       notification:
         type: boolean
@@ -152,6 +156,10 @@ definitions:
         type: array
       token:
         type: string
+      wishes:
+        items:
+          $ref: '#/definitions/handler.WishView'
+        type: array
     type: object
   handler.AccountView:
     properties:
@@ -171,7 +179,11 @@ definitions:
         type: boolean
       id:
         type: integer
+      lastname:
+        type: string
       login:
+        type: string
+      name:
         type: string
       notification:
         type: boolean
@@ -182,6 +194,10 @@ definitions:
       shippingProfiles:
         items:
           $ref: '#/definitions/handler.ProfileView'
+        type: array
+      wishes:
+        items:
+          $ref: '#/definitions/handler.WishView'
         type: array
     type: object
   handler.AutocompleteRequest:
@@ -312,6 +328,8 @@ definitions:
     properties:
       content:
         type: string
+      customization:
+        type: string
       description:
         type: string
       id:
@@ -324,6 +342,16 @@ definitions:
         type: string
       title:
         type: string
+    type: object
+  handler.CategoryPatchRequest:
+    properties:
+      product:
+        properties:
+          id:
+            type: integer
+          sort:
+            type: integer
+        type: object
     type: object
   handler.CategoryView:
     properties:
@@ -535,56 +563,6 @@ definitions:
       transfers:
         $ref: '#/definitions/handler.TransferView'
         type: object
-    type: object
-  handler.DeliveriesCosts:
-    items:
-      $ref: '#/definitions/handler.DeliveryCost'
-    type: array
-  handler.DeliveryCost:
-    properties:
-      by:
-        type: string
-      byVolume:
-        type: number
-      byWeight:
-        type: number
-      cost:
-        type: string
-      fees:
-        type: number
-      id:
-        description: transport ID
-        type: integer
-      itemFee:
-        type: string
-      orderFee:
-        type: string
-      special:
-        description: in case of ZIP match
-        type: boolean
-      sum:
-        type: number
-      thumbnail:
-        type: string
-      title:
-        type: string
-      value:
-        type: number
-      volume:
-        type: number
-      weight:
-        type: number
-    type: object
-  handler.DeliveryRequest:
-    properties:
-      country:
-        type: string
-      items:
-        items:
-          $ref: '#/definitions/handler.NewItem'
-        type: array
-      zip:
-        type: string
     type: object
   handler.DeliveryView:
     properties:
@@ -848,6 +826,8 @@ definitions:
         type: string
       size:
         type: integer
+      thumbnail:
+        type: string
       updated:
         type: string
       url:
@@ -953,9 +933,6 @@ definitions:
   handler.ItemView:
     properties:
       comment:
-        description: |-
-          Variation VariationShortView `json:",omitempty"`
-          Properties []PropertyShortView `json:",omitempty"`
         type: string
       description:
         type: string
@@ -965,6 +942,10 @@ definitions:
         type: string
       price:
         type: number
+      properties:
+        items:
+          $ref: '#/definitions/handler.PropertyShortView'
+        type: array
       quantity:
         type: integer
       thumbnail:
@@ -975,6 +956,9 @@ definitions:
         type: number
       uuid:
         type: string
+      variation:
+        $ref: '#/definitions/handler.VariationShortView'
+        type: object
     type: object
   handler.LastOrderView:
     properties:
@@ -1080,6 +1064,12 @@ definitions:
       csrf:
         type: string
       email:
+        type: string
+      lastname:
+        type: string
+      name:
+        type: string
+      password:
         type: string
       shippingProfile:
         $ref: '#/definitions/handler.NewProfile'
@@ -1525,10 +1515,10 @@ definitions:
     properties:
       comment:
         type: string
+      createdAt:
+        type: string
       delivery:
         type: number
-      description:
-        type: string
       id:
         type: integer
       items:
@@ -1615,37 +1605,6 @@ definitions:
         type: object
       valueId:
         type: integer
-    type: object
-  handler.PaymentMethodsView:
-    properties:
-      advancePayment:
-        properties:
-          details:
-            type: string
-          enabled:
-            type: boolean
-        type: object
-      default:
-        type: string
-      mollie:
-        properties:
-          enabled:
-            type: boolean
-          methods:
-            items:
-              type: string
-            type: array
-        type: object
-      onDelivery:
-        properties:
-          enabled:
-            type: boolean
-        type: object
-      stripe:
-        properties:
-          enabled:
-            type: boolean
-        type: object
     type: object
   handler.PaymentView:
     properties:
@@ -1921,6 +1880,8 @@ definitions:
         type: string
       sku:
         type: string
+      sort:
+        type: integer
       thumbnail:
         type: string
       title:
@@ -2004,10 +1965,32 @@ definitions:
       type:
         type: string
     type: object
+  handler.RegisterRequest:
+    properties:
+      csrf:
+        type: string
+      email:
+        type: string
+      lastname:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      password2:
+        type: string
+    type: object
   handler.RelatedProduct:
     properties:
       id:
         type: integer
+    type: object
+  handler.ResetRequest:
+    properties:
+      email:
+        type: string
+      login:
+        type: string
     type: object
   handler.ShippingOrderView:
     properties:
@@ -2337,6 +2320,10 @@ definitions:
     type: array
   handler.User2View:
     properties:
+      lastname:
+        type: string
+      name:
+        type: string
       newPassword:
         type: string
       newPassword2:
@@ -2354,7 +2341,11 @@ definitions:
         type: boolean
       id:
         type: integer
+      lastname:
+        type: string
       login:
+        type: string
+      name:
         type: string
       notification:
         type: boolean
@@ -2725,6 +2716,66 @@ definitions:
       total:
         type: integer
     type: object
+  handler.WishView:
+    properties:
+      categoryId:
+        type: integer
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      path:
+        type: string
+      price:
+        type: number
+      properties:
+        items:
+          $ref: '#/definitions/handler.PropertyShortView'
+        type: array
+      thumbnail:
+        type: string
+      title:
+        type: string
+      uuid:
+        type: string
+      variation:
+        $ref: '#/definitions/handler.VariationShortView'
+        type: object
+    type: object
+  handler.WishWrapperView:
+    properties:
+      categoryId:
+        type: integer
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      path:
+        type: string
+      price:
+        type: number
+      thumbnail:
+        type: string
+      title:
+        type: string
+      uuid:
+        type: string
+    type: object
+  handler.WishesView:
+    items:
+      $ref: '#/definitions/handler.WishView'
+    type: array
+  handler.WithRequest:
+    properties:
+      categoryId:
+        type: integer
+      uuid:
+        type: string
+    type: object
   handler.WranglerSettingsView:
     properties:
       accountId:
@@ -2882,40 +2933,10 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update account
+      summary: Update account
       tags:
-      - order
-  /api/v1/account/billing_profile/{id}:
-    delete:
-      consumes:
-      - application/json
-      parameters:
-      - description: Billing Profile ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.HTTPMessage'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Delete billing profile
-      tags:
-      - account
       - frontend
+      - account
   /api/v1/account/billing_profiles:
     get:
       consumes:
@@ -2976,6 +2997,64 @@ paths:
       - profile
       - frontend
   /api/v1/account/billing_profiles/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Billing Profile ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete billing profile
+      tags:
+      - account
+      - frontend
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: BillingProfile ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.OrderView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get billing profile
+      tags:
+      - account
+      - frontend
     put:
       consumes:
       - application/json
@@ -3125,7 +3204,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update order by user
+      summary: Update order by user
       tags:
       - order
   /api/v1/account/orders/{id}/advance_payment/submit:
@@ -3276,10 +3355,38 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handler.HTTPError'
-      summary: Post order
+      summary: Checkout stripe
       tags:
       - account
-  /api/v1/account/shipping_profile/{id}:
+  /api/v1/account/shipping_profiles:
+    get:
+      consumes:
+      - application/json
+      description: get account shipping profiles
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.ProfileView'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get account shipping profiles
+      tags:
+      - account
+      - frontend
+  /api/v1/account/shipping_profiles/{id}:
     delete:
       consumes:
       - application/json
@@ -3310,20 +3417,22 @@ paths:
       tags:
       - account
       - frontend
-  /api/v1/account/shipping_profiles:
     get:
       consumes:
       - application/json
-      description: get account shipping profiles
+      parameters:
+      - description: ShippingProfile ID
+        in: path
+        name: id
+        required: true
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/handler.ProfileView'
-            type: array
+            $ref: '#/definitions/handler.OrderView'
         "404":
           description: Not Found
           schema:
@@ -3332,13 +3441,10 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Get account shipping profiles
+      summary: Get shipping profile
       tags:
       - account
       - frontend
-  /api/v1/account/shipping_profiles/{id}:
     put:
       consumes:
       - application/json
@@ -3374,6 +3480,121 @@ paths:
       summary: Update shipping profile
       tags:
       - profile
+      - frontend
+  /api/v1/account/wishes:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.WishesView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get account wishes
+      tags:
+      - account
+      - frontend
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.WithRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.WishWrapperView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create account wish
+      tags:
+      - account
+      - frontend
+  /api/v1/account/wishes/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Wish ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete account wish
+      tags:
+      - account
+      - frontend
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Wish ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.WishWrapperView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get account wish
+      tags:
+      - account
       - frontend
   /api/v1/categories:
     get:
@@ -3597,6 +3818,41 @@ paths:
       security:
       - BasicAuth: []
       summary: Delete category
+      tags:
+      - category
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CategoryPatchRequest'
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: patch category
       tags:
       - category
   /api/v1/checkout:
@@ -3883,7 +4139,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update coupon
+      summary: Update coupon
       tags:
       - coupon
   /api/v1/coupons/list:
@@ -3963,38 +4219,6 @@ paths:
           schema:
             $ref: '#/definitions/handler.HTTPError'
       summary: Get dashboard
-  /api/v1/delivery:
-    post:
-      consumes:
-      - application/json
-      description: my description
-      parameters:
-      - description: body
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handler.DeliveryRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.DeliveriesCosts'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: (DEPRECATED) Calculate shipping cost
-      tags:
-      - frontend
   /api/v1/email:
     post:
       consumes:
@@ -4147,7 +4371,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update file
+      summary: Update file
       tags:
       - file
   /api/v1/files/list:
@@ -4343,7 +4567,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update image
+      summary: Update image
       tags:
       - image
   /api/v1/images/list:
@@ -4419,7 +4643,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handler.HTTPError'
-      summary: login
+      summary: Get login
       tags:
       - auth
       - frontend
@@ -4448,7 +4672,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handler.HTTPError'
-      summary: login
+      summary: Lost login
       tags:
       - auth
       - frontend
@@ -4622,7 +4846,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update email template
+      summary: Update email template
       tags:
       - notification
   /api/v1/notification/email/list:
@@ -4801,7 +5025,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update option
+      summary: Update option
       tags:
       - option
   /api/v1/options/list:
@@ -4924,7 +5148,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update order
+      summary: Update order
       tags:
       - order
   /api/v1/orders/list:
@@ -5089,29 +5313,6 @@ paths:
       summary: Get parameter
       tags:
       - parameter
-  /api/v1/payment_methods:
-    get:
-      consumes:
-      - application/json
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.PaymentMethodsView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      summary: (DEPRECATED) Get account payment methods
-      tags:
-      - account
-      - frontend
   /api/v1/prepare:
     post:
       consumes:
@@ -5696,6 +5897,36 @@ paths:
       security:
       - BasicAuth: []
       summary: Make publish
+  /api/v1/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: form
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: register
+      tags:
+      - auth
+      - frontend
   /api/v1/render:
     post:
       consumes:
@@ -5735,7 +5966,7 @@ paths:
         name: form
         required: true
         schema:
-          $ref: '#/definitions/handler.LoginRequest'
+          $ref: '#/definitions/handler.ResetRequest'
       produces:
       - application/json
       responses:
@@ -6257,7 +6488,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update time
+      summary: Update time
       tags:
       - time
   /api/v1/times/list:
@@ -6380,7 +6611,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update transaction
+      summary: Update transaction
       tags:
       - transaction
   /api/v1/transactions/list:
@@ -6559,7 +6790,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update transport
+      summary: Update transport
       tags:
       - transport
   /api/v1/transports/list:
@@ -6710,7 +6941,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update user
+      summary: Update user
       tags:
       - user
   /api/v1/users/list:
@@ -7301,7 +7532,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update vendor
+      summary: Update vendor
       tags:
       - vendor
   /api/v1/vendors/list:
@@ -7457,7 +7688,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update widget
+      summary: Update widget
       tags:
       - widget
   /api/v1/widgets/list:
@@ -7636,7 +7867,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: update zone
+      summary: Update zone
       tags:
       - zone
   /api/v1/zones/list:

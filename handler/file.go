@@ -363,7 +363,7 @@ type ExistingFile struct {
 
 // @security BasicAuth
 // UpdateFile godoc
-// @Summary update file
+// @Summary Update file
 // @Accept json
 // @Produce json
 // @Param file body ExistingFile true "body"

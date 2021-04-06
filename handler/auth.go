@@ -189,138 +189,9 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 			})
 		})
 	}
-	postRegisterHandler := func (c *fiber.Ctx) error {
-		var request struct {
-			Email string
-			Password string
-			Password2 string
-		}
-		if err := c.BodyParser(&request); err != nil {
-			return err
-		}
-		req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(c.Request().Header.Header())))
-		if err != nil {
-			logger.Errorf("%+v", err)
-		}
-		request.Email = strings.TrimSpace(request.Email)
-		request.Password = strings.TrimSpace(request.Password)
-		request.Password2 = strings.TrimSpace(request.Password2)
-		var e error
-		if request.Email == "" || !regexp.MustCompile("[^@]+@[^@]+").MatchString(request.Email) {
-			e = fmt.Errorf("Invalid email")
-		}
-		if e == nil && len(request.Password) < config.PasswordMinLength {
-			e = fmt.Errorf("Password should contains at least %d chars", config.PasswordMinLength)
-		}
-		if e == nil && !regexp.MustCompile("(?i)[0-9]+").MatchString(request.Password) {
-			e = fmt.Errorf("Password should contains digits")
-		}
-		if e == nil && !regexp.MustCompile("(?i)[a-z]+").MatchString(request.Password) {
-			e = fmt.Errorf("Password should contains abc chars")
-		}
-		if e == nil && config.PasswordSpecialChartRequired && !regexp.MustCompile(`[-_\+=\!@#\$%\^\&\*\(\)\[\]\{\}<>:;'"~]+`).MatchString(request.Password) {
-			e = fmt.Errorf("Password should contains special chars")
-		}
-		if e == nil && request.Password != request.Password2 {
-			e = fmt.Errorf("Passwords mismatch")
-		}
-		if _, err := models.GetUserByEmail(common.Database, request.Email); err == nil {
-			e = fmt.Errorf("Email already is use")
-		}
-		if e != nil {
-			if v := req.Header.Get("Content-Type"); v != "" {
-				for _, chunk := range strings.Split(v, ";") {
-					if strings.EqualFold(chunk, "application/json") {
-						c.Status(http.StatusInternalServerError)
-						return c.JSON(fiber.Map{"ERROR": e.Error()})
-					}
-				}
-			}
-			return c.Render("login", fiber.Map{
-				"Error":    e.Error(),
-			})
-		}
-		var login string
-		if res := regexp.MustCompile(`^([^@]+)@`).FindAllStringSubmatch(request.Email, 1); len(res) > 0 && len(res[0]) > 1 {
-			s := math_rand.NewSource(time.Now().UnixNano())
-			r := math_rand.New(s)
-			login = fmt.Sprintf("%v-%d", res[0][1], r.Intn(8999) + 1000)
-		}
-		user := models.User{
-			Enabled:  true,
-			Login:    login,
-			Email:    request.Email,
-			EmailConfirmed: true,
-			Password: models.MakeUserPassword(request.Password),
-			Role: models.ROLE_USER,
-			Notification: true,
-		}
-		if !config.EmailConfirmationRequired {
-			user.EmailConfirmed = true
-		}
-		if _, err := models.CreateUser(common.Database, &user); err == nil {
-			if v := req.Header.Get("Accept"); strings.EqualFold(v, "application/jwt") {
-				expiration := time.Now().Add(JWTLoginDuration)
-				claims := &JWTClaims{
-					Login: user.Login,
-					Password: user.Password,
-					StandardClaims: jwt.StandardClaims{
-						ExpiresAt: expiration.Unix(),
-					},
-				}
-				token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-				if str, err := token.SignedString(JWTSecret); err == nil {
-					c.JSON(fiber.Map{
-						"MESSAGE": "OK",
-						"Token": str,
-						"Expiration": expiration,
-					})
-				}else{
-					c.Status(http.StatusInternalServerError)
-					c.JSON(fiber.Map{"ERROR": err.Error()})
-				}
-			}else{
-				value := map[string]string{
-					"email": user.Email,
-					"login": user.Login,
-					"password": request.Password,
-				}
-				if encoded, err := cookieHandler.Encode(COOKIE_NAME, value); err == nil {
-					expires := time.Time{}
-					if config.CookieDuration > 0 {
-						expires = time.Now().Add(config.CookieDuration)
-					}
-					cookie := &fiber.Cookie{
-						Name:  COOKIE_NAME,
-						Value: encoded,
-						Path:  "/",
-						Expires: expires,
-						SameSite: config.SameSite,
-					}
-					c.Cookie(cookie)
-					if v := req.Header.Get("Content-Type"); v != "" {
-						for _, chunk := range strings.Split(v, ";") {
-							if strings.EqualFold(chunk, "application/json") {
-								return c.JSON(fiber.Map{"MESSAGE": "OK"})
-							}
-						}
-					}
-					if err = c.Redirect("/", http.StatusFound); err != nil {
-						logger.Warningf("%+v", err)
-					}
-				}else{
-					c.Status(http.StatusInternalServerError)
-					c.JSON(fiber.Map{"ERROR": err.Error()})
-				}
-			}
-		}else{
-			c.Status(http.StatusInternalServerError)
-			c.JSON(fiber.Map{"ERROR": err.Error()})
-		}
-		return nil
-	}
-	app.Post("/api/v1/register", postRegisterHandler)
-	app.Post("/register", postRegisterHandler)
+
+	//app.Post("/api/v1/register", postRegisterHandler)
+	//app.Post("/register", postRegisterHandler)
 	// Refresh
 	app.Get("/refresh", func (c *fiber.Ctx) error {
 		if req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(c.Request().Header.Header()))); err == nil {
@@ -689,7 +560,7 @@ func isValid(code string) error {
 		if bts, err := decrypt([]byte(common.SECRET), token); err == nil {
 			if v, err := strconv.Atoi(string(bts)); err == nil {
 				t := time.Unix(int64(v), 0)
-				if time.Now().Sub(t).Seconds() <= 30 {
+				if time.Since(t).Seconds() <= 30 {
 					return nil
 				} else {
 					err := fmt.Errorf("csrf expired")
@@ -726,7 +597,7 @@ type LoginRequest struct {
 }
 
 // Login godoc
-// @Summary login
+// @Summary Lost login
 // @Accept json
 // @Produce json
 // @Param form body LoginRequest true "body"
@@ -775,7 +646,7 @@ func postLoginHandler(c *fiber.Ctx) error {
 			}
 		}
 	}else{
-		if user, err = models.GetUserByCode(common.Database, request.Code); err != nil {
+		if _, err = models.GetUserByCode(common.Database, request.Code); err != nil {
 			if v := req.Header.Get("Content-Type"); v != "" {
 				for _, chunk := range strings.Split(v, ";") {
 					if strings.EqualFold(chunk, "application/json") {
@@ -859,6 +730,163 @@ func postLoginHandler(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"ERROR": err.Error()})
 	}
 
+	return nil
+}
+
+type RegisterRequest struct {
+	Email string
+	Password string
+	Password2 string
+	Name string
+	Lastname string
+	Csrf string
+}
+
+// Register godoc
+// @Summary register
+// @Accept json
+// @Produce json
+// @Param form body RegisterRequest true "body"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/register [post]
+// @Tags auth
+// @Tags frontend
+func postRegisterHandler(c *fiber.Ctx) error {
+	var request RegisterRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(c.Request().Header.Header())))
+	if err != nil {
+		logger.Errorf("%+v", err)
+	}
+	request.Email = strings.TrimSpace(request.Email)
+	request.Password = strings.TrimSpace(request.Password)
+	request.Password2 = strings.TrimSpace(request.Password2)
+	request.Name = strings.TrimSpace(request.Name)
+	if len(request.Name) > 32 {
+		request.Name = request.Name[0:32]
+	}
+	request.Lastname = strings.TrimSpace(request.Lastname)
+	if len(request.Lastname) > 32 {
+		request.Lastname = request.Lastname[0:32]
+	}
+	var e error
+	if request.Email == "" || !regexp.MustCompile("[^@]+@[^@]+").MatchString(request.Email) {
+		e = fmt.Errorf("Invalid email")
+	}
+	if e == nil && len(request.Password) < authMultipleConfig.PasswordMinLength {
+		e = fmt.Errorf("Password should contains at least %d chars", authMultipleConfig.PasswordMinLength)
+	}
+	if e == nil && !regexp.MustCompile("(?i)[0-9]+").MatchString(request.Password) {
+		e = fmt.Errorf("Password should contains digits")
+	}
+	if e == nil && !regexp.MustCompile("(?i)[a-z]+").MatchString(request.Password) {
+		e = fmt.Errorf("Password should contains abc chars")
+	}
+	if e == nil && authMultipleConfig.PasswordSpecialChartRequired && !regexp.MustCompile(`[-_\+=\!@#\$%\^\&\*\(\)\[\]\{\}<>:;'"~]+`).MatchString(request.Password) {
+		e = fmt.Errorf("Password should contains special chars")
+	}
+	if e == nil && request.Password != request.Password2 {
+		e = fmt.Errorf("Passwords mismatch")
+	}
+	if _, err := models.GetUserByEmail(common.Database, request.Email); err == nil {
+		e = fmt.Errorf("Email already is use")
+	}
+	if e != nil {
+		if v := req.Header.Get("Content-Type"); v != "" {
+			for _, chunk := range strings.Split(v, ";") {
+				if strings.EqualFold(chunk, "application/json") {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(fiber.Map{"ERROR": e.Error()})
+				}
+			}
+		}
+		return c.Render("login", fiber.Map{
+			"Error":    e.Error(),
+		})
+	}
+	var login string
+	if res := regexp.MustCompile(`^([^@]+)@`).FindAllStringSubmatch(request.Email, 1); len(res) > 0 && len(res[0]) > 1 {
+		s := math_rand.NewSource(time.Now().UnixNano())
+		r := math_rand.New(s)
+		login = fmt.Sprintf("%v-%d", res[0][1], r.Intn(8999) + 1000)
+	}
+	user := models.User{
+		Enabled:  true,
+		Login:    login,
+		Email:    request.Email,
+		EmailConfirmed: true,
+		Password: models.MakeUserPassword(request.Password),
+		Name: request.Name,
+		Lastname: request.Lastname,
+		Role: models.ROLE_USER,
+		Notification: true,
+	}
+	if !authMultipleConfig.EmailConfirmationRequired {
+		user.EmailConfirmed = true
+	}
+	if _, err := models.CreateUser(common.Database, &user); err == nil {
+		if v := req.Header.Get("Accept"); strings.EqualFold(v, "application/jwt") {
+			expiration := time.Now().Add(JWTLoginDuration)
+			claims := &JWTClaims{
+				Login: user.Login,
+				Password: user.Password,
+				StandardClaims: jwt.StandardClaims{
+					ExpiresAt: expiration.Unix(),
+				},
+			}
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+			if str, err := token.SignedString(JWTSecret); err == nil {
+				c.JSON(fiber.Map{
+					"MESSAGE": "OK",
+					"Token": str,
+					"Expiration": expiration,
+				})
+			}else{
+				c.Status(http.StatusInternalServerError)
+				c.JSON(fiber.Map{"ERROR": err.Error()})
+			}
+		}else{
+			value := map[string]string{
+				"email": user.Email,
+				"login": user.Login,
+				"password": request.Password,
+			}
+			if encoded, err := cookieHandler.Encode(COOKIE_NAME, value); err == nil {
+				expires := time.Time{}
+				if authMultipleConfig.CookieDuration > 0 {
+					expires = time.Now().Add(authMultipleConfig.CookieDuration)
+				}
+				cookie := &fiber.Cookie{
+					Name:  COOKIE_NAME,
+					Value: encoded,
+					Path:  "/",
+					Expires: expires,
+					SameSite: authMultipleConfig.SameSite,
+				}
+				c.Cookie(cookie)
+				if v := req.Header.Get("Content-Type"); v != "" {
+					for _, chunk := range strings.Split(v, ";") {
+						if strings.EqualFold(chunk, "application/json") {
+							return c.JSON(fiber.Map{"MESSAGE": "OK"})
+						}
+					}
+				}
+				if err = c.Redirect("/", http.StatusFound); err != nil {
+					logger.Warningf("%+v", err)
+				}
+			}else{
+				c.Status(http.StatusInternalServerError)
+				c.JSON(fiber.Map{"ERROR": err.Error()})
+			}
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		c.JSON(fiber.Map{"ERROR": err.Error()})
+	}
 	return nil
 }
 

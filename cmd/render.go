@@ -23,7 +23,6 @@ import (
 )
 
 var (
-	STORAGE storage.Storage
 	VALUES = cmap.New()
 	reKV = regexp.MustCompile(`^([^\:]+):\s*(.*)$`)
 )
@@ -132,10 +131,13 @@ var renderCmd = &cobra.Command{
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheValue{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheTransport{})
 		//
-		STORAGE, err = storage.NewLocalStorage(path.Join(dir, "hugo", "static"), common.Config.Resize.Quality)
+		common.STORAGE, err = storage.NewLocalStorage(path.Join(dir, "hugo", "static"), common.Config.Resize.Quality)
+		if err != nil {
+			logger.Warningf("%+v", err)
+		}
 		if common.Config.Storage.Enabled {
 			if common.Config.Storage.S3.Enabled {
-				if STORAGE, err = storage.NewAWSS3Storage(common.Config.Storage.S3.AccessKeyID,common.Config.Storage.S3.SecretAccessKey, common.Config.Storage.S3.Region, common.Config.Storage.S3.Bucket, common.Config.Storage.S3.Prefix, path.Join(dir, "temp", "s3"), common.Config.Resize.Quality, common.Config.Storage.S3.Rewrite); err != nil {
+				if common.STORAGE, err = storage.NewAWSS3Storage(common.Config.Storage.S3.AccessKeyID,common.Config.Storage.S3.SecretAccessKey, common.Config.Storage.S3.Region, common.Config.Storage.S3.Bucket, common.Config.Storage.S3.Prefix, path.Join(dir, "temp", "s3"), common.Config.Resize.Quality, common.Config.Storage.S3.Rewrite); err != nil {
 					logger.Warningf("%+v", err)
 				}
 			}
@@ -244,17 +246,8 @@ var renderCmd = &cobra.Command{
 									name = name[:32]
 								}
 								filename := fmt.Sprintf("%d-%s-%d%v", category.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-								//p2 := path.Join(path.Dir(p2), filename)
-								/*p2 := path.Join(dir, "hugo", "static", "images", "categories", filename)
-								logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-								if _, err := os.Stat(path.Dir(p2)); err != nil {
-									if err = os.MkdirAll(path.Dir(p2), 0755); err != nil {
-										logger.Warningf("%v", err)
-									}
-								}*/
-								//
 								logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "categories", filename), fi.Size())
-								if thumbnails, err = STORAGE.PutImage(p1, path.Join("images", "categories", filename), common.Config.Resize.Thumbnail.Size); err != nil {
+								if thumbnails, err = common.STORAGE.PutImage(p1, path.Join("images", "categories", filename), common.Config.Resize.Thumbnail.Size); err != nil {
 									logger.Warningf("%v", err)
 								}
 							}
@@ -300,6 +293,10 @@ var renderCmd = &cobra.Command{
 												})
 											}
 										}
+									}
+									//
+									if result := getChildrenCategoriesView(common.Database, &CategoryView{ID: category.ID, Name: category.Name}); result != nil {
+										categoryFile.Count = result.Count
 									}
 									//
 									if err = common.WriteCategoryFile(p2, categoryFile); err != nil {
@@ -519,34 +516,8 @@ var renderCmd = &cobra.Command{
 																				if fi, err := os.Stat(p1); err == nil {
 																					filename := filepath.Base(p1)
 																					filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																					/*p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
-																					thumbnail = "/" + path.Join("images", "values", filename)
-																					if _, err = os.Stat(p2); err != nil {
-																						logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																						if err = common.Copy(p1, p2); err != nil {
-																							logger.Warningf("%v", err)
-																						}
-																					}
-																					if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
-																						p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
-																						if _, err = os.Stat(p2); err != nil {
-																							logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																							if err = common.Copy(p1, p2); err != nil {
-																								logger.Warningf("%v", err)
-																							}
-																						}
-																						if images, err := common.ImageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
-																							thumbnails := []string{fmt.Sprintf("/images/values/resize/%s", filename)}
-																							for _, image := range images {
-																								thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
-																							}
-																							thumbnail = strings.Join(thumbnails, ",")
-																						} else {
-																							logger.Warningf("%v", err)
-																						}
-																					}*/
 																					logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-																					if thumbnails, err := STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+																					if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 																						thumbnail = strings.Join(thumbnails, ",")
 																					} else {
 																						logger.Warningf("%v", err)
@@ -580,34 +551,8 @@ var renderCmd = &cobra.Command{
 																		if fi, err := os.Stat(p1); err == nil {
 																			filename := filepath.Base(p1)
 																			filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																			/*p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
-																			thumbnail = "/" + path.Join("images", "values", filename)
-																			if _, err = os.Stat(p2); err != nil {
-																				logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																				if err = common.Copy(p1, p2); err != nil {
-																					logger.Warningf("%v", err)
-																				}
-																			}
-																			if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
-																				p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
-																				if _, err = os.Stat(p2); err != nil {
-																					logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																					if err = common.Copy(p1, p2); err != nil {
-																						logger.Warningf("%v", err)
-																					}
-																				}
-																				if images, err := common.ImageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
-																					thumbnails := []string{fmt.Sprintf("/images/values/resize/%s", filename)}
-																					for _, image := range images {
-																						thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
-																					}
-																					thumbnail = strings.Join(thumbnails, ",")
-																				} else {
-																					logger.Warningf("%v", err)
-																				}
-																			}*/
 																			logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-																			if thumbnails, err := STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+																			if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 																				thumbnail = strings.Join(thumbnails, ",")
 																			} else {
 																				logger.Warningf("%v", err)
@@ -650,34 +595,8 @@ var renderCmd = &cobra.Command{
 																					if fi, err := os.Stat(p1); err == nil {
 																						filename := filepath.Base(p1)
 																						filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																						/*p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
-																						thumbnail = "/" + path.Join("images", "values", filename)
-																						if _, err = os.Stat(p2); err != nil {
-																							logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																							if err = common.Copy(p1, p2); err != nil {
-																								logger.Warningf("%v", err)
-																							}
-																						}
-																						if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
-																							p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
-																							if _, err = os.Stat(p2); err != nil {
-																								logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																								if err = common.Copy(p1, p2); err != nil {
-																									logger.Warningf("%v", err)
-																								}
-																							}
-																							if images, err := common.ImageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
-																								thumbnails := []string{fmt.Sprintf("/images/values/resize/%s", filename)}
-																								for _, image := range images {
-																									thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
-																								}
-																								thumbnail = strings.Join(thumbnails, ",")
-																							} else {
-																								logger.Warningf("%v", err)
-																							}
-																						}*/
 																						logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-																						if thumbnails, err := STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+																						if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 																							thumbnail = strings.Join(thumbnails, ",")
 																						} else {
 																							logger.Warningf("%v", err)
@@ -715,34 +634,8 @@ var renderCmd = &cobra.Command{
 																				if fi, err := os.Stat(p1); err == nil {
 																					filename := filepath.Base(p1)
 																					filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																					/*p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
-																					thumbnail = "/" + path.Join("images", "values", filename)
-																					if _, err = os.Stat(p2); err != nil {
-																						logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																						if err = common.Copy(p1, p2); err != nil {
-																							logger.Warningf("%v", err)
-																						}
-																					}
-																					if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
-																						p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
-																						if _, err = os.Stat(p2); err != nil {
-																							logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																							if err = common.Copy(p1, p2); err != nil {
-																								logger.Warningf("%v", err)
-																							}
-																						}
-																						if images, err := common.ImageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
-																							thumbnails := []string{fmt.Sprintf("/images/values/resize/%s", filename)}
-																							for _, image := range images {
-																								thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
-																							}
-																							thumbnail = strings.Join(thumbnails, ",")
-																						} else {
-																							logger.Warningf("%v", err)
-																						}
-																					}*/
 																					logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-																					if thumbnails, err := STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+																					if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 																						thumbnail = strings.Join(thumbnails, ",")
 																					} else {
 																						logger.Warningf("%v", err)
@@ -787,34 +680,8 @@ var renderCmd = &cobra.Command{
 																					if fi, err := os.Stat(p1); err == nil {
 																						filename := filepath.Base(p1)
 																						filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																						/*p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
-																						thumbnail = "/" + path.Join("images", "values", filename)
-																						if _, err = os.Stat(p2); err != nil {
-																							logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																							if err = common.Copy(p1, p2); err != nil {
-																								logger.Warningf("%v", err)
-																							}
-																						}
-																						if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
-																							p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
-																							if _, err = os.Stat(p2); err != nil {
-																								logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																								if err = common.Copy(p1, p2); err != nil {
-																									logger.Warningf("%v", err)
-																								}
-																							}
-																							if images, err := common.ImageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
-																								thumbnails := []string{fmt.Sprintf("/images/values/resize/%s", filename)}
-																								for _, image := range images {
-																									thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
-																								}
-																								thumbnail = strings.Join(thumbnails, ",")
-																							} else {
-																								logger.Warningf("%v", err)
-																							}
-																						}*/
 																						logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-																						if thumbnails, err := STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+																						if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 																							thumbnail = strings.Join(thumbnails, ",")
 																						} else {
 																							logger.Warningf("%v", err)
@@ -852,34 +719,8 @@ var renderCmd = &cobra.Command{
 																				if fi, err := os.Stat(p1); err == nil {
 																					filename := filepath.Base(p1)
 																					filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																					/*p2 := path.Join(dir, "hugo", "assets", "images", "values", filename)
-																					thumbnail = "/" + path.Join("images", "values", filename)
-																					if _, err = os.Stat(p2); err != nil {
-																						logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																						if err = common.Copy(p1, p2); err != nil {
-																							logger.Warningf("%v", err)
-																						}
-																					}
-																					if common.Config.Resize.Enabled && common.Config.Resize.Thumbnail.Enabled {
-																						p2 := path.Join(dir, "hugo", "static", "images", "values", filename)
-																						if _, err = os.Stat(p2); err != nil {
-																							logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																							if err = common.Copy(p1, p2); err != nil {
-																								logger.Warningf("%v", err)
-																							}
-																						}
-																						if images, err := common.ImageResize(p2, common.Config.Resize.Thumbnail.Size); err == nil {
-																							thumbnails := []string{fmt.Sprintf("/images/values/resize/%s", filename)}
-																							for _, image := range images {
-																								thumbnails = append(thumbnails, fmt.Sprintf("/images/values/resize/%s %s", image.Filename, image.Size))
-																							}
-																							thumbnail = strings.Join(thumbnails, ",")
-																						} else {
-																							logger.Warningf("%v", err)
-																						}
-																					}*/
 																					logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-																					if thumbnails, err := STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+																					if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 																						thumbnail = strings.Join(thumbnails, ",")
 																					} else {
 																						logger.Warningf("%v", err)
@@ -937,7 +778,7 @@ var renderCmd = &cobra.Command{
 											filename := fmt.Sprintf("%d-%s-%d%v", product.ID, name, fi.ModTime().Unix(), path.Ext(p1))
 											//p2 := path.Join(p0, filename)
 											logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "products", filename), fi.Size())
-											if thumbnails, err := STORAGE.PutImage(p1, path.Join("images", "products", filename), common.Config.Resize.Image.Size); err == nil {
+											if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "products", filename), common.Config.Resize.Image.Size); err == nil {
 												productFile.Thumbnail = strings.Join(thumbnails, ",")
 												productView.Thumbnail = strings.Join(thumbnails, ",")
 											} else {
@@ -959,7 +800,7 @@ var renderCmd = &cobra.Command{
 													}
 													filename := fmt.Sprintf("%d-%s-%d%v", image.ID, name, fi.ModTime().Unix(), path.Ext(p1))
 													logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "products", filename), fi.Size())
-													if images2, err := STORAGE.PutImage(p1, path.Join("images", "products", filename), common.Config.Resize.Image.Size); err == nil {
+													if images2, err := common.STORAGE.PutImage(p1, path.Join("images", "products", filename), common.Config.Resize.Image.Size); err == nil {
 														// Generate thumbnail
 														if i == 0 || product.ImageId == image.ID {
 															productFile.Thumbnail = strings.Join(images2, ",")
@@ -967,10 +808,19 @@ var renderCmd = &cobra.Command{
 														}
 														//
 														images = append(images, strings.Join(images2, ","))
+														//
+														// Cache
+														if _, err = models.CreateCacheImage(common.Database, &models.CacheImage{
+															ImageId:   image.ID,
+															Name: image.Name,
+															Thumbnail: strings.Join(images2, ","),
+														}); err != nil {
+															logger.Warningf("%v", err)
+														}
 													} else {
 														logger.Warningf("%v", err)
 													}
-													/**/
+
 												}
 											}
 										}
@@ -986,7 +836,7 @@ var renderCmd = &cobra.Command{
 												if fi, err := os.Stat(p1); err == nil {
 													filename := fmt.Sprintf("%d-file-%d%v", file.ID, fi.ModTime().Unix(), path.Ext(p1))
 													logger.Infof("Copy %v => %v %v bytes", p1, path.Join("files", "products", filename), fi.Size())
-													if url, err := STORAGE.PutFile(p1, path.Join("files", "products", filename)); err == nil {
+													if url, err := common.STORAGE.PutFile(p1, path.Join("files", "products", filename)); err == nil {
 														files = append(files, common.FilePF{
 															Id:   file.ID,
 															Type: file.Type,
@@ -1116,6 +966,7 @@ var renderCmd = &cobra.Command{
 											Depth: variation.Depth,
 											Weight: variation.Weight,
 											Availability: variation.Availability,
+											Sku: variation.Sku,
 											Selected:    len(productView.Variations) == 0,
 										}
 										if variation.Time != nil {
@@ -1132,7 +983,7 @@ var renderCmd = &cobra.Command{
 														if fi, err := os.Stat(p1); err == nil {
 															filename := fmt.Sprintf("%d-image-%d%v", image.ID, fi.ModTime().Unix(), path.Ext(p1))
 															logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "variations", filename), fi.Size())
-															if images2, err := STORAGE.PutImage(p1, path.Join("images", "variations", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+															if images2, err := common.STORAGE.PutImage(p1, path.Join("images", "variations", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 																images = append(images, strings.Join(images2, ","))
 															} else{
 																logger.Warningf("%v", err)
@@ -1157,7 +1008,7 @@ var renderCmd = &cobra.Command{
 															if fi, err := os.Stat(p1); err == nil {
 																filename := fmt.Sprintf("%d-file-%d%v", file.ID, fi.ModTime().Unix(), path.Ext(p1))
 																logger.Infof("Copy %v => %v %v bytes", p1, path.Join("files", "variations", filename), fi.Size())
-																if url, err := STORAGE.PutFile(p1, path.Join("files", "variations", filename)); err == nil {
+																if url, err := common.STORAGE.PutFile(p1, path.Join("files", "variations", filename)); err == nil {
 																	files = append(files, common.FilePF{
 																		Id:   file.ID,
 																		Type: file.Type,
@@ -1193,7 +1044,7 @@ var renderCmd = &cobra.Command{
 													filename := filepath.Base(p1)
 													filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
 													logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "variations", filename), fi.Size())
-													if thumbnails, err := STORAGE.PutImage(p1, path.Join("images", "variations", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+													if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "variations", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 														variationView.Thumbnail = strings.Join(thumbnails, ",")
 													} else {
 														logger.Warningf("%v", err)
@@ -1249,7 +1100,7 @@ var renderCmd = &cobra.Command{
 															}
 															valueView.Thumbnail = strings.Join(thumbnails, ",")*/
 															logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-															if thumbnails, err := STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+															if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 																valueView.Thumbnail = strings.Join(thumbnails, ",")
 															} else {
 																logger.Warningf("%v", err)
@@ -1335,6 +1186,20 @@ var renderCmd = &cobra.Command{
 											}
 										}
 									}
+									productFile.Sku = product.Sku
+									// Sort
+									if rows, err := common.Database.Debug().Table("categories_products_sort").Select("Value").Where("CategoryId = ? and ProductId = ?", category.ID, product.ID).Rows(); err == nil {
+										for rows.Next() {
+											var r struct {
+												Value int
+											}
+											if err = common.Database.ScanRows(rows, &r); err == nil {
+												logger.Infof("DEBUG: %+v", r)
+												productFile.Sort = r.Value
+											}
+										}
+									}
+									//
 									if err = common.WriteProductFile(file, productFile); err != nil {
 										logger.Errorf("%v", err)
 									}
@@ -1456,7 +1321,7 @@ var renderCmd = &cobra.Command{
 							}*/
 							var thumbnails []string
 							logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "transport", filename), fi.Size())
-							if thumbnails, err = STORAGE.PutImage(p1, path.Join("images", "categories", filename), common.Config.Resize.Thumbnail.Size); err != nil {
+							if thumbnails, err = common.STORAGE.PutImage(p1, path.Join("images", "categories", filename), common.Config.Resize.Thumbnail.Size); err != nil {
 								logger.Warningf("%v", err)
 							}
 							//
@@ -1487,69 +1352,17 @@ func init() {
 
 type CategoryView struct {
 	ID uint
-	Date time.Time
-	Title string
-	Thumbnail string
-	Path string
-	Type string
+	Name string
+	Count int
 }
 
-/*type PageView struct {
-	ID uint
-	Type       string
-	ZIP      string
-	Date       time.Time
-	Tags       []string
-	Canonical  string
-	Categories []string
-	CategoryId  uint
-	Images     []string
-	Thumbnail  string
-	BasePrice  string
-	Products    ProductView
+func getChildrenCategoriesView(connector *gorm.DB, root *CategoryView) *CategoryView {
+	for _, category := range models.GetChildrenOfCategoryById(connector, root.ID) {
+		child := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Name: category.Name})
+		root.Count += child.Count
+	}
+	if products, err := models.GetProductsByCategoryId(connector, root.ID); err == nil {
+		root.Count += len(products)
+	}
+	return root
 }
-
-type ProductView struct {
-	Id         uint `json:"Id"`
-	CategoryId uint
-	Country       string
-	ZIP      string
-	Thumbnail  string
-	Path       string
-	Variations []VariationView
-}
-
-type VariationView struct {
-	Id uint
-	Country string
-	ZIP string
-	Thumbnail string
-	Description string
-	BasePrice float64
-	Properties []PropertyView
-	Selected bool
-}
-
-type PropertyView struct {
-	Id uint
-	Type string
-	Country string
-	ZIP string
-	Description string
-	Values []ValueView
-}
-
-type ValueView struct {
-	Id uint
-	Enabled bool
-	ZIP string
-	Thumbnail string
-	Value string
-	Price PriceView
-	Selected bool
-}
-
-type PriceView struct {
-	Id uint
-	Price float64
-}*/

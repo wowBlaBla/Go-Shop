@@ -64,19 +64,27 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 
 		var base string
 		var redirectUrl string
-		if v := c.Request().Header.Referer(); len(v) > 0 {
-			if u, err := url.Parse(string(v)); err == nil {
-				u.Path = ""
-				u.RawQuery = ""
-				base = u.String()
-				u.Path = fmt.Sprintf("/api/v1/account/orders/%v/mollie/success", order.ID)
-				values := url.Values{}
-				if v := c.Query("method", ""); v != "" {
-					values.Set("method", v)
-					u.RawQuery = values.Encode()
-				}
-				redirectUrl = u.String()
+		//
+		var source string
+		if common.Config.Url == "" {
+			if v := c.Request().Header.Referer(); len(v) > 0 {
+				source = string(v)
 			}
+		}else{
+			source = common.Config.Url
+		}
+		//
+		if u, err := url.Parse(source); err == nil {
+			u.Path = ""
+			u.RawQuery = ""
+			base = u.String()
+			u.Path = fmt.Sprintf("/api/v1/account/orders/%v/mollie/success", order.ID)
+			values := url.Values{}
+			if v := c.Query("method", ""); v != "" {
+				values.Set("method", v)
+				u.RawQuery = values.Encode()
+			}
+			redirectUrl = u.String()
 		}
 
 		var request MollieSubmitRequest

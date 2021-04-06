@@ -9,9 +9,10 @@ import (
 )
 
 const (
+	NOTIFICATION_TYPE_CREATE_ACCOUNT = "create-account"
+	NOTIFICATION_TYPE_RESET_PASSWORD = "reset-password"
 	NOTIFICATION_TYPE_ADMIN_ORDER_PAID = "admin-order-paid"
 	NOTIFICATION_TYPE_USER_ORDER_PAID = "user-order-paid"
-	NOTIFICATION_TYPE_RESET_PASSWORD = "reset-password"
 )
 
 var (
@@ -75,6 +76,8 @@ type NotificationTemplateVariables struct {
 	Symbol string
 	Order interface{}
 	Code string
+	Email string
+	Password string
 }
 
 func (n *Notification) SendEmail(from, to *mail.Email, topic, message string, vars *NotificationTemplateVariables) error {
