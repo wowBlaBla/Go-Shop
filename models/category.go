@@ -1,7 +1,11 @@
 package models
 
 import (
+	"fmt"
+	"github.com/yonnic/goshop/common"
 	"gorm.io/gorm"
+	"path"
+	"strings"
 	"time"
 )
 
@@ -192,4 +196,101 @@ func DeleteCategory(connector *gorm.DB, category *Category) error {
 	db := connector
 	db.Debug().Unscoped().Delete(&category)
 	return db.Error
+}
+
+/**/
+
+type CategoriesView []CategoryView
+
+type CategoryView struct {
+	ID uint
+	Name string
+	Path string
+	Title string
+	Thumbnail string `json:",omitempty"`
+	Description string `json:",omitempty"`
+	Type string `json:",omitempty"` // "category", "product"
+	Children []*CategoryView `json:",omitempty"`
+	Parents []*CategoryView `json:",omitempty"`
+	Products int64 `json:",omitempty"`
+	Count int `json:",omitempty"`
+}
+
+func GetCategoriesView(connector *gorm.DB, id int, depth int, noProducts bool, count bool) (*CategoryView, error) {
+	if id == 0 {
+		return getChildrenCategoriesView(connector, &CategoryView{Path: "/", Name: strings.ToLower(common.Config.Products), Title: common.Config.Products, Type: "category"}, depth, noProducts, count), nil
+	} else {
+		if category, err := GetCategory(connector, id); err == nil {
+			chunks := &[]string{}
+			if err := getCategoryPath(connector, int(category.ParentId), chunks); err != nil {
+				return nil, err
+			}
+			view := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Path: fmt.Sprintf("/%s", strings.Join(*chunks, "/")), Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category"}, depth, noProducts, count)
+			if view != nil {
+				if err = getParentCategoriesView(connector, view, category.ParentId); err != nil {
+					return nil, err
+				}
+			}
+			return view, nil
+		}else{
+			return nil, err
+		}
+	}
+}
+
+func getCategoryPath(connector *gorm.DB, pid int, chunks *[]string) error {
+	if pid == 0 {
+		return nil
+	} else {
+		if category, err := GetCategory(connector, pid); err == nil {
+			*chunks = append([]string{category.Name}, *chunks...)
+			return getCategoryPath(connector, int(category.ParentId), chunks)
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
+func getChildrenCategoriesView(connector *gorm.DB, root *CategoryView, depth int, noProducts bool, count bool) *CategoryView {
+	for _, category := range GetChildrenOfCategoryById(connector, root.ID) {
+		if depth > 0 {
+			child := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Path: path.Join(root.Path, root.Name), Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category"}, depth - 1, noProducts, count)
+			root.Children = append(root.Children, child)
+			if count {
+				root.Count += child.Count
+			}
+		}
+	}
+	if count || !noProducts {
+		if products, err := GetProductsByCategoryId(connector, root.ID); err == nil {
+			for _, product := range products {
+				var thumbnail string
+				if product.Image != nil {
+					thumbnail = product.Image.Url
+				}
+				if !noProducts {
+					root.Children = append(root.Children, &CategoryView{ID: product.ID, Path: path.Join(root.Path, root.Name), Name: product.Name, Title: product.Title, Thumbnail: thumbnail, Description: product.Description, Type: "product"})
+				}
+			}
+			if count {
+				root.Count += len(products)
+			}
+		}
+	}
+	return root
+}
+
+func getParentCategoriesView(connector *gorm.DB, node *CategoryView, pid uint) error {
+	if pid == 0 {
+		node.Parents = append([]*CategoryView{{Path: "/", Name: strings.ToLower(common.Config.Products), Title: common.Config.Products}}, node.Parents...)
+	} else {
+		if category, err := GetCategory(connector, int(pid)); err == nil {
+			node.Parents = append([]*CategoryView{{ID: category.ID, Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description}}, node.Parents...)
+			return getParentCategoriesView(connector, node, category.ParentId)
+		} else {
+			return err
+		}
+	}
+	return nil
 }

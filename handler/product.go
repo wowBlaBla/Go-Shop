@@ -348,7 +348,11 @@ func postProductsListHandler(c *fiber.Ctx) error {
 		return err
 	}
 	if len(request.Sort) == 0 {
-		request.Sort = map[string]string{"Sort": "desc"}
+		if id > 0 {
+			request.Sort = map[string]string{"Sort": "desc"}
+		}else{
+			request.Sort = map[string]string{"Id": "desc"}
+		}
 	}
 	if request.Length == 0 {
 		request.Length = 10
@@ -428,7 +432,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_products.Thumbnail as Thumbnail, products.Description, products.Sku, group_concat(distinct variations.ID) as VariationsIds, group_concat(distinct variations.Title) as VariationsTitles, categories_products_sort.Value as Sort").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join categories_products_sort on categories_products_sort.productId = products.id").Joins("left join cache_products on products.id = cache_products.product_id").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_images.Thumbnail as Thumbnail, products.Description, products.Sku, group_concat(distinct variations.ID) as VariationsIds, group_concat(distinct variations.Title) as VariationsTitles, categories_products_sort.Value as Sort").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join categories_products_sort on categories_products_sort.productId = products.id").Joins("left join cache_products on products.id = cache_products.product_id").Joins("left join cache_images on products.image_id = cache_images.image_id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -444,7 +448,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, images.Path as Thumbnail, products.Description, products.Sku, group_concat(distinct variations.ID) as VariationsIds, group_concat(distinct variations.Title) as VariationsTitles").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join images on products.image_id = images.id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_images.Thumbnail as Thumbnail, products.Description, products.Sku, group_concat(distinct variations.ID) as VariationsIds, group_concat(distinct variations.Title) as VariationsTitles").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join cache_images on products.image_id = cache_images.image_id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++

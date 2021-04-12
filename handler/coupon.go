@@ -257,7 +257,7 @@ type CouponView struct {
 	Count int `json:",omitempty"`
 	Limit int `json:",omitempty"`
 	ApplyTo string `json:",omitempty"`
-	Categories []CategoryView `json:",omitempty"`
+	Categories []models.CategoryView `json:",omitempty"`
 	Products []ProductShortView `json:",omitempty"`
 }
 

@@ -44,7 +44,7 @@ func getCategoriesHandler(c *fiber.Ctx) error {
 			noProducts = vv
 		}
 	}
-	view, err := GetCategoriesView(common.Database, id, depth, noProducts)
+	view, err := models.GetCategoriesView(common.Database, id, depth, noProducts, true)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
@@ -75,7 +75,7 @@ type NewCategory struct {
 // @Router /api/v1/categories [post]
 // @Tags category
 func postCategoriesHandler(c *fiber.Ctx) error {
-	var view CategoryView
+	var view models.CategoryView
 	var request NewCategory
 	if err := c.BodyParser(&request); err != nil {
 		return err
@@ -548,7 +548,7 @@ func patchCategoryHandler(c *fiber.Ctx) error {
 // @Router /api/v1/categories/{id} [put]
 // @Tags category
 func putCategoryHandler(c *fiber.Ctx) error {
-	var view CategoryView
+	var view models.CategoryView
 	var id int
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)

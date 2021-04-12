@@ -30,7 +30,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210406165749"
+	COMPILED = "20210412124908"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -662,4 +662,18 @@ func ImageResize(src, sizes string) ([]Image, error) {
 		images = append(images, Image{Filename: filename, Size: fmt.Sprintf("%dw", width)})
 	}
 	return images, nil
+}
+
+type MenuView2 struct {
+	Name string
+	Title string
+	Location string
+	Children []interface{}
+	//Children []MenuX
+}
+
+type MenuX struct {
+	Path string
+	Title string
+	Thumbnail string `json:",omitempty"`
 }

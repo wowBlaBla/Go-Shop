@@ -28,7 +28,6 @@ import (
 	"github.com/yonnic/goshop/config"
 	"github.com/yonnic/goshop/models"
 	"github.com/yonnic/goshop/storage"
-	"gorm.io/gorm"
 	_ "image/gif"
 	"image/jpeg"
 	_ "image/jpeg"
@@ -247,6 +246,12 @@ func GetFiber() *fiber.App {
 	v1.Get("/widgets/:id", authRequired, getWidgetHandler)
 	v1.Put("/widgets/:id", authRequired, changed("widget updated"), putWidgetHandler)
 	v1.Delete("/widgets/:id", authRequired, changed("widget deleted"), delWidgetHandler)
+	// Menu
+	v1.Post("/menus", authRequired, changed("menu created"), postMenuHandler)
+	v1.Post("/menus/list", authRequired, postMenusListHandler)
+	v1.Get("/menus/:id", authRequired, getMenuHandler)
+	v1.Put("/menus/:id", authRequired, changed("menu updated"), putMenuHandler)
+	v1.Delete("/menus/:id", authRequired, changed("menu updated"), delMenuHandler)
 	//
 	v1.Get("/me", authRequired, getMeHandler)
 	//
@@ -582,7 +587,7 @@ func getPreviewHandler (c *fiber.Ctx) error {
 						}else if res := regexp.MustCompile(`/categories/(\d+)`).FindAllStringSubmatch(referer, 1); len(res) > 0 && len(res[0]) > 1 {
 							logger.Infof("res: %+v", res)
 							if v, err := strconv.Atoi(res[0][1]); err == nil {
-								if c, err := models.GetCacheCategoryByProductId(common.Database, uint(v)); err == nil {
+								if c, err := models.GetCacheCategoryByCategoryId(common.Database, uint(v)); err == nil {
 									logger.Infof("c: %+v", c)
 									query.Set("referer", path.Join(c.Path, c.Name))
 
@@ -2523,7 +2528,7 @@ type WidgetView struct {
 	Content string `json:",omitempty"`
 	Location string `json:",omitempty"`
 	ApplyTo string `json:",omitempty"`
-	Categories []CategoryView `json:",omitempty"`
+	Categories []models.CategoryView `json:",omitempty"`
 	Products []ProductShortView `json:",omitempty"`
 }
 
@@ -2862,553 +2867,6 @@ func getTariffsHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-	}else{
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-}
-
-
-// Shipping
-type TransportsView []TransportView
-
-type TransportView struct{
-	ID uint
-	Enabled bool
-	Name string
-	Title string
-	Thumbnail string
-	Weight float64
-	Volume float64
-	Order string
-	Item string
-	Kg float64
-	M3 float64
-	Free float64 `json:",omitempty"`
-	Services string `json:",omitempty"`
-}
-
-// @security BasicAuth
-// GetTransports godoc
-// @Summary Get transports
-// @Accept json
-// @Produce json
-// @Success 200 {object} TransportsView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/transports [get]
-// @Tags transport
-func getTransportsHandler(c *fiber.Ctx) error {
-	if transports, err := models.GetTransports(common.Database); err == nil {
-		sort.Slice(transports, func(i, j int) bool {
-			return transports[i].Weight < transports[j].Weight
-		})
-		var view TransportsView
-		if bts, err := json.MarshalIndent(transports, "", "   "); err == nil {
-			if err = json.Unmarshal(bts, &view); err == nil {
-				return c.JSON(view)
-			}else{
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-	}else{
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-}
-
-type NewTransport struct {
-	Enabled bool
-	Name string
-	Title string
-	Weight float64
-	Volume float64
-	Order string
-	Item string
-	Kg float64
-	M3 float64
-}
-
-// @security BasicAuth
-// CreateTransport godoc
-// @Summary Create transport
-// @Accept json
-// @Produce json
-// @Param transport body NewTransport true "body"
-// @Success 200 {object} TransportView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/transports [post]
-// @Tags transport
-func postTransportHandler(c *fiber.Ctx) error {
-	var view TransportView
-	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
-			data, err := c.Request().MultipartForm()
-			if err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			var enabled bool
-			if v, found := data.Value["Enabled"]; found && len(v) > 0 {
-				enabled, err = strconv.ParseBool(v[0])
-				if err != nil {
-					logger.Infof("%+v", err)
-				}
-			}
-			var name string
-			if v, found := data.Value["Name"]; found && len(v) > 0 {
-				name = strings.TrimSpace(v[0])
-			}
-			var title string
-			if v, found := data.Value["Title"]; found && len(v) > 0 {
-				title = strings.TrimSpace(v[0])
-			}
-			var weight float64
-			if v, found := data.Value["Weight"]; found && len(v) > 0 {
-				weight, err = strconv.ParseFloat(v[0],10)
-				if err != nil {
-					logger.Infof("%+v", err)
-				}
-			}
-			var volume float64
-			if v, found := data.Value["Volume"]; found && len(v) > 0 {
-				volume, err = strconv.ParseFloat(v[0],10)
-				if err != nil {
-					logger.Infof("%+v", err)
-				}
-			}
-			var order string
-			if v, found := data.Value["Order"]; found && len(v) > 0 {
-				order = strings.TrimSpace(v[0])
-			}
-			var item string
-			if v, found := data.Value["Item"]; found && len(v) > 0 {
-				item = strings.TrimSpace(v[0])
-			}
-			var kg float64
-			if v, found := data.Value["Kg"]; found && len(v) > 0 {
-				kg, err = strconv.ParseFloat(v[0],10)
-				if err != nil {
-					logger.Infof("%+v", err)
-				}
-			}
-			var m3 float64
-			if v, found := data.Value["M3"]; found && len(v) > 0 {
-				m3, err = strconv.ParseFloat(v[0],10)
-				if err != nil {
-					logger.Infof("%+v", err)
-				}
-			}
-			var free float64
-			if v, found := data.Value["Free"]; found && len(v) > 0 {
-				free, err = strconv.ParseFloat(v[0],10)
-				if err != nil {
-					logger.Infof("%+v", err)
-				}
-			}
-			var services string
-			if v, found := data.Value["Services"]; found && len(v) > 0 {
-				services = strings.TrimSpace(v[0])
-			}
-			transport := &models.Transport {
-				Enabled: enabled,
-				Name:    name,
-				Title:   title,
-				Weight:  weight,
-				Volume:  volume,
-				Order:   order,
-				Item:    item,
-				Kg:      kg,
-				M3:      m3,
-				Free: free,
-				Services: services,
-			}
-			if id, err := models.CreateTransport(common.Database, transport); err == nil {
-				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
-					p := path.Join(dir, "storage", "values")
-					if _, err := os.Stat(p); err != nil {
-						if err = os.MkdirAll(p, 0755); err != nil {
-							logger.Errorf("%v", err)
-						}
-					}
-					filename := fmt.Sprintf("%d-%s-thumbnail%s", id, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(transport.Name, "-"), path.Ext(v[0].Filename))
-					if p := path.Join(p, filename); len(p) > 0 {
-						if in, err := v[0].Open(); err == nil {
-							out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
-							if err != nil {
-								c.Status(http.StatusInternalServerError)
-								return c.JSON(HTTPError{err.Error()})
-							}
-							defer out.Close()
-							if _, err := io.Copy(out, in); err != nil {
-								c.Status(http.StatusInternalServerError)
-								return c.JSON(HTTPError{err.Error()})
-							}
-							transport.Thumbnail = "/" + path.Join("transports", filename)
-							if err = models.UpdateTransport(common.Database, transport); err != nil {
-								c.Status(http.StatusInternalServerError)
-								return c.JSON(HTTPError{err.Error()})
-							}
-						}
-					}
-				}
-			}else{
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			if bts, err := json.Marshal(transport); err == nil {
-				if err = json.Unmarshal(bts, &view); err != nil {
-					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{err.Error()})
-				}
-			}
-			return c.JSON(view)
-		} else {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Unsupported Content-Type"})
-		}
-	}
-	return c.JSON(view)
-}
-
-type TransportsListResponse struct {
-	Data []TransportsListItem
-	Filtered int64
-	Total int64
-}
-
-type TransportsListItem struct {
-	ID uint
-	Enabled bool
-	Name string
-	Title string
-	Weight float64
-	Volume float64
-	Order string
-	Item string
-	Kg float64
-	M3 float64
-}
-
-// @security BasicAuth
-// SearchTransports godoc
-// @Summary Search transports
-// @Accept json
-// @Produce json
-// @Param request body ListRequest true "body"
-// @Success 200 {object} TransportsListResponse
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/transports/list [post]
-// @Tags transport
-func postTransportsListHandler(c *fiber.Ctx) error {
-	var response TransportsListResponse
-	var request ListRequest
-	if err := c.BodyParser(&request); err != nil {
-		return err
-	}
-	if len(request.Sort) == 0 {
-		request.Sort["ID"] = "asc"
-	}
-	if request.Length == 0 {
-		request.Length = 10
-	}
-	// Filter
-	var keys1 []string
-	var values1 []interface{}
-	if len(request.Filter) > 0 {
-		for key, value := range request.Filter {
-			if key != "" && len(strings.TrimSpace(value)) > 0 {
-				switch key {
-				case "Order":
-					keys1 = append(keys1, fmt.Sprintf("transports.`%v` like ?", key))
-					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
-				default:
-					keys1 = append(keys1, fmt.Sprintf("transports.%v like ?", key))
-					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
-				}
-			}
-		}
-	}
-	//logger.Infof("keys1: %+v, values1: %+v", keys1, values1)
-	//
-	// Sort
-	var order string
-	if len(request.Sort) > 0 {
-		var orders []string
-		for key, value := range request.Sort {
-			if key != "" && value != "" {
-				switch key {
-				case "Order":
-					orders = append(orders, fmt.Sprintf("transports.`%v` %v", key, value))
-				default:
-					orders = append(orders, fmt.Sprintf("transports.%v %v", key, value))
-				}
-			}
-		}
-		order = strings.Join(orders, ", ")
-	}
-	//logger.Infof("order: %+v", order)
-	//
-	rows, err := common.Database.Debug().Model(&models.Transport{}).Select("transports.ID, transports.Enabled, transports.Name, transports.Title, transports.Weight, transports.Volume, transports.`Order`, transports.Item, transports.Kg, transports.M3").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
-	if err == nil {
-		if err == nil {
-			for rows.Next() {
-				var item TransportsListItem
-				if err = common.Database.ScanRows(rows, &item); err == nil {
-					response.Data = append(response.Data, item)
-				} else {
-					logger.Errorf("%v", err)
-				}
-			}
-		}else{
-			logger.Errorf("%v", err)
-		}
-		rows.Close()
-	}
-	rows, err = common.Database.Debug().Model(&models.Transport{}).Select("transports.ID, transports.Enabled, transports.Name, transports.Title, transports.Weight, transports.Volume, transports.`Order`, transports.Item, transports.Kg, transports.M3").Where(strings.Join(keys1, " and "), values1...).Rows()
-	if err == nil {
-		for rows.Next() {
-			response.Filtered ++
-		}
-		rows.Close()
-	}
-	if len(keys1) > 0 {
-		common.Database.Debug().Model(&models.Transport{}).Count(&response.Total)
-	}else{
-		response.Total = response.Filtered
-	}
-	c.Status(http.StatusOK)
-	return c.JSON(response)
-}
-
-// @security BasicAuth
-// GetTransport godoc
-// @Summary Get transport
-// @Accept json
-// @Produce json
-// @Param id path int true "Shipping ID"
-// @Success 200 {object} TransportView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/transports/{id} [get]
-// @Tags transport
-func getTransportHandler(c *fiber.Ctx) error {
-	var id int
-	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
-	}
-	if transport, err := models.GetTransport(common.Database, id); err == nil {
-		var view TransportView
-		if bts, err := json.MarshalIndent(transport, "", "   "); err == nil {
-			if err = json.Unmarshal(bts, &view); err == nil {
-				return c.JSON(view)
-			}else{
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-	}else{
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-}
-
-// @security BasicAuth
-// UpdateTransport godoc
-// @Summary Update transport
-// @Accept json
-// @Produce json
-// @Param transport body TransportView true "body"
-// @Param id path int true "Shipping ID"
-// @Success 200 {object} TagView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/transports/{id} [put]
-// @Tags transport
-func putTransportHandler(c *fiber.Ctx) error {
-	var transport *models.Transport
-	var id int
-	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
-		var err error
-		if transport, err = models.GetTransport(common.Database, id); err != nil {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-	}else{
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
-	}
-	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
-			data, err := c.Request().MultipartForm()
-			if err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			var enabled bool
-			if v, found := data.Value["Enabled"]; found && len(v) > 0 {
-				enabled, err = strconv.ParseBool(v[0])
-				if err != nil {
-					logger.Infof("%+v", err)
-				}
-			}
-			var title string
-			if v, found := data.Value["Title"]; found && len(v) > 0 {
-				title = strings.TrimSpace(v[0])
-			}
-			var weight float64
-			if v, found := data.Value["Weight"]; found && len(v) > 0 {
-				weight, err = strconv.ParseFloat(v[0],10)
-				if err != nil {
-					logger.Infof("%+v", err)
-				}
-			}
-			var volume float64
-			if v, found := data.Value["Volume"]; found && len(v) > 0 {
-				volume, err = strconv.ParseFloat(v[0],10)
-				if err != nil {
-					logger.Infof("%+v", err)
-				}
-			}
-			var order string
-			if v, found := data.Value["Order"]; found && len(v) > 0 {
-				order = strings.TrimSpace(v[0])
-			}
-			var item string
-			if v, found := data.Value["Item"]; found && len(v) > 0 {
-				item = strings.TrimSpace(v[0])
-			}
-			var kg float64
-			if v, found := data.Value["Kg"]; found && len(v) > 0 {
-				kg, err = strconv.ParseFloat(v[0],10)
-				if err != nil {
-					logger.Infof("%+v", err)
-				}
-			}
-			var m3 float64
-			if v, found := data.Value["M3"]; found && len(v) > 0 {
-				m3, err = strconv.ParseFloat(v[0],10)
-				if err != nil {
-					logger.Infof("%+v", err)
-				}
-			}
-			var free float64
-			if v, found := data.Value["Free"]; found && len(v) > 0 {
-				free, err = strconv.ParseFloat(v[0],10)
-				if err != nil {
-					logger.Infof("%+v", err)
-				}
-			}
-			var services string
-			if v, found := data.Value["Services"]; found && len(v) > 0 {
-				services = strings.TrimSpace(v[0])
-			}
-			transport.Enabled = enabled
-			transport.Title = title
-			transport.Weight = weight
-			transport.Volume = volume
-			transport.Order = order
-			transport.Item = item
-			transport.Kg = kg
-			transport.M3 = m3
-			transport.Free = free
-			transport.Services = services
-			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
-				// To delete existing
-				if transport.Thumbnail != "" {
-					if err = os.Remove(path.Join(dir, transport.Thumbnail)); err != nil {
-						logger.Errorf("%v", err)
-					}
-					transport.Thumbnail = ""
-				}
-			}else if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
-				p := path.Join(dir, "storage", "transports")
-				if _, err := os.Stat(p); err != nil {
-					if err = os.MkdirAll(p, 0755); err != nil {
-						logger.Errorf("%v", err)
-					}
-				}
-				filename := fmt.Sprintf("%d-%s-thumbnail%s", id, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(transport.Name, "-"), path.Ext(v[0].Filename))
-				if p := path.Join(p, filename); len(p) > 0 {
-					if in, err := v[0].Open(); err == nil {
-						out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
-						if err != nil {
-							c.Status(http.StatusInternalServerError)
-							return c.JSON(HTTPError{err.Error()})
-						}
-						defer out.Close()
-						if _, err := io.Copy(out, in); err != nil {
-							c.Status(http.StatusInternalServerError)
-							return c.JSON(HTTPError{err.Error()})
-						}
-						transport.Thumbnail = "/" + path.Join("transports", filename)
-						if err = models.UpdateTransport(common.Database, transport); err != nil {
-							c.Status(http.StatusInternalServerError)
-							return c.JSON(HTTPError{err.Error()})
-						}
-					}
-				}
-			}
-			//
-			if err := models.UpdateTransport(common.Database, transport); err == nil {
-				var view TransportView
-				if bts, err := json.Marshal(transport); err == nil {
-					if err = json.Unmarshal(bts, &view); err == nil {
-						return c.JSON(view)
-					}else{
-						c.Status(http.StatusInternalServerError)
-						return c.JSON(HTTPError{err.Error()})
-					}
-				}else{
-					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{err.Error()})
-				}
-			}else{
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Unsupported Content-Type"})
-		}
-	}
-	c.Status(http.StatusInternalServerError)
-	return c.JSON(HTTPError{"Something went wrong"})
-}
-
-// @security BasicAuth
-// DelTransport godoc
-// @Summary Delete transport
-// @Accept json
-// @Produce json
-// @Param id path int true "Shipping ID"
-// @Success 200 {object} HTTPMessage
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/transports/{id} [delete]
-// @Tags transport
-func delTransportHandler(c *fiber.Ctx) error {
-	var id int
-	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
-	}
-	if transport, err := models.GetTransport(common.Database, id); err == nil {
-		if err = models.DeleteTransport(common.Database, transport); err == nil {
-			return c.JSON(HTTPMessage{MESSAGE: "OK"})
 		}else{
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
@@ -5697,6 +5155,7 @@ func postVATHandler(c *fiber.Ctx) error {
 type FilterRequest ListRequest
 
 type ProductsFilterResponse struct {
+	Categories *models.CategoryView
 	Data []ProductsFilterItem
 	Filtered int64
 	Total int64
@@ -5717,6 +5176,8 @@ type ProductsFilterItem struct {
 	Depth float64
 	Weight float64
 	CategoryId uint
+	CategoryName string
+	CategoryTitle string
 }
 
 // @security BasicAuth
@@ -5732,13 +5193,27 @@ type ProductsFilterItem struct {
 // @Router /api/v1/filter [post]
 // @Tags frontend
 func postFilterHandler(c *fiber.Ctx) error {
+	var response ProductsFilterResponse
 	var relPath string
 	if v := c.Query("relPath"); v != "" {
 		relPath = v
 	}else{
 		return c.JSON(HTTPError{"relPath required"})
 	}
-	var response ProductsFilterResponse
+	if category, err := models.GetCacheCategoryByLink(common.Database, relPath); err == nil {
+		if tree, err := models.GetCategoriesView(common.Database, int(category.CategoryID), 999, true, false); err == nil {
+			response.Categories = tree
+		}else{
+			logger.Warningf("%+v", err)
+		}
+	} else {
+		if tree, err := models.GetCategoriesView(common.Database, 0, 999, true, false); err == nil {
+			response.Categories = tree
+		}else{
+			logger.Warningf("%+v", err)
+		}
+	}
+	//
 	var request FilterRequest
 	if err := c.BodyParser(&request); err != nil {
 		return err
@@ -5815,7 +5290,7 @@ func postFilterHandler(c *fiber.Ctx) error {
 		keys1 = append(keys1, fmt.Sprintf("(%v)", strings.Join(keys2, " or ")))
 		values1 = append(values1, values2...)
 	}
-	keys1 = append(keys1, "Path LIKE ?")
+	keys1 = append(keys1, "cache_products.Path LIKE ?")
 	if common.Config.FlatUrl {
 		if prefix := "/" + strings.ToLower(common.Config.Products); prefix == relPath || prefix + "/" == relPath {
 			relPath = "/"
@@ -5845,8 +5320,42 @@ func postFilterHandler(c *fiber.Ctx) error {
 		order = strings.Join(orders, ", ")
 	}
 	//logger.Infof("order: %+v", order)
+	rows, err := common.Database.Debug().Model(&models.CacheProduct{}).Select("cache_products.ID, cache_products.Name, cache_products.Title, cache_products.Path, cache_products.Description, cache_products.Thumbnail, cache_products.Images, cache_products.Variations, cache_products.Price as Price, cache_products.Width as Width, cache_products.Height as Height, cache_products.Depth as Depth,  cache_products.Weight as Weight, cache_products.Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join prices on prices.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...)/*.Having(strings.Join(keys2, " and "), values2...)*/.Rows()
+	if err == nil {
+		for rows.Next() {
+			var item ProductsFilterItem
+			if err = common.Database.ScanRows(rows, &item); err == nil {
+				//logger.Infof("Item: %+v, %+v, %+v", item.ID, item.Name, item.Path)
+				arr := strings.Split(strings.TrimLeft(item.Path, "/"), "/")
+				root := response.Categories
+				for i, slug := range arr {
+					//logger.Infof("\t%d: %+v", i, slug)
+					if i == 0 && slug == "" {
+						slug = strings.ToLower(common.Config.Products)
+					}
+					if root.Name == slug {
+						//logger.Infof("\t\tcase1")
+						root.Count++
+					} else {
+						//logger.Infof("\t\tcase2")
+						for i, child := range root.Children {
+							if child.Name == slug {
+								root.Children[i].Count++
+								//logger.Infof("\t\t\tcase2.1: %d, %+v, %+v", child.ID, child.Name, root.Children[i].Count)
+								root = child
+								break
+							}
+						}
+					}
+				}
+			} else {
+				logger.Errorf("%v", err)
+			}
+		}
+		rows.Close()
+	}
 	//
-	rows, err := common.Database.Debug().Model(&models.CacheProduct{}).Select("cache_products.ID, cache_products.Name, cache_products.Title, cache_products.Path, cache_products.Description, cache_products.Thumbnail, cache_products.Images, cache_products.Variations, cache_products.Price as Price, cache_products.Width as Width, cache_products.Height as Height, cache_products.Depth as Depth,  cache_products.Weight as Weight, cache_products.Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join prices on prices.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...)/*.Having(strings.Join(keys2, " and "), values2...)*/.Group("cache_products.product_id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err = common.Database.Debug().Model(&models.CacheProduct{}).Select("cache_products.ID, cache_products.Name, cache_products.Title, cache_products.Path, cache_products.Description, cache_products.Thumbnail, cache_products.Images, cache_products.Variations, cache_products.Price as Price, cache_products.Width as Width, cache_products.Height as Height, cache_products.Depth as Depth,  cache_products.Weight as Weight, cache_products.Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join prices on prices.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...)/*.Having(strings.Join(keys2, " and "), values2...)*/.Group("cache_products.product_id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		for rows.Next() {
 			var item ProductsFilterItem
@@ -6085,73 +5594,6 @@ func postAccountOrderOnDeliverySubmitHandler(c *fiber.Ctx) error {
 
 /* *** */
 
-type CategoriesView []CategoryView
-
-type CategoryView struct {
-	ID uint
-	Name string
-	Title string
-	Thumbnail string
-	Description string `json:",omitempty"`
-	Type string `json:",omitempty"` // "category", "product"
-	Children []*CategoryView `json:",omitempty"`
-	Parents []*CategoryView `json:",omitempty"`
-	Products int64 `json:",omitempty"`
-}
-
-func GetCategoriesView(connector *gorm.DB, id int, depth int, noProducts bool) (*CategoryView, error) {
-	if id == 0 {
-		return getChildrenCategoriesView(connector, &CategoryView{Name: "root", Title: "Root", Type: "category"}, depth, noProducts), nil
-	} else {
-		if category, err := models.GetCategory(connector, id); err == nil {
-			view := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category"}, depth, noProducts)
-			if view != nil {
-				if err = getParentCategoriesView(connector, view, category.ParentId); err != nil {
-					return nil, err
-				}
-			}
-			return view, nil
-		}else{
-			return nil, err
-		}
-	}
-}
-
-func getChildrenCategoriesView(connector *gorm.DB, root *CategoryView, depth int, noProducts bool) *CategoryView {
-	for _, category := range models.GetChildrenOfCategoryById(connector, root.ID) {
-		if depth > 0 {
-			child := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category"}, depth - 1, noProducts)
-			root.Children = append(root.Children, child)
-		}
-	}
-	if !noProducts {
-		if products, err := models.GetProductsByCategoryId(connector, root.ID); err == nil {
-			for _, product := range products {
-				var thumbnail string
-				if product.Image != nil {
-					thumbnail = product.Image.Url
-				}
-				root.Children = append(root.Children, &CategoryView{ID: product.ID, Name: product.Name, Title: product.Title, Thumbnail: thumbnail, Description: product.Description, Type: "product"})
-			}
-		}
-	}
-	return root
-}
-
-func getParentCategoriesView(connector *gorm.DB, node *CategoryView, pid uint) error {
-	if pid == 0 {
-		node.Parents = append([]*CategoryView{{Name: "root", Title: "Root"}}, node.Parents...)
-	} else {
-		if category, err := models.GetCategory(connector, int(pid)); err == nil {
-			node.Parents = append([]*CategoryView{{ID: category.ID, Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description}}, node.Parents...)
-			return getParentCategoriesView(connector, node, category.ParentId)
-		} else {
-			return err
-		}
-	}
-	return nil
-}
-
 type ProductView struct {
 	ID uint
 	Enabled bool
@@ -6210,7 +5652,7 @@ type ProductView struct {
 	VendorId int `json:",omitempty"`
 	TimeId int `json:",omitempty"`
 	//
-	Categories []CategoryView `json:",omitempty"`
+	Categories []models.CategoryView `json:",omitempty"`
 	Tags []TagView `json:",omitempty"`
 	RelatedProducts []RelatedProduct `json:",omitempty"`
 	//

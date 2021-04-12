@@ -189,7 +189,6 @@ var RootCmd = &cobra.Command{
 		if v := os.Getenv("SALT"); v != "" {
 			common.SALT = v
 		}
-		logger.Infof("Password: %+v", models.MakeUserPassword("password123"))
 		// Database
 		var dialer gorm.Dialector
 		if common.Config.Database.Dialer == "mysql" {
@@ -319,6 +318,10 @@ var RootCmd = &cobra.Command{
 		}
 		//
 		if err := common.Database.AutoMigrate(&models.Wish{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
+		//
+		if err := common.Database.AutoMigrate(&models.Menu{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
 		//

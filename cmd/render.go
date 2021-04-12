@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/google/logger"
 	"github.com/spf13/cobra"
@@ -13,6 +14,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -173,7 +175,22 @@ var renderCmd = &cobra.Command{
 		} else {
 			logger.Warningf("%+v", err)
 		}
-		// Categories
+		// Catalog
+		if tree, err := models.GetCategoriesView(common.Database, 0, 999, false, true); err == nil {
+			if bts, err := json.MarshalIndent(tree, " ", "   "); err == nil {
+				p := path.Join(dir, "hugo", "data")
+				if _, err = os.Stat(p); err != nil {
+					if err = os.MkdirAll(p, 0755); err != nil {
+						logger.Warningf("%+v", err)
+					}
+				}
+				if err = ioutil.WriteFile(path.Join(p, "catalog.json"), bts, 0755); err != nil {
+					logger.Warningf("%+v", err)
+				}
+			}
+		}else{
+			logger.Warningf("%+v", err)
+		}
 		if categories, err := models.GetCategories(common.Database); err == nil {
 			// Clear existing "products" folder
 			if common.Config.Products != "" {
@@ -295,8 +312,10 @@ var renderCmd = &cobra.Command{
 										}
 									}
 									//
-									if result := getChildrenCategoriesView(common.Database, &CategoryView{ID: category.ID, Name: category.Name}); result != nil {
-										categoryFile.Count = result.Count
+									if tree, err := models.GetCategoriesView(common.Database, int(category.ID), 999, true, true); err == nil {
+										categoryFile.Count = tree.Count
+									}else{
+										logger.Warningf("%+v", err)
 									}
 									//
 									if err = common.WriteCategoryFile(p2, categoryFile); err != nil {
@@ -313,6 +332,7 @@ var renderCmd = &cobra.Command{
 						Name:        category.Name,
 						Title:       category.Title,
 						Thumbnail:   strings.Join(thumbnails, ","),
+						Link: fmt.Sprintf("/%s/%s", strings.Join(names[:len(names) - 1], "/"), category.Name),
 					}); err != nil {
 						logger.Warningf("%v", err)
 					}
@@ -461,35 +481,65 @@ var renderCmd = &cobra.Command{
 												}}, product.Variations...)
 												for _, variation := range variations {
 													// Price
-													if categoryFile.Price.Min > variation.BasePrice || categoryFile.Price.Min == 0 {
+													if categoryFile.Price.Max == 0 {
+														categoryFile.Price.Max = variation.BasePrice
+														if categoryFile.Price.Min == 0 {
+															categoryFile.Price.Min = categoryFile.Price.Max
+														}
+													}
+													if categoryFile.Price.Min > variation.BasePrice {
 														categoryFile.Price.Min = variation.BasePrice
 													}
 													if categoryFile.Price.Max < variation.BasePrice {
 														categoryFile.Price.Max = variation.BasePrice
 													}
 													// Width
-													if categoryFile.Dimensions.Width.Min > variation.Width || categoryFile.Dimensions.Width.Min == 0 {
+													if categoryFile.Dimensions.Width.Max == 0 {
+														categoryFile.Dimensions.Width.Max = variation.Width
+														if categoryFile.Dimensions.Width.Min == 0 {
+															categoryFile.Dimensions.Width.Min = categoryFile.Dimensions.Width.Max
+														}
+													}
+													if categoryFile.Dimensions.Width.Min > variation.Width {
 														categoryFile.Dimensions.Width.Min = variation.Width
 													}
 													if categoryFile.Dimensions.Width.Max < variation.Width {
 														categoryFile.Dimensions.Width.Max = variation.Width
 													}
 													// Height
-													if categoryFile.Dimensions.Height.Min > variation.Height || categoryFile.Dimensions.Height.Min == 0 {
+													if categoryFile.Dimensions.Height.Max == 0 {
+														categoryFile.Dimensions.Height.Max = variation.Height
+														if categoryFile.Dimensions.Height.Min == 0 {
+															categoryFile.Dimensions.Height.Min = categoryFile.Dimensions.Height.Max
+														}
+													}
+													if categoryFile.Dimensions.Height.Min > variation.Height {
 														categoryFile.Dimensions.Height.Min = variation.Height
 													}
 													if categoryFile.Dimensions.Height.Max < variation.Height {
 														categoryFile.Dimensions.Height.Max = variation.Height
 													}
 													// Depth
-													if categoryFile.Dimensions.Depth.Min > variation.Depth || categoryFile.Dimensions.Depth.Min == 0 {
+													if categoryFile.Dimensions.Depth.Max == 0 {
+														categoryFile.Dimensions.Depth.Max = variation.Depth
+														if categoryFile.Dimensions.Depth.Min == 0 {
+															categoryFile.Dimensions.Depth.Min = categoryFile.Dimensions.Depth.Max
+														}
+													}
+													if categoryFile.Dimensions.Depth.Min > variation.Depth {
 														categoryFile.Dimensions.Depth.Min = variation.Depth
 													}
 													if categoryFile.Dimensions.Depth.Max < variation.Depth {
 														categoryFile.Dimensions.Depth.Max = variation.Depth
 													}
 													// Weight
-													if categoryFile.Weight.Min > variation.Weight || categoryFile.Weight.Min == 0 {
+													if categoryFile.Weight.Max == 0 {
+														categoryFile.Weight.Max = variation.Weight
+														if categoryFile.Weight.Min == 0 {
+															categoryFile.Weight.Min = categoryFile.Weight.Max
+														}
+													}
+													if categoryFile.Weight.Min > variation.Weight {
 														categoryFile.Weight.Min = variation.Weight
 													}
 													if categoryFile.Weight.Max < variation.Weight {
@@ -834,7 +884,11 @@ var renderCmd = &cobra.Command{
 										if file.Path != "" {
 											if p1 := path.Join(dir, "storage", file.Path); len(p1) > 0 {
 												if fi, err := os.Stat(p1); err == nil {
-													filename := fmt.Sprintf("%d-file-%d%v", file.ID, fi.ModTime().Unix(), path.Ext(p1))
+													name := product.Name + "-" + file.Name
+													if len(name) > 32 {
+														name = name[:32]
+													}
+													filename := fmt.Sprintf("%d-%s-%d%v", file.ID, name, fi.ModTime().Unix(), path.Ext(p1))
 													logger.Infof("Copy %v => %v %v bytes", p1, path.Join("files", "products", filename), fi.Size())
 													if url, err := common.STORAGE.PutFile(p1, path.Join("files", "products", filename)); err == nil {
 														files = append(files, common.FilePF{
@@ -981,7 +1035,11 @@ var renderCmd = &cobra.Command{
 												if image.Path != "" {
 													if p1 := path.Join(dir, "storage", image.Path); len(p1) > 0 {
 														if fi, err := os.Stat(p1); err == nil {
-															filename := fmt.Sprintf("%d-image-%d%v", image.ID, fi.ModTime().Unix(), path.Ext(p1))
+															name := product.Name + "-" + variation.Name
+															if len(name) > 32 {
+																name = name[:32]
+															}
+															filename := fmt.Sprintf("%d-%s-%d%v", image.ID, name, fi.ModTime().Unix(), path.Ext(p1))
 															logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "variations", filename), fi.Size())
 															if images2, err := common.STORAGE.PutImage(p1, path.Join("images", "variations", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 																images = append(images, strings.Join(images2, ","))
@@ -1006,7 +1064,11 @@ var renderCmd = &cobra.Command{
 													if file.Path != "" {
 														if p1 := path.Join(dir, "storage", file.Path); len(p1) > 0 {
 															if fi, err := os.Stat(p1); err == nil {
-																filename := fmt.Sprintf("%d-file-%d%v", file.ID, fi.ModTime().Unix(), path.Ext(p1))
+																name := product.Name + "-" + file.Name
+																if len(name) > 32 {
+																	name = name[:32]
+																}
+																filename := fmt.Sprintf("%d-%s-%d%v", file.ID, name, fi.ModTime().Unix(), path.Ext(p1))
 																logger.Infof("Copy %v => %v %v bytes", p1, path.Join("files", "variations", filename), fi.Size())
 																if url, err := common.STORAGE.PutFile(p1, path.Join("files", "variations", filename)); err == nil {
 																	files = append(files, common.FilePF{
@@ -1194,7 +1256,6 @@ var renderCmd = &cobra.Command{
 												Value int
 											}
 											if err = common.Database.ScanRows(rows, &r); err == nil {
-												logger.Infof("DEBUG: %+v", r)
 												productFile.Sort = r.Value
 											}
 										}
@@ -1338,6 +1399,77 @@ var renderCmd = &cobra.Command{
 				}
 			}
 		}
+		// Menu
+		if menus, err := models.GetMenus(common.Database); err == nil {
+			var views []common.MenuView2
+			for _, menu := range menus {
+				if menu.Enabled {
+					view := common.MenuView2{
+						Name: menu.Name,
+						Title: menu.Title,
+						Location: menu.Location,
+					}
+					var items []struct {
+						Data struct {
+							Type string
+							Id uint
+							Name string
+							Title string
+							Path string
+							Url string
+							Anchor string
+						}
+					}
+					if err := json.Unmarshal([]byte(menu.Description), &items); err == nil {
+						for _, item := range items {
+							//logger.Infof("item: %+v", item.Data)
+							if item.Data.Type == "category" {
+								if categoriesView, err := models.GetCategoriesView(common.Database, int(item.Data.Id), 999, true, true); err == nil {
+									view.Children = append(view.Children, categoriesView)
+								}
+							}else if item.Data.Type == "product" {
+								if cache, err := models.GetCacheProductByProductId(common.Database, item.Data.Id); err == nil {
+									view.Children = append(view.Children, map[string]string{
+										"Type": item.Data.Type,
+										"Url": fmt.Sprintf("%s%s", cache.Path, cache.Name),
+										"Title": cache.Title,
+										"Thumbnail": cache.Thumbnail,
+									})
+								}else{
+									logger.Warningf("%+v", err)
+								}
+							}else if item.Data.Type == "page" {
+								view.Children = append(view.Children, map[string]string{
+									"Type": item.Data.Type,
+									"Url": item.Data.Path,
+									"Title": item.Data.Title,
+								})
+							}else if item.Data.Type == "custom" {
+								view.Children = append(view.Children, map[string]string{
+									"Type": item.Data.Type,
+									"Url": item.Data.Path,
+									"Title": item.Data.Title,
+								})
+							}
+						}
+					}else{
+						logger.Warningf("%+v", err)
+					}
+					views = append(views, view)
+				}
+			}
+			if bts, err := json.MarshalIndent(views, " ", "   "); err == nil {
+				p := path.Join(dir, "hugo", "data")
+				if _, err = os.Stat(p); err != nil {
+					if err = os.MkdirAll(p, 0755); err != nil {
+						logger.Warningf("%+v", err)
+					}
+				}
+				if err = ioutil.WriteFile(path.Join(p, "menus.json"), bts, 0755); err != nil {
+					logger.Warningf("%+v", err)
+				}
+			}
+		}
 		logger.Infof("Rendered ~ %.3f ms", float64(time.Since(t1).Nanoseconds())/1000000)
 	},
 }
@@ -1346,23 +1478,4 @@ func init() {
 	RootCmd.AddCommand(renderCmd)
 	renderCmd.Flags().StringP("products", "p", "products", "products output folder")
 	renderCmd.Flags().BoolP("remove", "r", false, "remove all files during rendering")
-}
-
-/**/
-
-type CategoryView struct {
-	ID uint
-	Name string
-	Count int
-}
-
-func getChildrenCategoriesView(connector *gorm.DB, root *CategoryView) *CategoryView {
-	for _, category := range models.GetChildrenOfCategoryById(connector, root.ID) {
-		child := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Name: category.Name})
-		root.Count += child.Count
-	}
-	if products, err := models.GetProductsByCategoryId(connector, root.ID); err == nil {
-		root.Count += len(products)
-	}
-	return root
 }
