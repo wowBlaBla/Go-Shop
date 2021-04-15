@@ -3,7 +3,7 @@ package models
 import "gorm.io/gorm"
 
 type Price struct {
-	gorm.Model
+	gorm.Model // ID is here
 	Property *Property `gorm:"foreignKey:PropertyId"`
 	PropertyId uint
 	Value *Value `gorm:"foreignKey:ValueId"`
@@ -19,7 +19,7 @@ type Price struct {
 func GetPricesByProperty(connector *gorm.DB, propertyId uint) ([]*Price, error) {
 	db := connector
 	var prices []*Price
-	if err := db.Debug().Where("property_id = ?", propertyId).Find(&prices).Error; err != nil {
+	if err := db.Debug().Preload("Property").Preload("Property.Option").Preload("Value").Where("property_id = ?", propertyId).Find(&prices).Error; err != nil {
 		return nil, err
 	}
 	return prices, nil

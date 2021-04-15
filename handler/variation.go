@@ -98,7 +98,7 @@ func postVariationsListHandler(c *fiber.Ctx) error {
 		}
 	}
 	if id > 0 {
-		keys1 = append(keys1, "product_id = ?")
+		keys1 = append(keys1, "variations.product_id = ?")
 		values1 = append(values1, id)
 	}
 	//logger.Infof("keys1: %+v, values1: %+v", keys1, values1)

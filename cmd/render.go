@@ -1189,7 +1189,9 @@ var renderCmd = &cobra.Command{
 												}
 												propertyView.Values = append(propertyView.Values, valueView)
 											}
-											variationView.Properties = append(variationView.Properties, propertyView)
+											if len(propertyView.Values) > 0 {
+												variationView.Properties = append(variationView.Properties, propertyView)
+											}
 										}
 										productView.Variations = append(productView.Variations, variationView)
 										//variations = append(variations, strings.Join([]string{fmt.Sprintf("%d", variation.ID), variationView.Thumbnail}, ","))

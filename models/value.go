@@ -35,7 +35,7 @@ func GetValuesByOptionId(connector *gorm.DB, id int) ([]*Value, error) {
 func GetValue(connector *gorm.DB, id int) (*Value, error) {
 	db := connector
 	var value Value
-	if err := db.Where("id = ?", id).First(&value).Error; err != nil {
+	if err := db.Debug().First(&value, id).Error; err != nil {
 		return nil, err
 	}
 	return &value, nil

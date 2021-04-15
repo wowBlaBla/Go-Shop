@@ -172,6 +172,7 @@ func postPricesListHandler(c *fiber.Ctx) error {
 
 type NewPrice struct {
 	Enabled bool
+	ID uint
 	PropertyId uint
 	ValueId uint
 	Price float64
@@ -184,6 +185,7 @@ type PriceView struct {
 	ID uint
 	Enabled bool
 	PropertyId uint
+	Value ValueView
 	ValueId uint
 	Price float64
 	Availability string

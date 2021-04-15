@@ -19,6 +19,7 @@ type NewProperty struct {
 	OptionId uint
 	Sku string
 	Filtering bool
+	Prices []NewPrice
 }
 
 // @security BasicAuth
@@ -84,11 +85,24 @@ func postPropertyHandler(c *fiber.Ctx) error {
 				}
 			}
 			// logger.Infof("property: %+v", request)
+			for _, p := range request.Prices {
+				logger.Infof("p: %+v", p)
+				if value, err := models.GetValue(common.Database, int(p.ValueId)); err == nil {
+					property.Prices = append(property.Prices, &models.Price{
+						Enabled: true,
+						Availability: p.Availability,
+						Sku: p.Sku,
+						Price:   p.Price,
+						Value:   value,
+					})
+				}
+			}
 			//
 			if _, err := models.CreateProperty(common.Database, property); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
+			//
 			if bts, err := json.Marshal(property); err == nil {
 				if err = json.Unmarshal(bts, &view); err != nil {
 					c.Status(http.StatusInternalServerError)
@@ -355,6 +369,15 @@ func putPropertyHandler(c *fiber.Ctx) error {
 			property.Title = request.Title
 			property.Sku = request.Sku
 			property.Filtering = request.Filtering
+			// Update prices
+			for _, p := range request.Prices {
+				if price, err := models.GetPrice(common.Database, int(p.ID)); err == nil {
+					price.Availability = p.Availability
+					price.Sku = p.Sku
+					price.Price = p.Price
+				}
+			}
+			//
 			if err = models.UpdateProperty(common.Database, property); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})

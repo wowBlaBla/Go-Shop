@@ -5604,7 +5604,7 @@ type ProductView struct {
 	Parameters []ParameterView `json:",omitempty"`
 	CustomParameters string `json:",omitempty"`
 	Variation string `json:",omitempty"`
-	BasePrice float64 `json:",omitempty"`
+	BasePrice float64
 	SalePrice float64 `json:",omitempty"`
 	Start *time.Time `json:",omitempty"`
 	End *time.Time `json:",omitempty"`
