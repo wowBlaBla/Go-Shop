@@ -16,11 +16,11 @@ type Property struct {
 	Sku string
 	Filtering   bool
 	//
-	Prices []*Price `gorm:"foreignKey:PropertyId"`
+	Rates []*Rate `gorm:"foreignKey:PropertyId"`
 }
 
 func (p *Property) AfterDelete(tx *gorm.DB) error {
-	return tx.Model(&Price{}).Where("property_id = ?", p.ID).Unscoped().Delete(&Price{}).Error
+	return tx.Model(&Rate{}).Where("property_id = ?", p.ID).Unscoped().Delete(&Rate{}).Error
 }
 
 func GetProperties(connector *gorm.DB) ([]*Property, error) {

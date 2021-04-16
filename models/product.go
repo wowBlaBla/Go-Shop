@@ -23,6 +23,7 @@ type Product struct {
 	SalePrice float64          `sql:"type:decimal(8,2);"`
 	Start time.Time
 	End time.Time
+	Prices []*Price `gorm:"foreignKey:ProductId"`
 	//
 	Pattern string
 	Dimensions string
@@ -110,7 +111,7 @@ func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	db := connector
 	var product Product
-	if err := db.Debug().Preload("Categories").Preload("Parameters").Preload("Parameters.Option").Preload("Parameters.Value").Preload("Properties").Preload("Properties.Option").Preload("Properties.Prices").Preload("Properties.Prices.Value").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Preload("Variations.Images").Preload("Variations.Files").Preload("Variations.Time").Preload("Time").Preload("Tags").First(&product, id).Error; err != nil {
+	if err := db.Debug().Preload("Categories").Preload("Parameters").Preload("Parameters.Option").Preload("Parameters.Value").Preload("Properties").Preload("Properties.Option").Preload("Properties.Rates").Preload("Properties.Rates.Value").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Rates").Preload("Variations.Properties.Rates.Value").Preload("Variations.Images").Preload("Variations.Files").Preload("Variations.Time").Preload("Time").Preload("Tags").First(&product, id).Error; err != nil {
 		return nil, err
 	}
 	var customization struct {
@@ -191,7 +192,7 @@ func GetProductByName(connector *gorm.DB, name string) (*Product, error) {
 func GetProductVariations(connector *gorm.DB, id int) ([]*Variation, error) {
 	db := connector
 	var product Product
-	db.Debug().Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Prices").Preload("Variations.Properties.Prices.Value").Find(&product, id)
+	db.Debug().Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Rates").Preload("Variations.Properties.Rates.Value").Find(&product, id)
 	if err := db.Error; err != nil {
 		return nil, err
 	}

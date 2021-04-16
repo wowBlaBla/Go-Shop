@@ -361,7 +361,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 			if len(arr) > 2 {
 				//
 				for _, id := range arr[2:] {
-					if price, err := models.GetPrice(common.Database, id); err == nil {
+					if price, err := models.GetRate(common.Database, id); err == nil {
 						propertyShortView := PropertyShortView{}
 						propertyShortView.Title = price.Property.Title
 						//

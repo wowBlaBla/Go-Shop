@@ -13,13 +13,13 @@ import (
 )
 
 type NewProperty struct {
-	Type string
-	Name string
-	Title string
-	OptionId uint
-	Sku string
+	Type      string
+	Name      string
+	Title     string
+	OptionId  uint
+	Sku       string
 	Filtering bool
-	Prices []NewPrice
+	Rates     []NewRate
 }
 
 // @security BasicAuth
@@ -85,10 +85,10 @@ func postPropertyHandler(c *fiber.Ctx) error {
 				}
 			}
 			// logger.Infof("property: %+v", request)
-			for _, p := range request.Prices {
+			for _, p := range request.Rates {
 				logger.Infof("p: %+v", p)
 				if value, err := models.GetValue(common.Database, int(p.ValueId)); err == nil {
-					property.Prices = append(property.Prices, &models.Price{
+					property.Rates = append(property.Rates, &models.Rate{
 						Enabled: true,
 						Availability: p.Availability,
 						Sku: p.Sku,
@@ -253,7 +253,7 @@ func postPropertiesListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Property{}).Select("properties.ID, properties.Name, properties.Title, products.Id as ProductId, products.Title as ProductTitle, variations.Id as VariationId, variations.Title as VariationTitle, group_concat(prices.ID, ', ') as PricesIds, group_concat(`values`.Value, ', ') as ValuesValues, group_concat(prices.Price, ', ') as PricesPrices, options.ID as OptionId, options.Title as OptionTitle").Joins("left join prices on prices.property_id = properties.id").Joins("left join options on options.id = properties.option_id").Joins("left join `values` on `values`.id = prices.value_id").Joins("left join variations on variations.id = properties.variation_id").Joins("left join products on products.id = variations.product_id").Group("prices.property_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Property{}).Select("properties.ID, properties.Name, properties.Title, products.Id as ProductId, products.Title as ProductTitle, variations.Id as VariationId, variations.Title as VariationTitle, group_concat(prices.ID, ', ') as PricesIds, group_concat(`values`.Value, ', ') as ValuesValues, group_concat(prices.Rate, ', ') as PricesPrices, options.ID as OptionId, options.Title as OptionTitle").Joins("left join prices on prices.property_id = properties.id").Joins("left join options on options.id = properties.option_id").Joins("left join `values` on `values`.id = prices.value_id").Joins("left join variations on variations.id = properties.variation_id").Joins("left join products on products.id = variations.product_id").Group("prices.property_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -272,7 +272,7 @@ func postPropertiesListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Property{}).Select("properties.ID, properties.Name, properties.Title, products.Id as ProductId, products.Title as ProductTitle, variations.Id as VariationId, variations.Title as VariationTitle, count(prices.ID) as Prices").Joins("left join prices on prices.property_id = properties.id").Joins("left join variations on variations.id = properties.variation_id").Joins("left join products on products.id = variations.product_id").Group("prices.property_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Property{}).Select("properties.ID, properties.Name, properties.Title, products.Id as ProductId, products.Title as ProductTitle, variations.Id as VariationId, variations.Title as VariationTitle, count(prices.ID) as Rates").Joins("left join prices on prices.property_id = properties.id").Joins("left join variations on variations.id = properties.variation_id").Joins("left join products on products.id = variations.product_id").Group("prices.property_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -347,7 +347,7 @@ func getPropertyHandler(c *fiber.Ctx) error {
 // @Router /api/v1/properties/{id} [put]
 // @Tags property
 func putPropertyHandler(c *fiber.Ctx) error {
-	var view PriceView
+	var view RateView
 	var id int
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)
@@ -370,8 +370,8 @@ func putPropertyHandler(c *fiber.Ctx) error {
 			property.Sku = request.Sku
 			property.Filtering = request.Filtering
 			// Update prices
-			for _, p := range request.Prices {
-				if price, err := models.GetPrice(common.Database, int(p.ID)); err == nil {
+			for _, p := range request.Rates {
+				if price, err := models.GetRate(common.Database, int(p.ID)); err == nil {
 					price.Availability = p.Availability
 					price.Sku = p.Sku
 					price.Price = p.Price

@@ -912,8 +912,8 @@ func delProductHandler(c *fiber.Ctx) error {
 		//
 		for _, variation := range product.Variations {
 			for _, property := range variation.Properties {
-				for _, price := range property.Prices {
-					if err = models.DeletePrice(common.Database, price); err != nil {
+				for _, price := range property.Rates {
+					if err = models.DeleteRate(common.Database, price); err != nil {
 						logger.Errorf("%v", err.Error())
 					}
 				}

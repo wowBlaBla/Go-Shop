@@ -480,7 +480,7 @@ var renderCmd = &cobra.Command{
 													Properties: product.Properties,
 												}}, product.Variations...)
 												for _, variation := range variations {
-													// Price
+													// Rate
 													if categoryFile.Price.Max == 0 {
 														categoryFile.Price.Max = variation.BasePrice
 														if categoryFile.Price.Min == 0 {
@@ -629,7 +629,7 @@ var renderCmd = &cobra.Command{
 															for i, opt := range categoryFile.Options {
 																if opt.ID == property.Option.ID {
 																	//logger.Infof("TEST001 property ID: %v, Country: %v FOUND", property.ID, property.Country)
-																	for _, price := range property.Prices {
+																	for _, price := range property.Rates {
 																		var found bool
 																		for _, value := range opt.Values {
 																			if value.ID == price.Value.ID {
@@ -675,7 +675,7 @@ var renderCmd = &cobra.Command{
 																	Name:  property.Option.Name,
 																	Title: property.Option.Title,
 																}
-																for _, price := range property.Prices {
+																for _, price := range property.Rates {
 																	if price.Enabled {
 																		//
 																		var thumbnail string
@@ -714,7 +714,7 @@ var renderCmd = &cobra.Command{
 															for i, opt := range categoryFile.Options {
 																if opt.ID == property.Option.ID {
 																	//logger.Infof("TEST001 property ID: %v, Country: %v FOUND", property.ID, property.Country)
-																	for _, price := range property.Prices {
+																	for _, price := range property.Rates {
 																		var found bool
 																		for _, value := range opt.Values {
 																			if value.ID == price.Value.ID {
@@ -760,7 +760,7 @@ var renderCmd = &cobra.Command{
 																	Name:  property.Option.Name,
 																	Title: property.Option.Title,
 																}
-																for _, price := range property.Prices {
+																for _, price := range property.Rates {
 																	if price.Enabled {
 																		//
 																		var thumbnail string
@@ -977,6 +977,7 @@ var renderCmd = &cobra.Command{
 									SalePrice:    product.SalePrice,
 									Start:        product.Start,
 									End:          product.End,
+									Dimensions: product.Dimensions,
 									Width:        product.Width,
 									Height:       product.Height,
 									Depth:        product.Depth,
@@ -1122,7 +1123,7 @@ var renderCmd = &cobra.Command{
 												Name:  property.Name,
 												Title: property.Title,
 											}
-											for h, price := range property.Prices {
+											for h, price := range property.Rates {
 												valueView := common.ValuePF{
 													Id:      price.Value.ID,
 													Enabled: price.Enabled,

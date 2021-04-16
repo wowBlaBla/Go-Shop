@@ -578,8 +578,8 @@ func delVariationHandler(c *fiber.Ctx) error {
 	}
 	if variation, err := models.GetVariation(common.Database, id); err == nil {
 		for _, property := range variation.Properties {
-			for _, price := range property.Prices{
-				if err = models.DeletePrice(common.Database, price); err != nil {
+			for _, price := range property.Rates {
+				if err = models.DeleteRate(common.Database, price); err != nil {
 					logger.Errorf("%v", err)
 				}
 			}

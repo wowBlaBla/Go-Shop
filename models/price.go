@@ -4,10 +4,14 @@ import "gorm.io/gorm"
 
 type Price struct {
 	gorm.Model // ID is here
-	Property *Property `gorm:"foreignKey:PropertyId"`
-	PropertyId uint
-	Value *Value `gorm:"foreignKey:ValueId"`
-	ValueId uint
+	//
+	Product *Product `gorm:"foreignKey:ProductId"`
+	ProductId uint
+	Variation *Variation `gorm:"foreignKey:VariationId"`
+	VariationId uint
+	//
+	//RateIds string
+	Rates      []*Rate `gorm:"many2many:prices_rates;"`
 	//
 	Enabled bool
 	Price float64
@@ -16,19 +20,19 @@ type Price struct {
 	Sku string
 }
 
-func GetPricesByProperty(connector *gorm.DB, propertyId uint) ([]*Price, error) {
+func GetPricesByProductId(connector *gorm.DB, productId uint) ([]*Price, error) {
 	db := connector
 	var prices []*Price
-	if err := db.Debug().Preload("Property").Preload("Property.Option").Preload("Value").Where("property_id = ?", propertyId).Find(&prices).Error; err != nil {
+	if err := db.Debug().Preload("Rates").Preload("Rates.Property").Preload("Rates.Value").Where("product_id = ?", productId).Find(&prices).Error; err != nil {
 		return nil, err
 	}
 	return prices, nil
 }
 
-func GetPricesByPropertyAndValue(connector *gorm.DB, propertyId, valueId uint) ([]*Price, error) {
+func GetPricesByVariationId(connector *gorm.DB, variationId uint) ([]*Price, error) {
 	db := connector
 	var prices []*Price
-	if err := db.Where("property_id = ? and value_id = ?", propertyId, valueId).Find(&prices).Error; err != nil {
+	if err := db.Debug().Preload("Rates").Preload("Rates.Property").Preload("Rates.Value").Where("variation_id = ?", variationId).Find(&prices).Error; err != nil {
 		return nil, err
 	}
 	return prices, nil
@@ -37,7 +41,7 @@ func GetPricesByPropertyAndValue(connector *gorm.DB, propertyId, valueId uint) (
 func GetPrice(connector *gorm.DB, id int) (*Price, error) {
 	db := connector
 	var price Price
-	if err := db.Preload("Property").Preload("Property.Option").Preload("Value").Where("id = ?", id).First(&price).Error; err != nil {
+	if err := db.Preload("Rates").Preload("Rates.Property").Preload("Rates.Value").Where("id = ?", id).First(&price).Error; err != nil {
 		return nil, err
 	}
 	return &price, nil

@@ -245,6 +245,9 @@ var RootCmd = &cobra.Command{
 		if err := common.Database.AutoMigrate(&models.Value{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
+		if err := common.Database.AutoMigrate(&models.Rate{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
 		if err := common.Database.AutoMigrate(&models.Price{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
@@ -1122,7 +1125,7 @@ var RootCmd = &cobra.Command{
                              style="color: #615e5e; line-height: 140%; text-align: right; word-wrap: break-word;">
                           <p style="font-size: 14px; line-height: 140%;">
                             <span style="font-size: 14px; line-height: 19.6px;">
-                              {{$symbol}}{{printf "%.2f" $item.Price}} x {{$item.Quantity}} = {{$symbol}}{{printf "%.2f" $item.Total}}
+                              {{$symbol}}{{printf "%.2f" $item.Rate}} x {{$item.Quantity}} = {{$symbol}}{{printf "%.2f" $item.Total}}
                             </span>
                           </p>
                         </div>
@@ -2413,7 +2416,7 @@ var RootCmd = &cobra.Command{
                              style="color: #615e5e; line-height: 140%; text-align: right; word-wrap: break-word;">
                           <p style="font-size: 14px; line-height: 140%;">
                             <span style="font-size: 14px; line-height: 19.6px;">
-                              {{$symbol}}{{printf "%.2f" $item.Price}} x {{$item.Quantity}} = {{$symbol}}{{printf "%.2f" $item.Total}}
+                              {{$symbol}}{{printf "%.2f" $item.Rate}} x {{$item.Quantity}} = {{$symbol}}{{printf "%.2f" $item.Total}}
                             </span>
                           </p>
                         </div>

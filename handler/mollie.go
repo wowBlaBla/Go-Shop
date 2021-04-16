@@ -123,8 +123,8 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 					line.DiscountAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Discount * float64(item.Quantity))
 				}else if order.Discount > 0 {
 					discount := 1 - (order.Discount / order.Sum)
-					total = (item.Price * discount) * float64(item.Quantity)
-					line.DiscountAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Price * (1 - discount) * float64(item.Quantity))
+					total = (item.Rate * discount) * float64(item.Quantity)
+					line.DiscountAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), item.Rate * (1 - discount) * float64(item.Quantity))
 				}else{
 					line.DiscountAmount = mollie.NewAmount(strings.ToUpper(common.Config.Currency), 0)
 				}

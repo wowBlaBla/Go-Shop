@@ -176,19 +176,19 @@ func postAccountWishHandler(c *fiber.Ctx) error {
 		if len(arr) > 2 {
 			//
 			for _, id := range arr[2:] {
-				if price, err := models.GetPrice(common.Database, id); err == nil {
+				if rate, err := models.GetRate(common.Database, id); err == nil {
 					propertyShortView := PropertyShortView{}
-					propertyShortView.Title = price.Property.Title
+					propertyShortView.Title = rate.Property.Title
 					//
-					if cache, err := models.GetCacheValueByValueId(common.Database, price.Value.ID); err == nil {
+					if cache, err := models.GetCacheValueByValueId(common.Database, rate.Value.ID); err == nil {
 						propertyShortView.Thumbnail = cache.Thumbnail
 					}
 					//
-					propertyShortView.Value = price.Value.Value
-					if price.Price > 0 {
-						propertyShortView.Price = price.Price
+					propertyShortView.Value = rate.Value.Value
+					if rate.Price > 0 {
+						propertyShortView.Price = rate.Price
 					}
-					wish.Price += price.Price
+					wish.Price += rate.Price
 					propertiesShortView = append(propertiesShortView, propertyShortView)
 				} else {
 					c.Status(http.StatusInternalServerError)
