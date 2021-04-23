@@ -186,6 +186,7 @@ func GetFiber() *fiber.App {
 	v1.Get("/prices", authRequired, getPricesHandler)
 	//v1.Post("/prices/list", authRequired, postPricesListHandler)
 	v1.Post("/prices", authRequired, changed("price created"), postPriceHandler)
+	v1.Post("/prices/all", authRequired, changed("prices created"), postPriceAllHandler)
 	v1.Get("/prices/:id", authRequired, getPriceHandler)
 	v1.Put("/prices/:id", authRequired, changed("price updated"), putPriceHandler)
 	v1.Delete("/prices/:id", authRequired, changed("price deleted"), deletePriceHandler)
@@ -4544,6 +4545,7 @@ type UserView struct {
 	Lastname string `json:",omitempty"`
 	Role int `json:",omitempty"`
 	Notification bool
+	AllowReceiveEmails bool `json:",omitempty"`
 }
 
 // @security BasicAuth
@@ -5615,6 +5617,7 @@ type ProductView struct {
 	SalePrice float64 `json:",omitempty"`
 	Start *time.Time `json:",omitempty"`
 	End *time.Time `json:",omitempty"`
+	Prices []*PriceView
 	Pattern string `json:",omitempty"`
 	Dimensions string `json:",omitempty"`
 	Width float64 `json:",omitempty"`

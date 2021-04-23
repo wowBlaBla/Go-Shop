@@ -33,6 +33,7 @@ type User struct {
 	BillingProfiles       []*BillingProfile `gorm:"foreignKey:UserId"`
 	ShippingProfiles       []*ShippingProfile `gorm:"foreignKey:UserId"`
 	//
+	AllowReceiveEmails bool `gorm:"foreignKey:UserId"`
 	UpdatedAt time.Time
 }
 

@@ -38,81 +38,73 @@ type NewProperty struct {
 // @Tags property
 func postPropertyHandler(c *fiber.Ctx) error {
 	var view PropertyView
-	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
-			var request NewProperty
-			if err := c.BodyParser(&request); err != nil {
-				return err
-			}
-			//
-			property := &models.Property{
-				Type: request.Type,
-				Name:        request.Name,
-				Title:       request.Title,
-				OptionId:    request.OptionId,
-				Sku: request.Sku,
-				Filtering: request.Filtering,
-			}
-			if v := c.Query("product_id"); v != "" {
-				if id, err := strconv.Atoi(v); err == nil {
-					if product, err := models.GetProduct(common.Database, id); err == nil {
-						if properties, err := models.GetPropertiesByProductAndName(common.Database, id, request.Name); err == nil {
-							if len(properties) > 0 {
-								c.Status(http.StatusInternalServerError)
-								return c.JSON(HTTPError{"Option already define"})
-							}
-						}
-						property.ProductId = product.ID
-					} else {
+	var request NewProperty
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	//
+	property := &models.Property{
+		Type: request.Type,
+		Name:        request.Name,
+		Title:       request.Title,
+		OptionId:    request.OptionId,
+		Sku: request.Sku,
+		Filtering: request.Filtering,
+	}
+	if v := c.Query("product_id"); v != "" {
+		if id, err := strconv.Atoi(v); err == nil {
+			if product, err := models.GetProduct(common.Database, id); err == nil {
+				if properties, err := models.GetPropertiesByProductAndName(common.Database, id, request.Name); err == nil {
+					if len(properties) > 0 {
 						c.Status(http.StatusInternalServerError)
-						return c.JSON(HTTPError{"Product not found"})
+						return c.JSON(HTTPError{"Option already define"})
 					}
 				}
-			}else if v := c.Query("variation_id"); v != "" {
-				if id, err := strconv.Atoi(v); err == nil {
-					if variation, err := models.GetVariation(common.Database, id); err == nil {
-						if properties, err := models.GetPropertiesByVariationAndName(common.Database, id, request.Name); err == nil {
-							if len(properties) > 0 {
-								c.Status(http.StatusInternalServerError)
-								return c.JSON(HTTPError{"Option already defined"})
-							}
-						}
-						property.VariationId = variation.ID
-					} else {
-						c.Status(http.StatusInternalServerError)
-						return c.JSON(HTTPError{"Variation not found"})
-					}
-				}
-			}
-			// logger.Infof("property: %+v", request)
-			for _, p := range request.Rates {
-				logger.Infof("p: %+v", p)
-				if value, err := models.GetValue(common.Database, int(p.ValueId)); err == nil {
-					property.Rates = append(property.Rates, &models.Rate{
-						Enabled: true,
-						Availability: p.Availability,
-						Sku: p.Sku,
-						Price:   p.Price,
-						Value:   value,
-					})
-				}
-			}
-			//
-			if _, err := models.CreateProperty(common.Database, property); err != nil {
+				property.ProductId = product.ID
+			} else {
 				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
+				return c.JSON(HTTPError{"Product not found"})
 			}
-			//
-			if bts, err := json.Marshal(property); err == nil {
-				if err = json.Unmarshal(bts, &view); err != nil {
-					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{err.Error()})
+		}
+	}else if v := c.Query("variation_id"); v != "" {
+		if id, err := strconv.Atoi(v); err == nil {
+			if variation, err := models.GetVariation(common.Database, id); err == nil {
+				if properties, err := models.GetPropertiesByVariationAndName(common.Database, id, request.Name); err == nil {
+					if len(properties) > 0 {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{"Option already defined"})
+					}
 				}
+				property.VariationId = variation.ID
+			} else {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Variation not found"})
 			}
-			return c.JSON(view)
-		} else {
+		}
+	}
+	// logger.Infof("property: %+v", request)
+	for _, p := range request.Rates {
+		if value, err := models.GetValue(common.Database, int(p.ValueId)); err == nil {
+			property.Rates = append(property.Rates, &models.Rate{
+				Enabled: true,
+				Availability: p.Availability,
+				Sku: p.Sku,
+				Price:   p.Price,
+				Value:   value,
+			})
+		}
+	}
+	logger.Infof("property.Rates: %+v", property.Rates)
+	//
+	if _, err := models.CreateProperty(common.Database, property); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	//
+	if bts, err := json.Marshal(property); err == nil {
+		if err = json.Unmarshal(bts, &view); err != nil {
 			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Unsupported Content-Type"})
+			return c.JSON(HTTPError{err.Error()})
 		}
 	}
 	return c.JSON(view)

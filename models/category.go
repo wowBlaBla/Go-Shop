@@ -18,6 +18,7 @@ type Category struct {
 	Content       string
 	Products      []*Product `gorm:"many2many:categories_products;"`
 	Customization string
+	Sort int
 	//
 	Parent *Category `gorm:"foreignKey:ParentId"`
 	ParentId uint
@@ -135,7 +136,7 @@ func GetChildrenOfCategory(connector *gorm.DB, category *Category) []*Category {
 func GetChildrenOfCategoryById(connector *gorm.DB, id uint) []*Category {
 	db := connector
 	var children []*Category
-	db.Where("parent_id = ?", id).Find(&children)
+	db.Where("parent_id = ?", id).Order("Sort asc, Title asc").Find(&children)
 	return children
 }
 
@@ -214,6 +215,7 @@ type CategoryView struct {
 	Parents []*CategoryView `json:",omitempty"`
 	Products int64 `json:",omitempty"`
 	Count int `json:",omitempty"`
+	Sort int `json:",omitempty"`
 }
 
 func GetCategoriesView(connector *gorm.DB, id int, depth int, noProducts bool, count bool) (*CategoryView, error) {
@@ -225,7 +227,7 @@ func GetCategoriesView(connector *gorm.DB, id int, depth int, noProducts bool, c
 			if err := getCategoryPath(connector, int(category.ParentId), chunks); err != nil {
 				return nil, err
 			}
-			view := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Path: fmt.Sprintf("/%s", strings.Join(*chunks, "/")), Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category"}, depth, noProducts, count)
+			view := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Path: fmt.Sprintf("/%s", strings.Join(*chunks, "/")), Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category", Sort: category.Sort}, depth, noProducts, count)
 			if view != nil {
 				if err = getParentCategoriesView(connector, view, category.ParentId); err != nil {
 					return nil, err
@@ -255,7 +257,7 @@ func getCategoryPath(connector *gorm.DB, pid int, chunks *[]string) error {
 func getChildrenCategoriesView(connector *gorm.DB, root *CategoryView, depth int, noProducts bool, count bool) *CategoryView {
 	for _, category := range GetChildrenOfCategoryById(connector, root.ID) {
 		if depth > 0 {
-			child := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Path: path.Join(root.Path, root.Name), Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category"}, depth - 1, noProducts, count)
+			child := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Path: path.Join(root.Path, root.Name), Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category", Sort: category.Sort}, depth - 1, noProducts, count)
 			root.Children = append(root.Children, child)
 			if count {
 				root.Count += child.Count

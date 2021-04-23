@@ -739,6 +739,7 @@ type RegisterRequest struct {
 	Password2 string
 	Name string
 	Lastname string
+	AllowReceiveEmails bool
 	Csrf string
 }
 
@@ -824,6 +825,7 @@ func postRegisterHandler(c *fiber.Ctx) error {
 		Lastname: request.Lastname,
 		Role: models.ROLE_USER,
 		Notification: true,
+		AllowReceiveEmails: request.AllowReceiveEmails,
 	}
 	if !authMultipleConfig.EmailConfirmationRequired {
 		user.EmailConfirmed = true

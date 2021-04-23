@@ -107,6 +107,8 @@ type NewAccount struct {
 	//
 	BillingProfile NewProfile
 	ShippingProfile NewProfile
+	//
+	AllowReceiveEmails bool
 }
 
 type Account2View struct {
@@ -172,6 +174,7 @@ func postAccountHandler(c *fiber.Ctx) error {
 		Lastname: request.Lastname,
 		Role: models.ROLE_USER,
 		Notification: true,
+		AllowReceiveEmails: request.AllowReceiveEmails,
 	}
 	// Billing profile
 	if err := sanitizeProfile(&request.BillingProfile); err != nil {

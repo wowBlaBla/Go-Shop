@@ -198,6 +198,29 @@ var renderCmd = &cobra.Command{
 					logger.Infof("%v", err)
 				}
 			}
+			//
+			if p2 := path.Join(output, strings.ToLower(common.Config.Products)); len(p2) > 0 {
+				if _, err := os.Stat(p2); err != nil {
+					if err = os.MkdirAll(p2, 0755); err != nil {
+						logger.Warningf("%+v", err)
+					}
+				}
+				categoryFile := &common.CategoryFile{
+					ID:    0,
+					Date:  time.Now(),
+					Title: common.Config.Products,
+					Path:    "/" + strings.ToLower(common.Config.Products),
+					Type:    "categories",
+				}
+				if tree, err := models.GetCategoriesView(common.Database, 0, 999, true, true); err == nil {
+					categoryFile.Count = tree.Count
+				}else{
+					logger.Warningf("%+v", err)
+				}
+				if err = common.WriteCategoryFile(path.Join(p2, "_index.html"), categoryFile); err != nil {
+					logger.Warningf("%v", err)
+				}
+			}
 			logger.Infof("Categories found: %v", len(categories))
 			// Widgets
 			var allCategoriesWidgets []common.WidgetCF
@@ -270,24 +293,24 @@ var renderCmd = &cobra.Command{
 							}
 						}
 					}
-					var arr = []string{}
-					for _, category := range *breadcrumbs {
-						arr = append(arr, category.Name)
+					//var arr = []string{}
+					//for _, category := range *breadcrumbs {
+						//arr = append(arr, category.Name)
 						//
 						for _, language := range languages {
-							if p2 := path.Join(append(append([]string{output}, arr...), fmt.Sprintf("_index%s.html", language.Suffix))...); len(p2) > 0 {
+							if p2 := path.Join(append(append([]string{output}, names...), fmt.Sprintf("_index%s.html", language.Suffix))...); len(p2) > 0 {
 								if _, err := os.Stat(p2); err != nil {
 									categoryFile := &common.CategoryFile{
 										ID:    category.ID,
 										Date:  category.UpdatedAt,
 										Title: category.Title,
 										//Thumbnail: category.Thumbnail,
-										Path:    "/" + path.Join(arr...),
+										Path:    "/" + path.Join(names...),
 										Type:    "categories",
 										Content: category.Content,
 									}
 									if common.Config.FlatUrl {
-										if len(arr) == 1 && arr[0] == strings.ToLower(common.Config.Products) {
+										if len(names) == 1 && names[0] == strings.ToLower(common.Config.Products) {
 											categoryFile.Url = "/" + strings.ToLower(common.Config.Products)
 										}else{
 											categoryFile.Url = "/" + path.Join(names[1:]...) + "/"
@@ -324,7 +347,7 @@ var renderCmd = &cobra.Command{
 								}
 							}
 						}
-					}
+					//}
 					// Cache
 					if _, err = models.CreateCacheCategory(common.Database, &models.CacheCategory{
 						CategoryID:   category.ID,
@@ -977,6 +1000,7 @@ var renderCmd = &cobra.Command{
 									SalePrice:    product.SalePrice,
 									Start:        product.Start,
 									End:          product.End,
+									Prices: product.Prices,
 									Dimensions: product.Dimensions,
 									Width:        product.Width,
 									Height:       product.Height,
@@ -1024,6 +1048,20 @@ var renderCmd = &cobra.Command{
 											Sku: variation.Sku,
 											Selected:    len(productView.Variations) == 0,
 										}
+										//
+										for _, price := range variation.Prices {
+											var ids []uint
+											for _, rate := range price.Rates {
+												ids = append(ids, rate.ID)
+											}
+											variationView.Prices = append(variationView.Prices, common.PricePF{
+												Ids: ids,
+												Price: price.Price,
+												Availability: price.Availability,
+												Sku: price.Sku,
+											})
+										}
+										//
 										if variation.Time != nil {
 											variationView.Time = variation.Time.Title
 										}
@@ -1131,10 +1169,11 @@ var renderCmd = &cobra.Command{
 													//Thumbnail: price.Value.Thumbnail,
 													Value: price.Value.Value,
 													Availability: price.Value.Availability,
-													Price: common.PricePF{
+													Price: common.RatePF{
 														Id:    price.ID,
 														Price: price.Price,
 														Availability: price.Availability,
+														Sku: price.Sku,
 													},
 													Selected: h == 0,
 												}
@@ -1404,7 +1443,7 @@ var renderCmd = &cobra.Command{
 		}
 		// Menu
 		if menus, err := models.GetMenus(common.Database); err == nil {
-			var views []common.MenuView2
+			views := []common.MenuView2{}
 			for _, menu := range menus {
 				if menu.Enabled {
 					view := common.MenuView2{
@@ -1412,52 +1451,11 @@ var renderCmd = &cobra.Command{
 						Title: menu.Title,
 						Location: menu.Location,
 					}
-					var items []struct {
-						Data struct {
-							Type string
-							Id uint
-							Name string
-							Title string
-							Path string
-							Url string
-							Anchor string
-						}
-					}
-					if err := json.Unmarshal([]byte(menu.Description), &items); err == nil {
-						for _, item := range items {
-							//logger.Infof("item: %+v", item.Data)
-							if item.Data.Type == "category" {
-								if categoriesView, err := models.GetCategoriesView(common.Database, int(item.Data.Id), 999, true, true); err == nil {
-									view.Children = append(view.Children, categoriesView)
-								}
-							}else if item.Data.Type == "product" {
-								if cache, err := models.GetCacheProductByProductId(common.Database, item.Data.Id); err == nil {
-									view.Children = append(view.Children, map[string]string{
-										"Type": item.Data.Type,
-										"Url": fmt.Sprintf("%s%s", cache.Path, cache.Name),
-										"Title": cache.Title,
-										"Thumbnail": cache.Thumbnail,
-									})
-								}else{
-									logger.Warningf("%+v", err)
-								}
-							}else if item.Data.Type == "page" {
-								view.Children = append(view.Children, map[string]string{
-									"Type": item.Data.Type,
-									"Url": item.Data.Path,
-									"Title": item.Data.Title,
-								})
-							}else if item.Data.Type == "custom" {
-								view.Children = append(view.Children, map[string]string{
-									"Type": item.Data.Type,
-									"Url": item.Data.Path,
-									"Title": item.Data.Title,
-								})
-							}
-						}
-					}else{
-						logger.Warningf("%+v", err)
-					}
+					//
+					root := &common.MenuItemView{}
+					createMenu(root, []byte(fmt.Sprintf(`{"Children":%s}`, menu.Description)))
+					view.Children = root.Children
+					//
 					views = append(views, view)
 				}
 			}
@@ -1475,6 +1473,60 @@ var renderCmd = &cobra.Command{
 		}
 		logger.Infof("Rendered ~ %.3f ms", float64(time.Since(t1).Nanoseconds())/1000000)
 	},
+}
+
+func createMenu(root *common.MenuItemView, bts []byte) {
+	var raw struct {
+		Name string
+		Data struct {
+			Id int
+			Type string
+			Path string
+			Title string
+			Thumbnail string
+		}
+		Children []interface{}
+	}
+	//
+	if err := json.Unmarshal(bts, &raw); err == nil {
+		if raw.Data.Type == "category" {
+			if categoriesView, err := models.GetCategoriesView(common.Database, raw.Data.Id, 999, true, true); err == nil {
+				root.Type = raw.Data.Type
+				root.ID = categoriesView.ID
+				root.Name = categoriesView.Name
+				root.Title = categoriesView.Title
+				root.Path = categoriesView.Path
+				root.Thumbnail = categoriesView.Thumbnail
+				for _, child := range categoriesView.Children {
+					root.Children = append(root.Children, child)
+				}
+			}
+		} else if raw.Data.Type == "product" {
+			if cache, err := models.GetCacheProductByProductId(common.Database, uint(raw.Data.Id)); err == nil {
+				root.Type = raw.Data.Type
+				root.Url = fmt.Sprintf("%s%s", cache.Path, cache.Name)
+				root.Title = cache.Title
+				root.Thumbnail = cache.Thumbnail
+			}else{
+				logger.Warningf("%+v", err)
+			}
+		} else if raw.Data.Type == "page" {
+			root.Type = raw.Data.Type
+			root.Url = raw.Data.Path
+			root.Title = raw.Data.Title
+		} else if raw.Data.Type == "custom" {
+			root.Type = raw.Data.Type
+			root.Url = raw.Data.Path
+			root.Title = raw.Data.Title
+		}
+		for _, child := range raw.Children {
+			item := &common.MenuItemView{}
+			if bts2, err := json.Marshal(child); err == nil {
+				createMenu(item, bts2)
+			}
+			root.Children = append(root.Children, item)
+		}
+	}
 }
 
 func init() {

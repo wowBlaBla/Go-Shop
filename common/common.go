@@ -30,7 +30,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210415212049"
+	COMPILED = "20210422180305"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -275,21 +275,29 @@ type VariationPF struct {
 	Images     []string `json:",omitempty"`
 	Files     []FilePF `json:",omitempty"`
 	BasePrice float64
-	SalePrice  float64 `json:",omitempty"`
-	Start *time.Time `json:",omitempty"`
-	End *time.Time `json:",omitempty"`
-	Pattern string `json:",omitempty"`
-	Dimensions string `json:",omitempty"`
-	Width float64 `json:",omitempty"`
-	Height float64 `json:",omitempty"`
-	Depth float64 `json:",omitempty"`
-	Weight float64 `json:",omitempty"`
+	SalePrice  float64  `json:",omitempty"`
+	Start *time.Time    `json:",omitempty"`
+	End *time.Time      `json:",omitempty"`
+	Prices []PricePF     `json:",omitempty"`
+	Pattern string      `json:",omitempty"`
+	Dimensions string   `json:",omitempty"`
+	Width float64       `json:",omitempty"`
+	Height float64      `json:",omitempty"`
+	Depth float64       `json:",omitempty"`
+	Weight float64      `json:",omitempty"`
 	Availability string `json:",omitempty"`
 	//Sending string `json:",omitempty"`
 	Time string `json:",omitempty"`
 	Properties []PropertyPF `json:",omitempty"`
 	Sku string `json:",omitempty"`
 	Selected bool
+}
+
+type PricePF struct {
+	Ids []uint
+	Price float64
+	Availability string `json:",omitempty"`
+	Sku string `json:",omitempty"`
 }
 
 type PropertyPF struct {
@@ -309,15 +317,15 @@ type ValuePF struct {
 	Value string
 	Availability string `json:",omitempty"`
 	//Sending string `json:",omitempty"`
-	Price PricePF
+	Price    RatePF
 	Selected bool
 }
 
-type PricePF struct {
+type RatePF struct {
 	Id uint
 	Price float64
 	Availability string `json:",omitempty"`
-	//Sending string `json:",omitempty"`
+	Sku string `json:",omitempty"`
 }
 
 func (p *ProductFile) MarshalJSON() ([]byte, error) {
@@ -672,8 +680,29 @@ type MenuView2 struct {
 	//Children []MenuX
 }
 
-type MenuX struct {
-	Path string
+type MenuView3 struct {
+	Name string
+	Data MenuView4
+	Children []MenuView3
+}
+
+type MenuView4 struct {
+	Type string
+	Id uint
+	Name string
 	Title string
+	Path string
+	Url string
+	Anchor string
+}
+
+type MenuItemView struct {
+	ID uint `json:",omitempty"`
+	Name string `json:",omitempty"`
+	Type  string
+	Url   string `json:",omitempty"`
+	Path string `json:",omitempty"`
+	Title string `json:",omitempty"`
 	Thumbnail string `json:",omitempty"`
+	Children []interface{} `json:",omitempty"`
 }

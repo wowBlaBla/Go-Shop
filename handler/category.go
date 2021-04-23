@@ -60,6 +60,7 @@ type NewCategory struct {
 	Title string
 	Description string
 	ParentId uint
+	Sort int
 }
 
 // @security BasicAuth
@@ -144,8 +145,13 @@ func postCategoriesHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Customization"]; found && len(v) > 0 {
 				customization = strings.TrimSpace(v[0])
 			}
-			category := &models.Category{Name: name, Title: title, Description: description, Content: content, Customization: customization, ParentId: request.ParentId}
+			category := &models.Category{Name: name, Title: title, Description: description, Content: content, Customization: customization, ParentId: request.ParentId, Sort: request.Sort}
 			if id, err := models.CreateCategory(common.Database, category); err == nil {
+				category.Sort = int(id)
+				if err = models.UpdateCategory(common.Database, category); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
 					p := path.Join(dir, "storage", "categories")
 					if _, err := os.Stat(p); err != nil {
@@ -300,6 +306,7 @@ type CategoriesListItem struct {
 	Thumbnail string
 	Description string
 	Products int
+	Sort int
 }
 
 // @security BasicAuth
@@ -325,6 +332,7 @@ func postCategoriesListHandler(c *fiber.Ctx) error {
 		return err
 	}
 	if len(request.Sort) == 0 {
+		request.Sort["Sort"] = "asc"
 		request.Sort["Title"] = "asc"
 	}
 	if request.Length == 0 {
@@ -402,7 +410,7 @@ func postCategoriesListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Category{}).Select("categories.ID, categories.Name, categories.Title, categories.Thumbnail, categories.Description, count(categories_products.product_id) as Products").Joins("left join categories_products on categories_products.category_id = categories.id").Group("categories.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Category{}).Select("categories.ID, categories.Name, categories.Title, categories.Thumbnail, categories.Description, count(categories_products.product_id) as Products, categories.Sort").Joins("left join categories_products on categories_products.category_id = categories.id").Group("categories.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -419,7 +427,7 @@ func postCategoriesListHandler(c *fiber.Ctx) error {
 		rows.Close()
 	}
 	//
-	rows, err = common.Database.Debug().Model(&models.Category{}).Select("categories.ID, categories.Name, categories.Title, categories.Thumbnail, categories.Description, count(categories_products.product_id) as Products").Joins("left join categories_products on categories_products.category_id = categories.id").Group("categories.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Category{}).Select("categories.ID, categories.Name, categories.Title, categories.Thumbnail, categories.Description, count(categories_products.product_id) as Products, categories.Sort").Joins("left join categories_products on categories_products.category_id = categories.id").Group("categories.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -492,6 +500,7 @@ type CategoryPatchRequest struct {
 		ID uint
 		Sort int
 	}
+	Sort int
 }
 
 // @security BasicAuth
@@ -524,14 +533,22 @@ func patchCategoryHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
-	//
-	if err := common.Database.Exec("delete from categories_products_sort where CategoryId = ? and ProductId = ?", category.ID, request.Product.ID).Error; err != nil {
-		logger.Errorf("%+v", err)
-	}
-	//
-	if err := common.Database.Exec("insert into categories_products_sort (CategoryId, ProductId, Value) values (?, ?, ?)", category.ID, request.Product.ID, request.Product.Sort).Error; err != nil {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
+	if request.Product.ID > 0 {
+		if err := common.Database.Exec("delete from categories_products_sort where CategoryId = ? and ProductId = ?", category.ID, request.Product.ID).Error; err != nil {
+			logger.Errorf("%+v", err)
+		}
+		if err := common.Database.Exec("insert into categories_products_sort (CategoryId, ProductId, Value) values (?, ?, ?)", category.ID, request.Product.ID, request.Product.Sort).Error; err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		category.Sort = request.Sort
+		if err := models.UpdateCategory(common.Database, category); err == nil {
+			return c.JSON(HTTPMessage{"OK"})
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
 	}
 	return c.JSON(HTTPMessage{"OK"})
 }
@@ -626,12 +643,19 @@ func putCategoryHandler(c *fiber.Ctx) error {
 					parentId = uint(id)
 				}
 			}
+			var sort int
+			if v, found := data.Value["Sort"]; found && len(v) > 0 {
+				if sort, err = strconv.Atoi(v[0]); err != nil {
+					logger.Warningf("%+v", err)
+				}
+			}
 			category.Name = name
 			category.Title = title
 			category.Description = description
 			category.Content = content
 			category.Customization = customization
 			category.ParentId = parentId
+			category.Sort = sort
 			if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
 				p := path.Join(dir, "storage", "categories")
 				if _, err := os.Stat(p); err != nil {

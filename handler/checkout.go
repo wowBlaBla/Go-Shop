@@ -159,11 +159,13 @@ type TransportServiceView struct {
 
 type ItemShortView struct {
 	Uuid string                    `json:",omitempty"`
+	CategoryId uint `json:",omitempty"`
 	Title string                   `json:",omitempty"`
 	Path string                    `json:",omitempty"`
 	Thumbnail string               `json:",omitempty"`
 	Variation VariationShortView    `json:",omitempty"`
 	Properties []PropertyShortView `json:",omitempty"`
+	Prices []PriceShortView `json:",omitempty"`
 	Coupons []*CouponOrderView     `json:",omitempty"`
 	Price float64                  `json:",omitempty"`
 	Discount float64                  `json:",omitempty"`
@@ -184,6 +186,11 @@ type PropertyShortView struct {
 	Thumbnail string `json:",omitempty"`
 	Value string `json:",omitempty"`
 	Price float64 `json:",omitempty"`
+}
+
+type PriceShortView struct {
+	Price float64
+	Availability string
 }
 
 // GetOrders godoc
@@ -285,6 +292,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 			var start, end time.Time
 			//var dimensions string
 			var width, height, depth float64
+			var prices []*models.Price
 			if variationId == 0 {
 				title = "default"
 				basePrice = product.BasePrice
@@ -296,6 +304,9 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 				height = product.Height
 				depth = product.Depth
 				weight = product.Weight
+				if prices, err = models.GetPricesByProductId(common.Database, uint(productId)); err != nil {
+					logger.Warningf("%+v", err)
+				}
 			} else {
 				if variation, err := models.GetVariation(common.Database, variationId); err == nil {
 					if product.ID != variation.ProductId {
@@ -312,6 +323,10 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 					height = variation.Height
 					depth = variation.Depth
 					weight = variation.Weight
+					//
+					if prices, err = models.GetPricesByVariationId(common.Database, uint(variationId)); err != nil {
+						logger.Warningf("%+v", err)
+					}
 				} else {
 					logger.Warningf("Variation #%+v not exists", variationId)
 					continue
@@ -340,6 +355,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 				for _, crumb := range breadcrumbs {
 					chunks = append(chunks, crumb.Name)
 				}
+				item.CategoryId = categoryId
 				item.Path = "/" + path.Join(append(chunks, product.Name)...)
 			}
 
@@ -355,10 +371,15 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 			} else {
 				logger.Warningf("%v", err.Error())
 			}
-
+			logger.Infof("Prices: %+v", len(prices))
+			for i, price := range prices {
+				logger.Infof("%d: %+v", i, price)
+			}
 			var propertiesShortView []PropertyShortView
+			var pricesShortView []PriceShortView
 			var couponsOrderView []*CouponOrderView
 			if len(arr) > 2 {
+				logger.Infof("arr: %+v", arr)
 				//
 				for _, id := range arr[2:] {
 					if price, err := models.GetRate(common.Database, id); err == nil {
@@ -378,6 +399,42 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 					} else {
 						return nil, nil, err
 					}
+				}
+				// Filter prices
+				var prices2 []*models.Price
+				for i := 0; i < len(prices); i++ {
+					//var ids []uint
+					var count int
+					for _, rate := range prices[i].Rates {
+						//ids = append(ids, rate.ID)
+						var found bool
+						for _, id := range arr {
+							if rate.ID == uint(id) {
+								found = true
+								break
+							}
+						}
+						if found {
+							count ++
+						}
+					}
+					if count == len(prices[i].Rates) {
+						prices2 = append(prices2, prices[i])
+					}
+				}
+				// Sort
+				sort.SliceStable(prices2, func(i, j int) bool {
+					return len(prices2[i].Rates) > len(prices2[j].Rates)
+				})
+				//
+				logger.Infof("Top")
+				for i, price := range prices2 {
+					logger.Infof("%d: %+v", i, price)
+				}
+				//
+				if len(prices2) > 0 && prices2[0].Price > 0 {
+					item.Price += prices2[0].Price * tax
+					pricesShortView = append(pricesShortView, PriceShortView{Price: prices2[0].Price * tax, Availability: prices2[0].Availability})
 				}
 			}
 			// Coupons
@@ -455,6 +512,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 				Title: title,
 			}
 			itemShortView.Properties = propertiesShortView
+			itemShortView.Prices = pricesShortView
 			itemShortView.Coupons = couponsOrderView
 			if bts, err := json.Marshal(itemShortView); err == nil {
 				item.Description = string(bts)

@@ -91,7 +91,7 @@ func GetProductsWithImages(connector *gorm.DB) ([]*Product, error) {
 func GetProductsByCategoryId(connector *gorm.DB, id uint) ([]*Product, error) {
 	db := connector
 	var products []*Product
-	db.Model(&Product{}).Preload("Image").Joins("inner join categories_products on categories_products.product_id = products.id").Where("categories_products.category_id = ?", id).Find(&products)
+	db.Model(&Product{}).Preload("Image").Joins("inner join categories_products on categories_products.product_id = products.id").Joins("left join categories_products_sort on categories_products_sort.ProductId = products.id").Where("categories_products.category_id = ?", id).Order("categories_products_sort.Value desc").Find(&products)
 	if err :=  db.Error; err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	db := connector
 	var product Product
-	if err := db.Debug().Preload("Categories").Preload("Parameters").Preload("Parameters.Option").Preload("Parameters.Value").Preload("Properties").Preload("Properties.Option").Preload("Properties.Rates").Preload("Properties.Rates.Value").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Rates").Preload("Variations.Properties.Rates.Value").Preload("Variations.Images").Preload("Variations.Files").Preload("Variations.Time").Preload("Time").Preload("Tags").First(&product, id).Error; err != nil {
+	if err := db.Debug().Preload("Categories").Preload("Parameters").Preload("Parameters.Option").Preload("Parameters.Value").Preload("Properties").Preload("Properties.Option").Preload("Properties.Rates").Preload("Properties.Rates.Value").Preload("Prices").Preload("Prices.Rates").Preload("Prices.Rates.Property").Preload("Prices.Rates.Value").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Rates").Preload("Variations.Properties.Rates.Value").Preload("Variations.Prices").Preload("Variations.Prices.Rates").Preload("Variations.Prices.Rates.Property").Preload("Variations.Prices.Rates.Value").Preload("Variations.Images").Preload("Variations.Files").Preload("Variations.Time").Preload("Time").Preload("Tags").First(&product, id).Error; err != nil {
 		return nil, err
 	}
 	var customization struct {

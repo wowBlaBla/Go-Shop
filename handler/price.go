@@ -3,12 +3,10 @@ package handler
 import (
 	"encoding/json"
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/logger"
 	"github.com/yonnic/goshop/common"
 	"github.com/yonnic/goshop/models"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
 type NewPrice struct {
@@ -52,44 +50,28 @@ type PriceView struct {
 // @Tags price
 func postPriceHandler(c *fiber.Ctx) error {
 	var view PriceView
-	/*var pid int
-	if v := c.Query("property_id"); v != "" {
-		pid, _ = strconv.Atoi(v)
-	}
-	var vid int
-	if v := c.Query("variation_id"); v != "" {
-		vid, _ = strconv.Atoi(v)
-	}
-	var property *models.Property
-	var err error
-	if property, err = models.GetProperty(common.Database, pid); err != nil {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}*/
-	//
 	var request NewPrice
 	if err := c.BodyParser(&request); err != nil {
 		return err
 	}
 	//
-	/*if prices, err := models.GetPricesByPropertyAndValue(common.Database, request.PropertyId, request.ValueId); err == nil {
-		if len(prices) > 0 {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Price already define, edit existing"})
-		}
-	}*/
-	//
 	price := &models.Price{
 		Enabled: request.Enabled,
-		ProductId: request.ProductId,
-		VariationId: request.VariationId,
-		Rates: request.Rates,
 		Price: request.Price,
 		Availability: request.Availability,
 		Sending: request.Sending,
 		Sku: request.Sku,
 	}
-	logger.Infof("price: %+v", price)
+	if request.VariationId > 0 {
+		price.VariationId = request.VariationId
+	}else if request.ProductId > 0 {
+		price.ProductId = request.ProductId
+	}
+	for _, rate := range request.Rates {
+		if rate.ID > 0 {
+			price.Rates = append(price.Rates, rate)
+		}
+	}
 	//
 	if _, err := models.CreatePrice(common.Database, price); err != nil {
 		c.Status(http.StatusInternalServerError)
@@ -102,6 +84,54 @@ func postPriceHandler(c *fiber.Ctx) error {
 		}
 	}
 	return c.JSON(view)
+}
+
+type NewPrices []NewPrice
+
+// @security BasicAuth
+// CreatePrices godoc
+// @Summary Create prices
+// @Accept json
+// @Produce json
+// @Param product_id query int true "Product id"
+// @Param variation_id query int true "Variation id"
+// @Param price body NewPrices true "body"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/prices/all [post]
+// @Tags price
+func postPriceAllHandler(c *fiber.Ctx) error {
+	var requests []NewPrice
+	if err := c.BodyParser(&requests); err != nil {
+		return err
+	}
+	//
+	for _, request := range requests {
+		price := &models.Price{
+			Enabled: request.Enabled,
+			Price: request.Price,
+			Availability: request.Availability,
+			Sending: request.Sending,
+			Sku: request.Sku,
+		}
+		if request.VariationId > 0 {
+			price.VariationId = request.VariationId
+		}else if request.ProductId > 0 {
+			price.ProductId = request.ProductId
+		}
+		for _, rate := range request.Rates {
+			if rate.ID > 0 {
+				price.Rates = append(price.Rates, rate)
+			}
+		}
+		//
+		if _, err := models.CreatePrice(common.Database, price); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}
+	return c.JSON(HTTPMessage{"OK"})
 }
 
 type PricesView []*PriceView
@@ -217,30 +247,22 @@ func putPriceHandler(c *fiber.Ctx) error {
 		return c.JSON(HTTPError{err.Error()})
 	}
 	//
-	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
-			var request NewPrice
-			if err := c.BodyParser(&request); err != nil {
-				return err
-			}
-			price.Price = request.Price
-			price.Availability = request.Availability
-			price.Sending = request.Sending
-			price.Sku = request.Sku
-			if err = models.UpdatePrice(common.Database, price); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			if bts, err := json.Marshal(price); err == nil {
-				if err = json.Unmarshal(bts, &view); err != nil {
-					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{err.Error()})
-				}
-			}
-			return c.JSON(view)
-		} else {
+	var request NewPrice
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	price.Price = request.Price
+	price.Availability = request.Availability
+	price.Sending = request.Sending
+	price.Sku = request.Sku
+	if err = models.UpdatePrice(common.Database, price); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	if bts, err := json.Marshal(price); err == nil {
+		if err = json.Unmarshal(bts, &view); err != nil {
 			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Unsupported Content-Type"})
+			return c.JSON(HTTPError{err.Error()})
 		}
 	}
 	return c.JSON(view)
