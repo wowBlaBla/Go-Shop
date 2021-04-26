@@ -13,6 +13,7 @@ type Variation struct {
 	Name string
 	Title string
 	Description string
+	Notes string
 	Thumbnail string
 	Properties []*Property `gorm:"foreignKey:VariationId"`
 	BasePrice float64      `sql:"type:decimal(8,2);"`

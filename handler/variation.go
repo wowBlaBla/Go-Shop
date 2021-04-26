@@ -252,6 +252,10 @@ func postVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Description"]; found && len(v) > 0 {
 				description = strings.TrimSpace(v[0])
 			}
+			var notes string
+			if v, found := data.Value["Notes"]; found && len(v) > 0 {
+				notes = strings.TrimSpace(v[0])
+			}
 			var basePrice float64
 			if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
 				if basePrice, err = strconv.ParseFloat(v[0], 10); err != nil {
@@ -313,7 +317,7 @@ func postVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Sku"]; found && len(v) > 0 {
 				sku = strings.TrimSpace(v[0])
 			}
-			variation := &models.Variation{Name: name, Title: title, Description: description, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, TimeId: timeId, Sku: sku}
+			variation := &models.Variation{Name: name, Title: title, Description: description, Notes: notes, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, TimeId: timeId, Sku: sku}
 			if id, err := models.CreateVariation(common.Database, variation); err == nil {
 				if name == "" {
 					variation.Name = fmt.Sprintf("new-variation-%d", variation.ID)
@@ -424,6 +428,10 @@ func putVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Description"]; found && len(v) > 0 {
 				description = strings.TrimSpace(v[0])
 			}
+			var notes string
+			if v, found := data.Value["Notes"]; found && len(v) > 0 {
+				notes = strings.TrimSpace(v[0])
+			}
 			var basePrice float64
 			if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
 				if basePrice, err = strconv.ParseFloat(v[0], 10); err != nil {
@@ -496,6 +504,7 @@ func putVariationHandler(c *fiber.Ctx) error {
 			variation.Name = name
 			variation.Title = title
 			variation.Description = description
+			variation.Notes = notes
 			variation.BasePrice = basePrice
 			variation.SalePrice = salePrice
 			variation.Start = start
@@ -649,6 +658,13 @@ func getVariationHandler(c *fiber.Ctx) error {
 			if bts, err := json.MarshalIndent(variation, "", "   "); err == nil {
 				if err = json.Unmarshal(bts, &view); err == nil {
 					view.New = variation.UpdatedAt.Sub(variation.CreatedAt).Seconds() < 1.0
+					for i, property := range view.Properties {
+						for j, rate := range property.Rates{
+							if cache, err := models.GetCacheValueByValueId(common.Database, rate.Value.ID); err == nil {
+								view.Properties[i].Rates[j].Value.Thumbnail = strings.Split(cache.Thumbnail, ",")[0]
+							}
+						}
+					}
 					return c.JSON(view)
 				}else{
 					c.Status(http.StatusInternalServerError)

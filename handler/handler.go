@@ -59,6 +59,7 @@ var (
 	reCSV = regexp.MustCompile(`,\s*`)
 	reNotAbc = regexp.MustCompile("(?i)[^a-z0-9]+")
 	rePercent = regexp.MustCompile(`^(\d+(:?\.\d{1,3})?)%$`)
+	reName = regexp.MustCompile(`(.+?)-(\d+)$`)
 )
 
 
@@ -5610,6 +5611,7 @@ type ProductView struct {
 	Title string
 	Thumbnail string `json:",omitempty"`
 	Description string `json:",omitempty"`
+	Notes string `json:",omitempty"`
 	Parameters []ParameterView `json:",omitempty"`
 	CustomParameters string `json:",omitempty"`
 	Variation string `json:",omitempty"`
@@ -5681,6 +5683,7 @@ type VariationView struct {
 	Name string
 	Title string
 	Description string `json:",omitempty"`
+	Notes string `json:",omitempty"`
 	Thumbnail string `json:",omitempty"`
 	BasePrice float64
 	SalePrice float64 `json:",omitempty"`

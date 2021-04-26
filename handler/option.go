@@ -76,7 +76,13 @@ func postOptionHandler(c *fiber.Ctx) error {
 				ValueId: request.ValueId,
 				Sort: request.Sort,
 			}
-			if _, err := models.CreateOption(common.Database, option); err != nil {
+			if id, err := models.CreateOption(common.Database, option); err == nil {
+				option.Sort = int(id)
+				if err = models.UpdateOption(common.Database, option); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			} else {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
@@ -130,7 +136,7 @@ func postOptionsListHandler(c *fiber.Ctx) error {
 		return err
 	}
 	if len(request.Sort) == 0 {
-		request.Sort["Sort"] = "desc"
+		request.Sort["Sort"] = "asc"
 	}
 	if request.Length == 0 {
 		request.Length = 10

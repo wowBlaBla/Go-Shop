@@ -91,216 +91,223 @@ type NewProduct struct {
 func postProductsHandler(c *fiber.Ctx) error {
 	var view ProductView
 	//
-	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
-			data, err := c.Request().MultipartForm()
-			if err != nil {
-				return err
-			}
-			var enabled bool
-			if v, found := data.Value["Enabled"]; found && len(v) > 0 {
-				enabled, _ = strconv.ParseBool(v[0])
-			}
-			var name string
-			if v, found := data.Value["Name"]; found && len(v) > 0 {
-				name = strings.TrimSpace(v[0])
-			}
-			/*if name == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Invalid name"})
-			}
-			if _, err := models.GetProductByName(common.Database, name); err == nil {
-				return c.JSON(HTTPError{"Name is already in use"})
-			}*/
-			var title string
-			if v, found := data.Value["Title"]; found && len(v) > 0 {
-				title = strings.TrimSpace(v[0])
-			}
-			/*if title == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Invalid title"})
-			}*/
-			var description string
-			if v, found := data.Value["Description"]; found && len(v) > 0 {
-				description = strings.TrimSpace(v[0])
-			}
-			var parameters []*models.Parameter
-			if options, err := models.GetOptionsByStandard(common.Database, true); err == nil {
-				for _, option := range options {
-					parameter := &models.Parameter{
-						Name: option.Name,
-						Title: option.Title,
-						Option: option,
-					}
-					if option.Value != nil {
-						parameter.Value = option.Value
-					}
-					parameters = append(parameters, parameter)
+	data, err := c.Request().MultipartForm()
+	if err != nil {
+		return err
+	}
+	var enabled bool
+	if v, found := data.Value["Enabled"]; found && len(v) > 0 {
+		enabled, _ = strconv.ParseBool(v[0])
+	}
+	var name string
+	if v, found := data.Value["Name"]; found && len(v) > 0 {
+		name = strings.TrimSpace(v[0])
+	}
+	/*if name == "" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{"Invalid name"})
+	}*/
+	for ;; {
+		if _, err := models.GetProductByName(common.Database, name); err == nil {
+			if res := reName.FindAllStringSubmatch(name, 1); len(res) > 0 && len(res[0]) > 2 {
+				if n, err := strconv.Atoi(res[0][2]); err == nil {
+					name = fmt.Sprintf("%s-%d", res[0][1], n + 1)
 				}
-			}
-			logger.Infof("Parameters: %+v", len(parameters))
-			for _, parameter := range parameters {
-				logger.Infof("Parameter: %+v", parameter)
-			}
-			var customParameters string
-			if v, found := data.Value["CustomParameters"]; found && len(v) > 0 {
-				customParameters = strings.TrimSpace(v[0])
-			}
-			var variation = "Default"
-			if v, found := data.Value["Variation"]; found && len(v) > 0 {
-				variation = strings.TrimSpace(v[0])
-			}
-			var basePrice float64
-			if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
-				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
-					basePrice = vv
-				}
-			}
-			var pattern string
-			if v, found := data.Value["Pattern"]; found && len(v) > 0 {
-				pattern = strings.TrimSpace(v[0])
-			}else if common.Config.Pattern != "" {
-				pattern = common.Config.Pattern
 			}else{
-				pattern = "whd"
+				name = fmt.Sprintf("%s-%d", name, 2)
 			}
-			var dimensions string
-			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
-				dimensions = strings.TrimSpace(v[0])
+		} else {
+			break
+		}
+	}
+	var title string
+	if v, found := data.Value["Title"]; found && len(v) > 0 {
+		title = strings.TrimSpace(v[0])
+	}
+	/*if title == "" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{"Invalid title"})
+	}*/
+	var description string
+	if v, found := data.Value["Description"]; found && len(v) > 0 {
+		description = strings.TrimSpace(v[0])
+	}
+	var notes string
+	if v, found := data.Value["Notes"]; found && len(v) > 0 {
+		notes = strings.TrimSpace(v[0])
+	}
+	var parameters []*models.Parameter
+	if options, err := models.GetOptionsByStandard(common.Database, true); err == nil {
+		for _, option := range options {
+			parameter := &models.Parameter{
+				Name: option.Name,
+				Title: option.Title,
+				Option: option,
 			}
-			var width float64
-			if v, found := data.Value["Width"]; found && len(v) > 0 {
-				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
-					width = vv
-				}
+			if option.Value != nil {
+				parameter.Value = option.Value
 			}
-			var height float64
-			if v, found := data.Value["Height"]; found && len(v) > 0 {
-				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
-					height = vv
-				}
-			}
-			var depth float64
-			if v, found := data.Value["Depth"]; found && len(v) > 0 {
-				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
-					depth = vv
-				}
-			}
-			var weight float64
-			if v, found := data.Value["Weight"]; found && len(v) > 0 {
-				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
-					weight = vv
-				}
-			}
-			var availability string
-			if v, found := data.Value["Availability"]; found && len(v) > 0 {
-				availability = strings.TrimSpace(v[0])
-			}
-			var timeId uint
-			if v, found := data.Value["TimeId"]; found && len(v) > 0 {
-				if vv, _ := strconv.Atoi(v[0]); err == nil {
-					timeId = uint(vv)
-				}
-			}
-			var sku string
-			if v, found := data.Value["Sku"]; found && len(v) > 0 {
-				sku = strings.TrimSpace(v[0])
-			}
-			var content string
-			if v, found := data.Value["Content"]; found && len(v) > 0 {
-				content = strings.TrimSpace(v[0])
-			}
-			var customization string
-			if v, found := data.Value["Customization"]; found && len(v) > 0 {
-				customization = strings.TrimSpace(v[0])
-			}
-			product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Parameters: parameters, CustomParameters: customParameters, Variation: variation, BasePrice: basePrice, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, TimeId: timeId, Sku: sku, Content: content, Customization: customization}
-			if _, err := models.CreateProduct(common.Database, product); err == nil {
-				// Create new product automatically
-				if name == "" {
-					product.Name = fmt.Sprintf("new-product-%d", product.ID)
-					product.Title = fmt.Sprintf("New Product %d", product.ID)
-					if err = models.UpdateProduct(common.Database, product); err != nil {
-						c.Status(http.StatusInternalServerError)
-						return c.JSON(HTTPError{err.Error()})
-					}
-				}
-				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
-					p := path.Join(dir, "storage", "products")
-					if _, err := os.Stat(p); err != nil {
-						if err = os.MkdirAll(p, 0755); err != nil {
-							logger.Errorf("%v", err)
-						}
-					}
-					// Image
-					var p1 string
-					img := &models.Image{Name: name, Size: v[0].Size}
-					//filename = fmt.Sprintf("%d-%s%s", id, img.Name, path.Ext(v[0].Filename))
-					if id, err := models.CreateImage(common.Database, img); err == nil {
-						p := path.Join(dir, "storage", "images")
-						if _, err := os.Stat(p); err != nil {
-							if err = os.MkdirAll(p, 0755); err != nil {
-								logger.Errorf("%v", err)
-							}
-						}
-						filename := fmt.Sprintf("%d-%s%s", id, img.Name, path.Ext(v[0].Filename))
-						if p := path.Join(p, filename); len(p) > 0 {
-							if err = common.Copy(p1, p); err == nil {
-								img.Url = common.Config.Base + "/" + path.Join("storage", "images", filename)
-								img.Path = "/" + path.Join("storage", "images", filename)
-								if reader, err := os.Open(p); err == nil {
-									defer reader.Close()
-									if config, _, err := image.DecodeConfig(reader); err == nil {
-										img.Height = config.Height
-										img.Width = config.Width
-									} else {
-										logger.Errorf("%v", err.Error())
-									}
-								}
-								if err = models.UpdateImage(common.Database, img); err != nil {
-									logger.Errorf("%v", err.Error())
-								}
-								if err = models.AddImageToProduct(common.Database, product, img); err != nil {
-									logger.Errorf("%v", err.Error())
-								}
-							}else{
-								logger.Errorf("%v", err.Error())
-							}
-						}
-					}
-				}
-				if bts, err := json.Marshal(product); err == nil {
-					if err = json.Unmarshal(bts, &view); err != nil {
-						c.Status(http.StatusInternalServerError)
-						return c.JSON(HTTPError{err.Error()})
-					}
-				}
-				if v, found := data.Value["Categories"]; found && len(v) > 0 {
-					for _, vv := range strings.Split(strings.TrimSpace(v[0]), ",") {
-						if categoryId, err := strconv.Atoi(strings.TrimSpace(vv)); err == nil {
-							if category, err := models.GetCategory(common.Database, categoryId); err == nil {
-								if err = models.AddProductToCategory(common.Database, category, product); err != nil {
-									logger.Errorf("%v", err)
-								}
-							}else{
-								logger.Errorf("%v", err)
-							}
-						}else{
-							logger.Errorf("%v", err)
-						}
-					}
-				}
-				/*if _, err = models.CreateVariation(common.Database, &models.Variation{Title: "Default", Name: "default", Description: "", BasePrice: basePrice, ProductId: product.ID}); err != nil {
-					logger.Errorf("%v", err)
-				}*/
-			}else{
+			parameters = append(parameters, parameter)
+		}
+	}
+	logger.Infof("Parameters: %+v", len(parameters))
+	for _, parameter := range parameters {
+		logger.Infof("Parameter: %+v", parameter)
+	}
+	var customParameters string
+	if v, found := data.Value["CustomParameters"]; found && len(v) > 0 {
+		customParameters = strings.TrimSpace(v[0])
+	}
+	var variation = "Default"
+	if v, found := data.Value["Variation"]; found && len(v) > 0 {
+		variation = strings.TrimSpace(v[0])
+	}
+	var basePrice float64
+	if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
+		if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+			basePrice = vv
+		}
+	}
+	var pattern string
+	if v, found := data.Value["Pattern"]; found && len(v) > 0 {
+		pattern = strings.TrimSpace(v[0])
+	}else if common.Config.Pattern != "" {
+		pattern = common.Config.Pattern
+	}else{
+		pattern = "whd"
+	}
+	var dimensions string
+	if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
+		dimensions = strings.TrimSpace(v[0])
+	}
+	var width float64
+	if v, found := data.Value["Width"]; found && len(v) > 0 {
+		if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+			width = vv
+		}
+	}
+	var height float64
+	if v, found := data.Value["Height"]; found && len(v) > 0 {
+		if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+			height = vv
+		}
+	}
+	var depth float64
+	if v, found := data.Value["Depth"]; found && len(v) > 0 {
+		if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+			depth = vv
+		}
+	}
+	var weight float64
+	if v, found := data.Value["Weight"]; found && len(v) > 0 {
+		if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+			weight = vv
+		}
+	}
+	var availability string
+	if v, found := data.Value["Availability"]; found && len(v) > 0 {
+		availability = strings.TrimSpace(v[0])
+	}
+	var timeId uint
+	if v, found := data.Value["TimeId"]; found && len(v) > 0 {
+		if vv, _ := strconv.Atoi(v[0]); err == nil {
+			timeId = uint(vv)
+		}
+	}
+	var sku string
+	if v, found := data.Value["Sku"]; found && len(v) > 0 {
+		sku = strings.TrimSpace(v[0])
+	}
+	var content string
+	if v, found := data.Value["Content"]; found && len(v) > 0 {
+		content = strings.TrimSpace(v[0])
+	}
+	var customization string
+	if v, found := data.Value["Customization"]; found && len(v) > 0 {
+		customization = strings.TrimSpace(v[0])
+	}
+	product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes, Parameters: parameters, CustomParameters: customParameters, Variation: variation, BasePrice: basePrice, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, TimeId: timeId, Sku: sku, Content: content, Customization: customization}
+	if _, err := models.CreateProduct(common.Database, product); err == nil {
+		// Create new product automatically
+		if name == "" {
+			product.Name = fmt.Sprintf("new-product-%d", product.ID)
+			product.Title = fmt.Sprintf("New Product %d", product.ID)
+			if err = models.UpdateProduct(common.Database, product); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Unsupported Content-Type"})
 		}
+		if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
+			p := path.Join(dir, "storage", "products")
+			if _, err := os.Stat(p); err != nil {
+				if err = os.MkdirAll(p, 0755); err != nil {
+					logger.Errorf("%v", err)
+				}
+			}
+			// Image
+			var p1 string
+			img := &models.Image{Name: name, Size: v[0].Size}
+			//filename = fmt.Sprintf("%d-%s%s", id, img.Name, path.Ext(v[0].Filename))
+			if id, err := models.CreateImage(common.Database, img); err == nil {
+				p := path.Join(dir, "storage", "images")
+				if _, err := os.Stat(p); err != nil {
+					if err = os.MkdirAll(p, 0755); err != nil {
+						logger.Errorf("%v", err)
+					}
+				}
+				filename := fmt.Sprintf("%d-%s%s", id, img.Name, path.Ext(v[0].Filename))
+				if p := path.Join(p, filename); len(p) > 0 {
+					if err = common.Copy(p1, p); err == nil {
+						img.Url = common.Config.Base + "/" + path.Join("storage", "images", filename)
+						img.Path = "/" + path.Join("storage", "images", filename)
+						if reader, err := os.Open(p); err == nil {
+							defer reader.Close()
+							if config, _, err := image.DecodeConfig(reader); err == nil {
+								img.Height = config.Height
+								img.Width = config.Width
+							} else {
+								logger.Errorf("%v", err.Error())
+							}
+						}
+						if err = models.UpdateImage(common.Database, img); err != nil {
+							logger.Errorf("%v", err.Error())
+						}
+						if err = models.AddImageToProduct(common.Database, product, img); err != nil {
+							logger.Errorf("%v", err.Error())
+						}
+					}else{
+						logger.Errorf("%v", err.Error())
+					}
+				}
+			}
+		}
+		if bts, err := json.Marshal(product); err == nil {
+			if err = json.Unmarshal(bts, &view); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}
+		if v, found := data.Value["Categories"]; found && len(v) > 0 {
+			for _, vv := range strings.Split(strings.TrimSpace(v[0]), ",") {
+				if categoryId, err := strconv.Atoi(strings.TrimSpace(vv)); err == nil {
+					if category, err := models.GetCategory(common.Database, categoryId); err == nil {
+						if err = models.AddProductToCategory(common.Database, category, product); err != nil {
+							logger.Errorf("%v", err)
+						}
+					}else{
+						logger.Errorf("%v", err)
+					}
+				}else{
+					logger.Errorf("%v", err)
+				}
+			}
+		}
+		/*if _, err = models.CreateVariation(common.Database, &models.Variation{Title: "Default", Name: "default", Description: "", BasePrice: basePrice, ProductId: product.ID}); err != nil {
+			logger.Errorf("%v", err)
+		}*/
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
 	}
 	return c.JSON(view)
 }
@@ -486,6 +493,13 @@ func getProductHandler(c *fiber.Ctx) error {
 		if bts, err := json.MarshalIndent(product, "", "   "); err == nil {
 			if err = json.Unmarshal(bts, &view); err == nil {
 				view.New = product.UpdatedAt.Sub(product.CreatedAt).Seconds() < 1.0
+				for i, property := range view.Properties {
+					for j, rate := range property.Rates{
+						if cache, err := models.GetCacheValueByValueId(common.Database, rate.Value.ID); err == nil {
+							view.Properties[i].Rates[j].Value.Thumbnail = strings.Split(cache.Thumbnail, ",")[0]
+						}
+					}
+				}
 				for i := 0; i < len(view.Images); i++ {
 					if cache, err := models.GetCacheImageByImageId(common.Database, view.Images[i].ID); err == nil {
 						view.Images[i].Thumbnail = cache.Thumbnail
@@ -587,6 +601,21 @@ func putProductHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Invalid name"})
 			}
+			//
+			for ;; {
+				if _, err := models.GetProductByName(common.Database, name); err == nil {
+					if res := reName.FindAllStringSubmatch(name, 1); len(res) > 0 && len(res[0]) > 2 {
+						if n, err := strconv.Atoi(res[0][2]); err == nil {
+							name = fmt.Sprintf("%s-%d", res[0][1], n + 1)
+						}
+					}else{
+						name = fmt.Sprintf("%s-%d", name, 2)
+					}
+				} else {
+					break
+				}
+			}
+			//
 			var title string
 			if v, found := data.Value["Title"]; found && len(v) > 0 {
 				title = strings.TrimSpace(v[0])
@@ -598,6 +627,10 @@ func putProductHandler(c *fiber.Ctx) error {
 			var description string
 			if v, found := data.Value["Description"]; found && len(v) > 0 {
 				description = strings.TrimSpace(v[0])
+			}
+			var notes string
+			if v, found := data.Value["Notes"]; found && len(v) > 0 {
+				notes = strings.TrimSpace(v[0])
 			}
 			var customParameters string
 			if v, found := data.Value["CustomParameters"]; found && len(v) > 0 {
@@ -695,6 +728,7 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Name = name
 			product.Title = title
 			product.Description = description
+			product.Notes = notes
 			product.CustomParameters = customParameters
 			oldBasePrice := product.BasePrice
 			product.Variation = variation

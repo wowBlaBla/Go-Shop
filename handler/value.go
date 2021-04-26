@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -148,6 +149,29 @@ func postValueHandler(c *fiber.Ctx) error {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
 							}
+							//
+							if p1 := path.Join(dir, "storage", "values", filename); len(p1) > 0 {
+								if fi, err := os.Stat(p1); err == nil {
+									filename := filepath.Base(p1)
+									filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+									logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
+									var paths string
+									if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+										paths = strings.Join(thumbnails, ",")
+									} else {
+										logger.Warningf("%v", err)
+									}
+									// Cache
+									if _, err = models.CreateCacheValue(common.Database, &models.CacheValue{
+										ValueID:   value.ID,
+										Title:     value.Title,
+										Thumbnail: paths,
+										Value:     value.Value,
+									}); err != nil {
+										logger.Warningf("%v", err)
+									}
+								}
+							}
 						}
 					}
 				}
@@ -252,7 +276,7 @@ func postValuesListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Value{}).Select("`values`.ID, `values`.Title, `values`.Thumbnail, `values`.Value, options.Title as OptionTitle").Joins("left join options on options.id = `values`.Option_Id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Value{}).Select("`values`.ID, `values`.Title, cache_values.Thumbnail as Thumbnail, `values`.Value, options.Title as OptionTitle").Joins("left join cache_values on cache_values.value_id = `values`.ID").Joins("left join options on options.id = `values`.Option_Id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -316,6 +340,9 @@ func getValueHandler(c *fiber.Ctx) error {
 	var view ValueView
 	if bts, err := json.MarshalIndent(value, "", "   "); err == nil {
 		if err = json.Unmarshal(bts, &view); err == nil {
+			if cache, err := models.GetCacheValueByValueId(common.Database, value.ID); err == nil {
+				view.Thumbnail = strings.Split(cache.Thumbnail, ",")[0]
+			}
 			return c.JSON(view)
 		}else{
 			c.Status(http.StatusInternalServerError)

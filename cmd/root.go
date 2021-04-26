@@ -363,6 +363,9 @@ var RootCmd = &cobra.Command{
 		if err := common.Database.Exec(`update products set sort = id where sort is null or sort = 0`).Error; err != nil {
 			logger.Errorf("%+v", err)
 		}
+		if err := common.Database.Exec(`update options set sort = id where sort is null or sort = 0`).Error; err != nil {
+			logger.Errorf("%+v", err)
+		}
 		// Manual database migration
 		/*reDimension := regexp.MustCompile(`^([0-9\.,]+)\s*x\s*([0-9\.,]+)\s*x\s*([0-9\.,]+)\s*`)
 		if products, err := models.GetProducts(common.Database); err == nil {

@@ -11,7 +11,7 @@ type CacheValue struct {
 }
 
 func (CacheValue) TableName() string {
-	return "cache_value"
+	return "cache_values"
 }
 
 func CreateCacheValue(connector *gorm.DB, value *CacheValue) (uint, error) {

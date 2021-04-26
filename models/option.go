@@ -19,7 +19,7 @@ type Option struct {
 func GetOptionsFull(connector *gorm.DB) ([]*Option, error) {
 	db := connector
 	var options []*Option
-	db.Debug().Preload("Values").Find(&options).Order("Weight desc, ID asc")
+	db.Debug().Preload("Values").Order("Sort asc, ID asc").Find(&options)
 	if err := db.Error; err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func GetOptionsFull(connector *gorm.DB) ([]*Option, error) {
 func GetOptions(connector *gorm.DB) ([]*Option, error) {
 	db := connector
 	var options []*Option
-	db.Debug().Find(&options)
+	db.Debug().Find(&options).Order("Sort asc, ID asc")
 	if err := db.Error; err != nil {
 		return nil, err
 	}
