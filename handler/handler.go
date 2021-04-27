@@ -168,6 +168,7 @@ func GetFiber() *fiber.App {
 	v1.Post("/variations", authRequired, changed("variation created"), postVariationHandler)
 	v1.Post("/variations/list", authRequired, postVariationsListHandler)
 	v1.Get("/variations/:id", authRequired, getVariationHandler)
+	v1.Patch("/variations/:id", authRequired, patchVariationHandler)
 	v1.Put("/variations/:id", authRequired, changed("variation updated"), putVariationHandler)
 	v1.Delete("/variations/:id", authRequired, changed("variation deleted"), delVariationHandler)
 	//

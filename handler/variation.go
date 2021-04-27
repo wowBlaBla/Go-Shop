@@ -683,3 +683,149 @@ func getVariationHandler(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"ERROR": "Variation ID is not defined"})
 	}
 }
+
+type PatchVariationRequest struct {
+	Action string
+}
+
+// @security BasicAuth
+// PatchVariation godoc
+// @Summary Patch variation
+// @Accept json
+// @Produce json
+// @Param id path int true "Variation ID"
+// @Success 200 {object} PatchVariationRequest
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/variations/{id} [post]
+// @Tags variation
+func patchVariationHandler(c *fiber.Ctx) error {
+	var variation *models.Variation
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+		var err error
+		if variation, err = models.GetVariation(common.Database, id); err == nil {
+
+			var request PatchVariationRequest
+			if err := c.BodyParser(&request); err != nil {
+				return err
+			}
+
+			if request.Action == "clone" {
+				variation.ID = 0
+				name := variation.Name
+				for ;; {
+					if variations, err := models.GetVariationsByProductAndName(common.Database, variation.ProductId, name); err == nil && len(variations) > 0 {
+						if res := reName.FindAllStringSubmatch(name, 1); len(res) > 0 && len(res[0]) > 2 {
+							if n, err := strconv.Atoi(res[0][2]); err == nil {
+								name = fmt.Sprintf("%s-%d", res[0][1], n + 1)
+							}
+						}else{
+							name = fmt.Sprintf("%s-%d", name, 2)
+						}
+					} else {
+						break
+					}
+				}
+				variation.Name = name
+				variation.Thumbnail = ""
+				properties := variation.Properties
+				variation.Properties = []*models.Property{}
+				prices := variation.Prices
+				variation.Prices = []*models.Price{}
+				variation.Images = []*models.Image{}
+				variation.Files = []*models.File{}
+				variation.Time = nil
+				variation.TimeId = 0
+				var vid uint
+				if vid, err = models.CreateVariation(common.Database, variation); err == nil {
+					// We need to replace old properties ids to new one, because of this first save old ids
+					alpha := []uint{}
+					for i := 0; i < len(properties); i++ {
+						properties[i].ID = 0
+						properties[i].VariationId = vid
+						rates := properties[i].Rates
+						properties[i].Rates = []*models.Rate{}
+						for _, rate := range rates {
+							alpha = append(alpha, rate.ID)
+							rate.ID = 0
+							rate.Property = nil
+							rate.PropertyId = 0
+							properties[i].Rates = append(properties[i].Rates, rate)
+						}
+						variation.Properties = append(variation.Properties, properties[i])
+					}
+					if err = models.UpdateVariation(common.Database, variation); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					// then create save new ids
+					beta := []uint{}
+					for i := 0; i < len(properties); i++ {
+						for j := 0; j < len(properties[i].Rates); j++ {
+							beta = append(beta, properties[i].Rates[j].ID)
+						}
+					}
+					// this map contains old => new match
+					m := make(map[uint]uint)
+					for i := 0; i < len(alpha); i++ {
+						m[alpha[i]] = beta[i]
+					}
+					//
+					for i := 0; i < len(prices); i++ {
+						prices[i].ID = 0
+						prices[i].Variation = nil
+						prices[i].VariationId = vid
+						rates := prices[i].Rates
+						prices[i].Rates = []*models.Rate{}
+						for _, rate := range rates {
+							// update old ids to new
+							if v, found := m[rate.ID]; found {
+								rate.ID = v
+							}
+							prices[i].Rates = append(prices[i].Rates, rate)
+						}
+						variation.Prices = append(variation.Prices, prices[i])
+					}
+					if err = models.UpdateVariation(common.Database, variation); err == nil {
+						var view VariationView
+						if bts, err := json.MarshalIndent(variation, "", "   "); err == nil {
+							if err = json.Unmarshal(bts, &view); err == nil {
+								view.New = variation.UpdatedAt.Sub(variation.CreatedAt).Seconds() < 1.0
+								for i, property := range view.Properties {
+									for j, rate := range property.Rates{
+										if cache, err := models.GetCacheValueByValueId(common.Database, rate.Value.ID); err == nil {
+											view.Properties[i].Rates[j].Value.Thumbnail = strings.Split(cache.Thumbnail, ",")[0]
+										}
+									}
+								}
+								return c.JSON(view)
+							}else{
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+						}else{
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+					} else {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+		} else {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "Variation ID is not defined"})
+	}
+	c.Status(http.StatusInternalServerError)
+	return c.JSON(fiber.Map{"ERROR": "Somethind wrong"})
+}
