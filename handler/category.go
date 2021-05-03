@@ -24,7 +24,7 @@ import (
 // @Produce json
 // @Param id query int false "Root ID"
 // @Param depth query int false "Depth, default 1"
-// @Success 200 {object} CategoryView
+// @Success 200 {object} models.CategoryView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/categories [get]
@@ -70,7 +70,7 @@ type NewCategory struct {
 // @Produce json
 // @Param parent_id query int false "Parent id"
 // @Param category body NewCategory true "body"
-// @Success 200 {object} CategoriesView
+// @Success 200 {object} models.CategoriesView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/categories [post]
@@ -559,7 +559,7 @@ func patchCategoryHandler(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param category body NewCategory true "body"
-// @Success 200 {object} CategoryView
+// @Success 200 {object} models.CategoryView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/categories/{id} [put]

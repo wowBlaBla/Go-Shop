@@ -100,7 +100,7 @@ func postImageHandler(c *fiber.Ctx) error {
 											if img.Path != "" {
 												if p1 := path.Join(dir, "storage", img.Path); len(p1) > 0 {
 													if fi, err := os.Stat(p1); err == nil {
-														name := product.Name + "-" + img.Name
+														name := product.Name
 														if len(name) > 32 {
 															name = name[:32]
 														}
@@ -140,13 +140,24 @@ func postImageHandler(c *fiber.Ctx) error {
 											if err = models.AddImageToVariation(common.Database, variation, img); err != nil {
 												logger.Errorf("%v", err.Error())
 											}
+											var product *models.Product
+											if product, err = models.GetProduct(common.Database, int(variation.ProductId)); err != nil {
+												logger.Errorf("%v", err.Error())
+											}
 											// Images processing
 											if len(variation.Images) > 0 {
 												for _, image := range variation.Images {
 													if image.Path != "" {
 														if p1 := path.Join(dir, "storage", image.Path); len(p1) > 0 {
 															if fi, err := os.Stat(p1); err == nil {
-																filename := fmt.Sprintf("%d-image-%d%v", image.ID, fi.ModTime().Unix(), path.Ext(p1))
+																name := variation.Name
+																if product != nil {
+																	name = product.Name + "-" + name
+																}
+																if len(name) > 32 {
+																	name = name[:32]
+																}
+																filename := fmt.Sprintf("%d-%s-%d%v", image.ID, name, fi.ModTime().Unix(), path.Ext(p1))
 																p2 := path.Join(dir, "hugo", "static", "images", "variations", filename)
 																logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
 																if _, err := os.Stat(path.Dir(p2)); err != nil {
@@ -154,20 +165,6 @@ func postImageHandler(c *fiber.Ctx) error {
 																		logger.Warningf("%v", err)
 																	}
 																}
-																/*if err = common.Copy(p1, p2); err == nil {
-																	images2 := []string{fmt.Sprintf("/%s/%s", strings.Join([]string{"images", "variations"}, "/"), filename)}
-																	if common.Config.Resize.Enabled && common.Config.Resize.Image.Enabled {
-																		if images, err := common.ImageResize(p2, common.Config.Resize.Image.Size); err == nil {
-																			for _, image := range images {
-																				images2 = append(images2, fmt.Sprintf("/%s/resize/%s %s", strings.Join([]string{"images", "variations"}, "/"), image.Filename, image.Size))
-																			}
-																		} else {
-																			logger.Warningf("%v", err)
-																		}
-																	}
-																} else {
-																	logger.Warningf("%v", err)
-																}*/
 															}
 														}
 													}

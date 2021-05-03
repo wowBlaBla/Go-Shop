@@ -15,6 +15,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"io/ioutil"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -1244,6 +1245,8 @@ var renderCmd = &cobra.Command{
 										productFile.Tags = append(productFile.Tags, tag.Name)
 									}
 								}
+								productFile.Max = math.Round(product.Max * 100) / 100
+								productFile.Votes = product.Votes
 								productFile.Content = product.Content
 								//
 								for _, language := range languages {

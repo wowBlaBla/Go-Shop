@@ -496,7 +496,12 @@ func getProductHandler(c *fiber.Ctx) error {
 				for i, property := range view.Properties {
 					for j, rate := range property.Rates{
 						if cache, err := models.GetCacheValueByValueId(common.Database, rate.Value.ID); err == nil {
-							view.Properties[i].Rates[j].Value.Thumbnail = strings.Split(cache.Thumbnail, ",")[0]
+							arr := strings.Split(cache.Thumbnail, ",")
+							if len(arr) > 1 {
+								view.Properties[i].Rates[j].Value.Thumbnail = strings.Split(arr[1], " ")[0]
+							}else{
+								view.Properties[i].Rates[j].Value.Thumbnail = arr[0]
+							}
 						}
 					}
 				}
@@ -554,6 +559,49 @@ func getProductHandler(c *fiber.Ctx) error {
 	}
 }
 
+type ProductMaxRequest struct {
+	Value int
+}
+
+// @security BasicAuth
+// PostProductMax godoc
+// @Summary Get product
+// @Accept json
+// @Produce json
+// @Param id path int true "Products ID"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/products/{id}/max [get]
+// @Tags product
+func postProductMaxHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}
+	if product, err := models.GetProductFull(common.Database, id); err == nil {
+		var request ProductMaxRequest
+		if err := c.BodyParser(&request); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+		if request.Value < 1 && request.Value > 5 {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{"Value should be in [1, 5]"})
+		}
+		product.Max = (product.Max * float64(product.Votes) + float64(request.Value)) / (float64(product.Votes) + 1.0)
+		product.Votes++
+		if err = models.UpdateProduct(common.Database, product); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+		return c.JSON(HTTPMessage{"OK"})
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
 // @security BasicAuth
 // UpdateProduct godoc
 // @Summary Update product
@@ -602,17 +650,19 @@ func putProductHandler(c *fiber.Ctx) error {
 				return c.JSON(HTTPError{"Invalid name"})
 			}
 			//
-			for ;; {
-				if _, err := models.GetProductByName(common.Database, name); err == nil {
-					if res := reName.FindAllStringSubmatch(name, 1); len(res) > 0 && len(res[0]) > 2 {
-						if n, err := strconv.Atoi(res[0][2]); err == nil {
-							name = fmt.Sprintf("%s-%d", res[0][1], n + 1)
+			if product.Name != name {
+				for ; ; {
+					if _, err := models.GetProductByName(common.Database, name); err == nil {
+						if res := reName.FindAllStringSubmatch(name, 1); len(res) > 0 && len(res[0]) > 2 {
+							if n, err := strconv.Atoi(res[0][2]); err == nil {
+								name = fmt.Sprintf("%s-%d", res[0][1], n+1)
+							}
+						} else {
+							name = fmt.Sprintf("%s-%d", name, 2)
 						}
-					}else{
-						name = fmt.Sprintf("%s-%d", name, 2)
+					} else {
+						break
 					}
-				} else {
-					break
 				}
 			}
 			//
@@ -814,25 +864,6 @@ func putProductHandler(c *fiber.Ctx) error {
 							return c.JSON(HTTPError{err.Error()})
 						}
 						product.Thumbnail = "/" + path.Join("variations", filename)
-					}
-				}
-			}
-			if product.ID > 0 {
-				var name = product.Name
-				for ;; {
-					if product2, err := models.GetProductByName(common.Database, name); err == nil && product2.ID != product.ID {
-						if res := regexp.MustCompile(`(.*)-(\d+)$`).FindAllStringSubmatch(product.Name, 1); len(res) > 0 && len(res[0]) > 2 {
-							if v, err := strconv.Atoi(res[0][2]); err == nil {
-								name = fmt.Sprintf("%v-%d", res[0][1], v + 1)
-							}else{
-								name = fmt.Sprintf("%v-%d", res[0][1], 1)
-							}
-						}else{
-							name = fmt.Sprintf("%v-%d", res[0][1], 1)
-						}
-					}else{
-						product.Name = name
-						break
 					}
 				}
 			}

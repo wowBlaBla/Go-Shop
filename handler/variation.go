@@ -661,7 +661,12 @@ func getVariationHandler(c *fiber.Ctx) error {
 					for i, property := range view.Properties {
 						for j, rate := range property.Rates{
 							if cache, err := models.GetCacheValueByValueId(common.Database, rate.Value.ID); err == nil {
-								view.Properties[i].Rates[j].Value.Thumbnail = strings.Split(cache.Thumbnail, ",")[0]
+								arr := strings.Split(cache.Thumbnail, ",")
+								if len(arr) > 1 {
+									view.Properties[i].Rates[j].Value.Thumbnail = strings.Split(arr[1], " ")[0]
+								}else{
+									view.Properties[i].Rates[j].Value.Thumbnail = arr[0]
+								}
 							}
 						}
 					}
@@ -715,7 +720,7 @@ func patchVariationHandler(c *fiber.Ctx) error {
 			if request.Action == "clone" {
 				variation.ID = 0
 				name := variation.Name
-				for ;; {
+				for ; ; {
 					if variations, err := models.GetVariationsByProductAndName(common.Database, variation.ProductId, name); err == nil && len(variations) > 0 {
 						if res := reName.FindAllStringSubmatch(name, 1); len(res) > 0 && len(res[0]) > 2 {
 							if n, err := strconv.Atoi(res[0][2]); err == nil {

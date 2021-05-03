@@ -30,7 +30,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210426191650"
+	COMPILED = "20210430115522"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -211,6 +211,8 @@ type ProductFile struct {
 	Related    []string `json:",omitempty"`
 	Widgets    []WidgetCF `json:",omitempty"`
 	Sku string `json:",omitempty"`
+	Max float64 `json:",omitempty"`
+	Votes int `json:",omitempty"`
 	Sort int
 	//
 	Content string
@@ -349,6 +351,8 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Related []string `json:",omitempty"`
 		Widgets []WidgetCF `json:",omitempty"`
 		Sku string
+		Max float64 `json:",omitempty"`
+		Votes int `json:",omitempty"`
 		Sort int
 	}{
 		ID: p.ID,
@@ -370,6 +374,8 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Related: p.Related,
 		Widgets: p.Widgets,
 		Sku: p.Sku,
+		Max: p.Max,
+		Votes: p.Votes,
 		Sort: p.Sort,
 	}, "", "   "); err == nil {
 		bts = append(bts, "\n\n"...)

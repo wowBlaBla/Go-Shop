@@ -367,6 +367,10 @@ func putPropertyHandler(c *fiber.Ctx) error {
 					price.Availability = p.Availability
 					price.Sku = p.Sku
 					price.Price = p.Price
+					if err = models.UpdateRate(common.Database, price); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
 				}
 			}
 			//

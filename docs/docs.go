@@ -1221,7 +1221,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.CategoryView"
+                            "$ref": "#/definitions/models.CategoryView"
                         }
                     },
                     "404": {
@@ -1275,7 +1275,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.CategoriesView"
+                            "$ref": "#/definitions/models.CategoriesView"
                         }
                     },
                     "404": {
@@ -1477,7 +1477,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.CategoryView"
+                            "$ref": "#/definitions/models.CategoryView"
                         }
                     },
                     "404": {
@@ -2978,6 +2978,292 @@ var doc = `{
                 }
             }
         },
+        "/api/v1/menus": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "menu"
+                ],
+                "summary": "Get menus",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.MenusView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "menu"
+                ],
+                "summary": "Create menu",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "menu",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.NewMenu"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.MenuView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/menus/list": {
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "menu"
+                ],
+                "summary": "Search menus",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.ListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.MenusListResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/menus/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "menu"
+                ],
+                "summary": "Get menu",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Shipping ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.MenuView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "menu"
+                ],
+                "summary": "Update menu",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "menu",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.MenuView"
+                        }
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Shipping ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.TagView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "menu"
+                ],
+                "summary": "Delete menu",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Shipping ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/notification/email": {
             "post": {
                 "security": [
@@ -4022,8 +4308,15 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Property ID",
-                        "name": "property_id",
+                        "description": "Product ID",
+                        "name": "product_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Variation ID",
+                        "name": "variation_id",
                         "in": "path",
                         "required": true
                     }
@@ -4068,8 +4361,15 @@ var doc = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Property id",
-                        "name": "property_id",
+                        "description": "Product id",
+                        "name": "product_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Variation id",
+                        "name": "variation_id",
                         "in": "query",
                         "required": true
                     },
@@ -4105,7 +4405,7 @@ var doc = `{
                 }
             }
         },
-        "/api/v1/prices/list": {
+        "/api/v1/prices/all": {
             "post": {
                 "security": [
                     {
@@ -4121,15 +4421,29 @@ var doc = `{
                 "tags": [
                     "price"
                 ],
-                "summary": "Search prices",
+                "summary": "Create prices",
                 "parameters": [
                     {
+                        "type": "integer",
+                        "description": "Product id",
+                        "name": "product_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Variation id",
+                        "name": "variation_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
                         "description": "body",
-                        "name": "request",
+                        "name": "price",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.ListRequest"
+                            "$ref": "#/definitions/handler.NewPrices"
                         }
                     }
                 ],
@@ -4137,7 +4451,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.PricesListResponse"
+                            "$ref": "#/definitions/handler.HTTPMessage"
                         }
                     },
                     "404": {
@@ -4595,6 +4909,54 @@ var doc = `{
                 }
             }
         },
+        "/api/v1/products/{id}/max": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product"
+                ],
+                "summary": "Get product",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Products ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/properties/list": {
             "post": {
                 "security": [
@@ -4830,6 +5192,308 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handler.CommandView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/rates": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "price"
+                ],
+                "summary": "Get rates",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Property ID",
+                        "name": "property_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.RateView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "price"
+                ],
+                "summary": "Create rates",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Property id",
+                        "name": "property_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "price",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.NewRate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.RateView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/rates/list": {
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "price"
+                ],
+                "summary": "Search rates",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.ListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.RatesListResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/rates/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "price"
+                ],
+                "summary": "Get price",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Rate ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.RateView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "price"
+                ],
+                "summary": "Update price",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Rate ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.NewRate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.RateView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "price"
+                ],
+                "summary": "Delete price",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Rate ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
                         }
                     },
                     "404": {
@@ -7121,6 +7785,52 @@ var doc = `{
                     }
                 }
             },
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "variation"
+                ],
+                "summary": "Patch variation",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Variation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.PatchVariationRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "security": [
                     {
@@ -8287,6 +8997,9 @@ var doc = `{
                 "admin": {
                     "type": "boolean"
                 },
+                "allowReceiveEmails": {
+                    "type": "boolean"
+                },
                 "billingProfileId": {
                     "type": "integer"
                 },
@@ -8350,6 +9063,9 @@ var doc = `{
             "type": "object",
             "properties": {
                 "admin": {
+                    "type": "boolean"
+                },
+                "allowReceiveEmails": {
                     "type": "boolean"
                 },
                 "billingProfileId": {
@@ -8561,6 +9277,9 @@ var doc = `{
                 "products": {
                     "type": "integer"
                 },
+                "sort": {
+                    "type": "integer"
+                },
                 "thumbnail": {
                     "type": "string"
                 },
@@ -8584,12 +9303,6 @@ var doc = `{
                 "total": {
                     "type": "integer"
                 }
-            }
-        },
-        "handler.CategoriesView": {
-            "type": "array",
-            "items": {
-                "$ref": "#/definitions/handler.CategoryView"
             }
         },
         "handler.CategoryFullView": {
@@ -8634,45 +9347,9 @@ var doc = `{
                             "type": "integer"
                         }
                     }
-                }
-            }
-        },
-        "handler.CategoryView": {
-            "type": "object",
-            "properties": {
-                "children": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handler.CategoryView"
-                    }
                 },
-                "description": {
-                    "type": "string"
-                },
-                "id": {
+                "sort": {
                     "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "parents": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handler.CategoryView"
-                    }
-                },
-                "products": {
-                    "type": "integer"
-                },
-                "thumbnail": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "type": {
-                    "description": "\"category\", \"product\"",
-                    "type": "string"
                 }
             }
         },
@@ -8862,7 +9539,7 @@ var doc = `{
                 "categories": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/handler.CategoryView"
+                        "$ref": "#/definitions/models.CategoryView"
                     }
                 },
                 "code": {
@@ -9283,6 +9960,9 @@ var doc = `{
                         "description": {
                             "type": "string"
                         },
+                        "flatUrl": {
+                            "type": "boolean"
+                        },
                         "keywords": {
                             "type": "string"
                         },
@@ -9395,6 +10075,9 @@ var doc = `{
                 "size": {
                     "type": "integer"
                 },
+                "thumbnail": {
+                    "type": "string"
+                },
                 "updated": {
                     "type": "string"
                 },
@@ -9467,6 +10150,9 @@ var doc = `{
         "handler.ItemShortView": {
             "type": "object",
             "properties": {
+                "categoryId": {
+                    "type": "integer"
+                },
                 "coupons": {
                     "type": "array",
                     "items": {
@@ -9481,6 +10167,12 @@ var doc = `{
                 },
                 "price": {
                     "type": "number"
+                },
+                "prices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.PriceShortView"
+                    }
                 },
                 "properties": {
                     "type": "array",
@@ -9685,6 +10377,72 @@ var doc = `{
                 }
             }
         },
+        "handler.MenuView": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.MenusListItem": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.MenusListResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.MenusListItem"
+                    }
+                },
+                "filtered": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.MenusView": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/handler.MenuView"
+            }
+        },
         "handler.MollieOrderView": {
             "type": "object",
             "properties": {
@@ -9713,6 +10471,9 @@ var doc = `{
         "handler.NewAccount": {
             "type": "object",
             "properties": {
+                "allowReceiveEmails": {
+                    "type": "boolean"
+                },
                 "billingProfile": {
                     "type": "object",
                     "$ref": "#/definitions/handler.NewProfile"
@@ -9748,6 +10509,9 @@ var doc = `{
                     "type": "string"
                 },
                 "parentId": {
+                    "type": "integer"
+                },
+                "sort": {
                     "type": "integer"
                 },
                 "title": {
@@ -9834,6 +10598,26 @@ var doc = `{
                 }
             }
         },
+        "handler.NewMenu": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.NewOption": {
             "type": "object",
             "properties": {
@@ -9889,11 +10673,21 @@ var doc = `{
                 "enabled": {
                     "type": "boolean"
                 },
+                "id": {
+                    "type": "integer"
+                },
                 "price": {
                     "type": "number"
                 },
-                "propertyId": {
+                "productId": {
                     "type": "integer"
+                },
+                "rates": {
+                    "description": "RateIds string",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Rate"
+                    }
                 },
                 "sending": {
                     "type": "string"
@@ -9901,9 +10695,15 @@ var doc = `{
                 "sku": {
                     "type": "string"
                 },
-                "valueId": {
+                "variationId": {
                     "type": "integer"
                 }
+            }
+        },
+        "handler.NewPrices": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/handler.NewPrice"
             }
         },
         "handler.NewProduct": {
@@ -9973,6 +10773,12 @@ var doc = `{
                 "optionId": {
                     "type": "integer"
                 },
+                "rates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.NewRate"
+                    }
+                },
                 "sku": {
                     "type": "string"
                 },
@@ -9981,6 +10787,35 @@ var doc = `{
                 },
                 "type": {
                     "type": "string"
+                }
+            }
+        },
+        "handler.NewRate": {
+            "type": "object",
+            "properties": {
+                "availability": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "propertyId": {
+                    "type": "integer"
+                },
+                "sending": {
+                    "type": "string"
+                },
+                "sku": {
+                    "type": "string"
+                },
+                "valueId": {
+                    "type": "integer"
                 }
             }
         },
@@ -10550,6 +11385,14 @@ var doc = `{
                 }
             }
         },
+        "handler.PatchVariationRequest": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.PaymentView": {
             "type": "object",
             "properties": {
@@ -10573,6 +11416,17 @@ var doc = `{
                 }
             }
         },
+        "handler.PriceShortView": {
+            "type": "object",
+            "properties": {
+                "availability": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "number"
+                }
+            }
+        },
         "handler.PriceView": {
             "type": "object",
             "properties": {
@@ -10588,8 +11442,15 @@ var doc = `{
                 "price": {
                     "type": "number"
                 },
-                "propertyId": {
+                "productId": {
                     "type": "integer"
+                },
+                "rates": {
+                    "description": "RateIds string",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.RateView"
+                    }
                 },
                 "sending": {
                     "type": "string"
@@ -10597,59 +11458,7 @@ var doc = `{
                 "sku": {
                     "type": "string"
                 },
-                "valueId": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handler.PricesListItem": {
-            "type": "object",
-            "properties": {
-                "enabled": {
-                    "type": "boolean"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "optionId": {
-                    "type": "integer"
-                },
-                "price": {
-                    "type": "number"
-                },
-                "productTitle": {
-                    "type": "string"
-                },
-                "propertyId": {
-                    "type": "integer"
-                },
-                "propertyTitle": {
-                    "type": "string"
-                },
-                "valueId": {
-                    "type": "integer"
-                },
-                "valueTitle": {
-                    "type": "string"
-                },
-                "variationTitle": {
-                    "type": "string"
-                }
-            }
-        },
-        "handler.PricesListResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handler.PricesListItem"
-                    }
-                },
-                "filtered": {
-                    "type": "integer"
-                },
-                "total": {
+                "variationId": {
                     "type": "integer"
                 }
             }
@@ -10686,7 +11495,7 @@ var doc = `{
                 "categories": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/handler.CategoryView"
+                        "$ref": "#/definitions/models.CategoryView"
                     }
                 },
                 "content": {
@@ -10740,6 +11549,9 @@ var doc = `{
                 "new": {
                     "type": "boolean"
                 },
+                "notes": {
+                    "type": "string"
+                },
                 "parameters": {
                     "type": "array",
                     "items": {
@@ -10748,6 +11560,12 @@ var doc = `{
                 },
                 "pattern": {
                     "type": "string"
+                },
+                "prices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.PriceView"
+                    }
                 },
                 "properties": {
                     "type": "array",
@@ -10780,7 +11598,7 @@ var doc = `{
                                     }
                                 }
                             },
-                            "prices": {
+                            "rates": {
                                 "type": "array",
                                 "items": {
                                     "type": "object",
@@ -10888,6 +11706,12 @@ var doc = `{
                 "categoryId": {
                     "type": "integer"
                 },
+                "categoryName": {
+                    "type": "string"
+                },
+                "categoryTitle": {
+                    "type": "string"
+                },
                 "depth": {
                     "type": "number"
                 },
@@ -10932,6 +11756,10 @@ var doc = `{
         "handler.ProductsFilterResponse": {
             "type": "object",
             "properties": {
+                "categories": {
+                    "type": "object",
+                    "$ref": "#/definitions/models.CategoryView"
+                },
                 "data": {
                     "type": "array",
                     "items": {
@@ -10976,11 +11804,8 @@ var doc = `{
                 "title": {
                     "type": "string"
                 },
-                "variationsIds": {
-                    "type": "string"
-                },
-                "variationsTitles": {
-                    "type": "string"
+                "variations": {
+                    "type": "integer"
                 }
             }
         },
@@ -11097,9 +11922,101 @@ var doc = `{
                 }
             }
         },
+        "handler.RateView": {
+            "type": "object",
+            "properties": {
+                "availability": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "property": {
+                    "type": "object",
+                    "$ref": "#/definitions/handler.PropertyView"
+                },
+                "propertyId": {
+                    "type": "integer"
+                },
+                "sending": {
+                    "type": "string"
+                },
+                "sku": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "object",
+                    "$ref": "#/definitions/handler.ValueView"
+                },
+                "valueId": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.RatesListItem": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "optionId": {
+                    "type": "integer"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "productTitle": {
+                    "type": "string"
+                },
+                "propertyId": {
+                    "type": "integer"
+                },
+                "propertyTitle": {
+                    "type": "string"
+                },
+                "valueId": {
+                    "type": "integer"
+                },
+                "valueTitle": {
+                    "type": "string"
+                },
+                "variationTitle": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.RatesListResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.RatesListItem"
+                    }
+                },
+                "filtered": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "handler.RegisterRequest": {
             "type": "object",
             "properties": {
+                "allowReceiveEmails": {
+                    "type": "boolean"
+                },
                 "csrf": {
                     "type": "string"
                 },
@@ -11660,6 +12577,9 @@ var doc = `{
         "handler.UserView": {
             "type": "object",
             "properties": {
+                "allowReceiveEmails": {
+                    "type": "boolean"
+                },
                 "email": {
                     "type": "string"
                 },
@@ -11877,8 +12797,17 @@ var doc = `{
                 "new": {
                     "type": "boolean"
                 },
+                "notes": {
+                    "type": "string"
+                },
                 "pattern": {
                     "type": "string"
+                },
+                "prices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.PriceView"
+                    }
                 },
                 "productId": {
                     "type": "integer"
@@ -11914,7 +12843,7 @@ var doc = `{
                                     }
                                 }
                             },
-                            "prices": {
+                            "rates": {
                                 "type": "array",
                                 "items": {
                                     "type": "object",
@@ -12196,7 +13125,7 @@ var doc = `{
                 "categories": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/handler.CategoryView"
+                        "$ref": "#/definitions/models.CategoryView"
                     }
                 },
                 "content": {
@@ -12431,6 +13360,190 @@ var doc = `{
             "type": "array",
             "items": {
                 "$ref": "#/definitions/handler.ZoneView"
+            }
+        },
+        "models.CategoriesView": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/models.CategoryView"
+            }
+        },
+        "models.CategoryView": {
+            "type": "object",
+            "properties": {
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.CategoryView"
+                    }
+                },
+                "count": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parents": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.CategoryView"
+                    }
+                },
+                "path": {
+                    "type": "string"
+                },
+                "products": {
+                    "type": "integer"
+                },
+                "sort": {
+                    "type": "integer"
+                },
+                "thumbnail": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "\"category\", \"product\"",
+                    "type": "string"
+                }
+            }
+        },
+        "models.Option": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
+                },
+                "standard": {
+                    "type": "boolean"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "object",
+                    "$ref": "#/definitions/models.Value"
+                },
+                "valueId": {
+                    "type": "integer"
+                },
+                "values": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Value"
+                    }
+                }
+            }
+        },
+        "models.Property": {
+            "type": "object",
+            "properties": {
+                "filtering": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "option": {
+                    "type": "object",
+                    "$ref": "#/definitions/models.Option"
+                },
+                "optionId": {
+                    "type": "integer"
+                },
+                "productId": {
+                    "type": "integer"
+                },
+                "rates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Rate"
+                    }
+                },
+                "sku": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "select / radio",
+                    "type": "string"
+                },
+                "variationId": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.Rate": {
+            "type": "object",
+            "properties": {
+                "availability": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "property": {
+                    "type": "object",
+                    "$ref": "#/definitions/models.Property"
+                },
+                "propertyId": {
+                    "type": "integer"
+                },
+                "sending": {
+                    "type": "string"
+                },
+                "sku": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "object",
+                    "$ref": "#/definitions/models.Value"
+                },
+                "valueId": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.Value": {
+            "type": "object",
+            "properties": {
+                "availability": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "optionId": {
+                    "type": "integer"
+                },
+                "thumbnail": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
             }
         }
     },

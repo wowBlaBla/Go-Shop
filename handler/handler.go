@@ -156,6 +156,7 @@ func GetFiber() *fiber.App {
 	v1.Post("/products", authRequired, changed("product created"), postProductsHandler)
 	v1.Post("/products/list", authRequired, postProductsListHandler)
 	v1.Get("/products/:id", authRequired, getProductHandler)
+	v1.Post("/products/:id/max", postProductMaxHandler)
 	v1.Put("/products/:id", authRequired, changed("product updated"), putProductHandler)
 	v1.Delete("/products/:id", authRequired, changed("product deleted"), delProductHandler)
 	//
@@ -1003,6 +1004,7 @@ func putBasicSettingsHandler(c *fiber.Ctx) error {
 		conf.Params.Currency = strings.ToLower(common.Config.Currency)
 		conf.Params.Symbol = strings.ToLower(common.Config.Symbol)
 		conf.Params.Products = strings.ToLower(common.Config.Products)
+		conf.Params.FlatUrl = common.Config.FlatUrl
 		conf.Params.MollieProfileId = common.Config.Payment.Mollie.ProfileID
 		conf.Params.StripePublishedKey = common.Config.Payment.Stripe.PublishedKey
 		//
@@ -1140,6 +1142,7 @@ type HugoSettingsView struct {
 		Currency string `toml:"currency"`
 		Symbol string `toml:"symbol"`
 		Products string `toml:"products"`
+		FlatUrl bool `toml:"flatUrl"`
 		MollieProfileId string `toml:"mollieProfileId"`
 		StripePublishedKey string `toml:"stripePublishedKey"`
 	} `toml:"params"`
