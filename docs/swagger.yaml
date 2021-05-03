@@ -393,6 +393,19 @@ definitions:
       status:
         type: string
     type: object
+  handler.CommentView:
+    properties:
+      body:
+        type: string
+      max:
+        type: integer
+      title:
+        type: string
+    type: object
+  handler.CommentsView:
+    items:
+      $ref: '#/definitions/handler.CommentView'
+    type: array
   handler.ContentAction:
     properties:
       action:
@@ -922,6 +935,8 @@ definitions:
     properties:
       comment:
         type: string
+      commentId:
+        type: integer
       description:
         type: string
       id:
@@ -1122,6 +1137,15 @@ definitions:
         type: string
     type: object
   handler.NewCommand:
+    type: object
+  handler.NewComment:
+    properties:
+      body:
+        type: string
+      max:
+        type: integer
+      title:
+        type: string
     type: object
   handler.NewCoupon:
     properties:
@@ -4152,6 +4176,166 @@ paths:
       summary: Get checkout information
       tags:
       - frontend
+  /api/v1/comments:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: ProductId
+        in: query
+        name: pid
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CommentsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get comments
+      tags:
+      - comment
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Item Id
+        in: query
+        name: iid
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewComment'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CommentView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create comment
+      tags:
+      - comment
+      - product
+  /api/v1/comments/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Comment ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete comment
+      tags:
+      - comment
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Comment ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CommentView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get comment
+      tags:
+      - comment
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Comment ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewComment'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CommentView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Update comment
+      tags:
+      - comment
   /api/v1/contents:
     get:
       consumes:

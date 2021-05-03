@@ -22,6 +22,33 @@ type Item struct {
 	OrderId     uint
 	Volume float64 `sql:"type:decimal(8,3);"`
 	Weight float64 `sql:"type:decimal(8,3);"`
+	//
+	CommentId uint
+	Comment       *Comment `gorm:"foreignKey:comment_id;"`
+}
+
+func GetItem(connector *gorm.DB, id int) (*Item, error) {
+	db := connector
+	var Item Item
+	if err := db.Debug().Where("id = ?", id).First(&Item).Error; err != nil {
+		return nil, err
+	}
+	return &Item, nil
+}
+
+func GetItemByComment(connector *gorm.DB, commentId int) (*Item, error) {
+	db := connector
+	var Item Item
+	if err := db.Debug().Where("comment_id = ?", commentId).First(&Item).Error; err != nil {
+		return nil, err
+	}
+	return &Item, nil
+}
+
+func UpdateItem(connector *gorm.DB, item *Item) error {
+	db := connector
+	db.Debug().Save(&item)
+	return db.Error
 }
 
 func DeleteItem(connector *gorm.DB, item *Item) error {

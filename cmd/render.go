@@ -1247,6 +1247,21 @@ var renderCmd = &cobra.Command{
 								}
 								productFile.Max = math.Round(product.Max * 100) / 100
 								productFile.Votes = product.Votes
+								if comments, err := models.GetCommentsByProduct(common.Database, product.ID); err == nil {
+									for _, comment := range comments {
+										commentPF := common.CommentPF{
+											Id: comment.ID,
+											Uuid: comment.Uuid,
+											Title: comment.Title,
+											Body: comment.Body,
+											Max: comment.Max,
+										}
+										if user, err := models.GetUser(common.Database, int(comment.UserId)); err == nil {
+											commentPF.Author = fmt.Sprintf("%s %s", user.Name, user.Lastname)
+										}
+										productFile.Comments = append(productFile.Comments, commentPF)
+									}
+								}
 								productFile.Content = product.Content
 								//
 								for _, language := range languages {

@@ -264,6 +264,12 @@ func GetFiber() *fiber.App {
 	v1.Put("/menus/:id", authRequired, changed("menu updated"), putMenuHandler)
 	v1.Delete("/menus/:id", authRequired, changed("menu updated"), delMenuHandler)
 	//
+	v1.Get("/comments", authRequired, getCommentsHandler)
+	v1.Post("/comments", authRequired, postCommentHandler)
+	v1.Get("/comments/:id", authRequired, getCommentHandler)
+	v1.Put("/comments/:id", authRequired, putCommentHandler)
+	v1.Delete("/comments/:id", authRequired, delCommentHandler)
+	//
 	v1.Get("/me", authRequired, getMeHandler)
 	//
 	//v1.Post("/discount", postDiscountHandler)

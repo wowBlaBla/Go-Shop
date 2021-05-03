@@ -1139,6 +1139,7 @@ type ItemView struct{
 	Price float64
 	Quantity int
 	Total float64
+	CommentId uint `json:",omitempty"`
 }
 
 // GetOrders godoc
