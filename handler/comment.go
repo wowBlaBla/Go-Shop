@@ -14,6 +14,7 @@ import (
 type CommentsView []*CommentView
 
 type CommentView struct {
+	Id int
 	Title string
 	Body string
 	Max int
@@ -178,9 +179,9 @@ func postCommentHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(fiber.Map{"ERROR": "Body is too big"})
 	}
-	if request.Max < 1 || request.Max > 5 {
+	if request.Max < 0 || request.Max > 5 {
 		c.Status(http.StatusInternalServerError)
-		return c.JSON(fiber.Map{"ERROR": "Max should be [1,5]"})
+		return c.JSON(fiber.Map{"ERROR": "Max should be [0,5]"})
 	}
 	comment := &models.Comment{
 		Uuid: item.Uuid,
@@ -269,9 +270,9 @@ func putCommentHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(fiber.Map{"ERROR": "Body is too big"})
 	}
-	if request.Max < 1 || request.Max > 5 {
+	if request.Max < 0 || request.Max > 5 {
 		c.Status(http.StatusInternalServerError)
-		return c.JSON(fiber.Map{"ERROR": "Max should be [1,5]"})
+		return c.JSON(fiber.Map{"ERROR": "Max should be [0,5]"})
 	}
 	comment.Title = request.Title
 	comment.Body = request.Body
