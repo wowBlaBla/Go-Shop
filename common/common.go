@@ -22,7 +22,10 @@ import (
 )
 
 const (
+	DEFAULT_TITLE = "Demo Shop"
+	DEFAULT_THEME = "default"
 	DEFAULT_PASSWORD = "goshoppass"
+	DEFAULT_PAGINATE = 32
 	PRODUCTS_NAME    = "products"
 	SECRET = "goshop"
 )
@@ -30,7 +33,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210503143350"
+	COMPILED = "20210503172713"
 	STORAGE storage.Storage
 	//
 	Started          time.Time

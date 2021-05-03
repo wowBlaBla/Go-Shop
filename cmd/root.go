@@ -3,6 +3,7 @@ package cmd
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/BurntSushi/toml"
 	"github.com/fsnotify/fsnotify"
 	"github.com/google/logger"
 	"github.com/spf13/cobra"
@@ -423,6 +424,65 @@ var RootCmd = &cobra.Command{
 					if err = ioutil.WriteFile(index, []byte(`Admin UI should be here`), 0644); err != nil {
 						logger.Errorf("%v", err)
 					}
+				}
+			}
+		}
+		if hugo := path.Join(dir, "hugo"); len(hugo) > 0 {
+			if _, err := os.Stat(hugo); err != nil {
+				if err = os.MkdirAll(hugo, 0755); err != nil {
+					logger.Errorf("%v", err)
+				}
+			}
+		}
+		if config := path.Join(dir, "hugo", "config.toml"); len(config) > 0 {
+			if _, err := os.Stat(config); err != nil {
+				var conf handler.HugoSettingsView
+				//
+				conf.Paginate = common.DEFAULT_PAGINATE
+				conf.Title = common.DEFAULT_TITLE
+				conf.Theme = common.DEFAULT_THEME
+				conf.Related = struct {
+					IncludeNewer bool `toml:"includeNewer"`
+					Threshold    int  `toml:"threshold"`
+					ToLower      bool `toml:"toLower"`
+					Indices      []struct {
+						Name   string `toml:"name"`
+						Weight int    `toml:"weight"`
+					} `toml:"indices"`
+				}(struct {
+					IncludeNewer bool
+					Threshold    int
+					ToLower      bool
+					Indices      []struct {
+						Name   string `toml:"name"`
+						Weight int    `toml:"weight"`
+					}
+				}{IncludeNewer: true, Threshold: 80, ToLower: false, Indices: []struct {
+					Name   string `toml:"name"`
+					Weight int    `toml:"weight"`
+				}{{Name: "Related", Weight: 100}}})
+				conf.Params.Currency = strings.ToLower(common.Config.Currency)
+				conf.Params.Symbol = strings.ToLower(common.Config.Symbol)
+				conf.Params.Products = strings.ToLower(common.Config.Products)
+				conf.Params.FlatUrl = common.Config.FlatUrl
+				conf.Params.MollieProfileId = common.Config.Payment.Mollie.ProfileID
+				conf.Params.StripePublishedKey = common.Config.Payment.Stripe.PublishedKey
+				//
+				f, err := os.Create(path.Join(dir, "hugo", "config.toml"))
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer f.Close()
+				if err = toml.NewEncoder(f).Encode(conf); err != nil {
+					logger.Fatalf("%+v", err)
+					os.Exit(1)
+				}
+			}
+		}
+		if themes := path.Join(dir, "hugo", "themes"); len(themes) > 0 {
+			if _, err := os.Stat(themes); err != nil {
+				if err = os.MkdirAll(themes, 0755); err != nil {
+					logger.Errorf("%v", err)
 				}
 			}
 		}

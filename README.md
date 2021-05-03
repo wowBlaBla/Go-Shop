@@ -1,3 +1,35 @@
+# Quick start
+
+1. Run binary first time to create required folder structure
+
+You will see similar to following sturcture
+
+```
+\
+ \ admin
+   (download latest release from https://github.com/gocommerce/goshop-admin-ui/releases/)
+ \ database
+   \ sqlite
+     database.sqlite
+ \ hugo
+  \ themes
+   \ default
+     (download latest release from git@github.com:gocommerce/goshop-ui.git release/staging)
+ + ssl
+ config.toml
+```
+
+**admin** is ui 
+
+**database** is default database folder (sqlite) 
+
+**hugo** is static content generator folder
+
+**ssl** is cert folder
+
+
+
+
 # Development
 
 Linter

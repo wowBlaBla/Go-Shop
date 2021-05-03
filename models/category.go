@@ -251,7 +251,6 @@ func getCategoryPath(connector *gorm.DB, pid int, chunks *[]string) error {
 			return err
 		}
 	}
-	return nil
 }
 
 func getChildrenCategoriesView(connector *gorm.DB, root *CategoryView, depth int, noProducts bool, count bool) *CategoryView {

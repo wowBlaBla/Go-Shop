@@ -23,36 +23,6 @@ type MenuView struct{
 	Location string
 }
 
-// @security BasicAuth
-// GetMenus godoc
-// @Summary Get menus
-// @Accept json
-// @Produce json
-// @Success 200 {object} MenusView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/menus [get]
-// @Tags menu
-func getMenusHandler(c *fiber.Ctx) error {
-	if menus, err := models.GetMenus(common.Database); err == nil {
-		var view MenusView
-		if bts, err := json.MarshalIndent(menus, "", "   "); err == nil {
-			if err = json.Unmarshal(bts, &view); err == nil {
-				return c.JSON(view)
-			}else{
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-	}else{
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-}
-
 type NewMenu struct {
 	Enabled bool
 	Name string

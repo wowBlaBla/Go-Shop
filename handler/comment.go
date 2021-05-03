@@ -314,7 +314,7 @@ func delCommentHandler(c *fiber.Ctx) error {
 	if item, err := models.GetItemByComment(common.Database, id); err == nil {
 		item.CommentId = 0
 		if err = models.UpdateItem(common.Database, item); err != nil {
-			logger.Warning("%+v", err)
+			logger.Warningf("%+v", err)
 		}
 	}
 	if err := models.DeleteComment(common.Database, comment); err == nil {
