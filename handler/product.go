@@ -585,9 +585,9 @@ func postProductMaxHandler(c *fiber.Ctx) error {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
 		}
-		if request.Value < 1 && request.Value > 5 {
+		if request.Value < 0 && request.Value > 5 {
 			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Value should be in [1, 5]"})
+			return c.JSON(HTTPError{"Value should be in [0, 5]"})
 		}
 		product.Max = (product.Max * float64(product.Votes) + float64(request.Value)) / (float64(product.Votes) + 1.0)
 		product.Votes++
