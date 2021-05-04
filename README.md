@@ -30,6 +30,17 @@ You will see similar to following structure
 
 # Dependientes #
 
+Use docker for cross platform compilation
+
+Being in main.go folder run one of following code
+
+## Centos 7 compatible compilation ##
+
+```
+$:~ docker run --rm -v "$PWD":/usr/src/myapp -v /tmp/go/pkg:/go/pkg -w /usr/src/myapp golang:1.16-stretch go build -v -ldflags="-s -w"
+```
+
+
 1. Install hugo - download binary from https://github.com/gohugoio/hugo/releases
    Put in /opt/hugo
 ```bash
