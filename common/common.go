@@ -30,7 +30,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210503143350"
+	COMPILED = "20210504184049"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
