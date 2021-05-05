@@ -9667,6 +9667,12 @@ var doc = `{
                 "body": {
                     "type": "string"
                 },
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
                 "max": {
                     "type": "integer"
                 },

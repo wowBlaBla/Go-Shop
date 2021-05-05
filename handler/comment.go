@@ -9,12 +9,14 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type CommentsView []*CommentView
 
 type CommentView struct {
 	Id int
+	CreatedAt time.Time
 	Title string
 	Body string
 	Max int
