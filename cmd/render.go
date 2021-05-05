@@ -1167,6 +1167,7 @@ var renderCmd = &cobra.Command{
 													Id:      price.Value.ID,
 													Enabled: price.Enabled,
 													Title:   price.Value.Title,
+													Description: price.Value.Description,
 													//Thumbnail: price.Value.Thumbnail,
 													Value: price.Value.Value,
 													Availability: price.Value.Availability,

@@ -33,7 +33,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210505100734"
+	COMPILED = "20210505165358"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -320,6 +320,7 @@ type ValuePF struct {
 	Enabled bool
 	Title string
 	Thumbnail string `json:",omitempty"`
+	Description string `json:",omitempty"`
 	Value string
 	Availability string `json:",omitempty"`
 	//Sending string `json:",omitempty"`
