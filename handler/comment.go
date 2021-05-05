@@ -9,12 +9,14 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type CommentsView []*CommentView
 
 type CommentView struct {
 	Id int
+	CreatedAt time.Time
 	Title string
 	Body string
 	Max int
@@ -43,7 +45,19 @@ func getCommentsHandler(c *fiber.Ctx) error {
 		return c.JSON(HTTPError{err.Error()})
 	}
 	//
-	if comments, err := models.GetCommentsByProduct(common.Database, product.ID); err == nil {
+	var offset int
+	if v := c.Query("offset"); v != "" {
+		offset, _ = strconv.Atoi(v)
+	}
+	var limit int
+	if v := c.Query("limit"); v != "" {
+		limit, _ = strconv.Atoi(v)
+	}
+	if limit == 0 {
+		limit = 20
+	}
+	//
+	if comments, err := models.GetCommentsByProductWithOffsetLimit(common.Database, product.ID, offset, limit); err == nil {
 		var view CommentsView
 		if bts, err := json.Marshal(comments); err == nil {
 			if err = json.Unmarshal(bts, &view); err == nil {

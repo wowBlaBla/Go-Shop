@@ -24,6 +24,15 @@ func GetCommentsByProduct(connector *gorm.DB, id uint) ([]*Comment, error) {
 	return comments, nil
 }
 
+func GetCommentsByProductWithOffsetLimit(connector *gorm.DB, id uint, offset int, limit int) ([]*Comment, error) {
+	db := connector
+	var comments []*Comment
+	if err := db.Debug().Where("product_id = ?", id).Offset(offset).Limit(limit).Order("id desc").Find(&comments).Error; err != nil {
+		return nil, err
+	}
+	return comments, nil
+}
+
 func CreateComment(connector *gorm.DB, comment *Comment) (uint, error) {
 	db := connector
 	db.Debug().Create(&comment)
