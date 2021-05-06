@@ -288,10 +288,9 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 			//var variation *models.Variation
 			var vId uint
 			var title string
-			var basePrice, salePrice, weight float64
+			var basePrice, salePrice, volume, weight float64
 			var start, end time.Time
 			//var dimensions string
-			var width, height, depth float64
 			var prices []*models.Price
 			if variationId == 0 {
 				title = "default"
@@ -299,10 +298,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 				salePrice = product.SalePrice
 				start = product.Start
 				end = product.End
-				//dimensions = product.Dimensions
-				width = product.Width
-				height = product.Height
-				depth = product.Depth
+				volume = product.Volume
 				weight = product.Weight
 				if prices, err = models.GetPricesByProductId(common.Database, uint(productId)); err != nil {
 					logger.Warningf("%+v", err)
@@ -319,9 +315,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 					salePrice = variation.SalePrice
 					start = variation.Start
 					end = variation.End
-					width = variation.Width
-					height = variation.Height
-					depth = variation.Depth
+					volume = product.Volume
 					weight = variation.Weight
 					//
 					if prices, err = models.GetPricesByVariationId(common.Database, uint(variationId)); err != nil {
@@ -347,7 +341,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 				item.Price = basePrice * tax
 			}
 			item.VAT = vat
-			item.Volume = width * height * depth / 1000000.0
+			item.Volume = volume
 			item.Weight = weight
 			//
 			if breadcrumbs := models.GetBreadcrumbs(common.Database, categoryId); len(breadcrumbs) > 0 {

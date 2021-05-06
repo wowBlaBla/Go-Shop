@@ -33,7 +33,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210505165358"
+	COMPILED = "20210506160028"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -61,6 +61,7 @@ type CategoryFile struct {
 	Options      []*OptionCF
 	Price        MiniMaxCF
 	Dimensions   DimensionsCF
+	Volume       MiniMaxCF
 	Weight       MiniMaxCF
 	Widgets      []WidgetCF
 	Type         string
@@ -122,6 +123,7 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		Price MiniMaxCF
 		Options []*OptionCF
 		Dimensions DimensionsCF
+		Volume MiniMaxCF
 		Weight MiniMaxCF
 		Widgets []WidgetCF
 		Type string
@@ -137,6 +139,7 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		Options: p.Options,
 		Price: p.Price,
 		Dimensions: p.Dimensions,
+		Volume: p.Volume,
 		Weight: p.Weight,
 		Widgets: p.Widgets,
 		Type: p.Type,
@@ -235,6 +238,7 @@ type ProductPF struct {
 	CustomParameters []CustomParameterPF
 	Pattern string `json:",omitempty"`
 	Dimensions string `json:",omitempty"`
+	Volume float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
 	Availability string `json:",omitempty"`
 	Time string `json:",omitempty"`
@@ -290,6 +294,7 @@ type VariationPF struct {
 	Width float64       `json:",omitempty"`
 	Height float64      `json:",omitempty"`
 	Depth float64       `json:",omitempty"`
+	Volume float64 `json:",omitempty"`
 	Weight float64      `json:",omitempty"`
 	Availability string `json:",omitempty"`
 	//Sending string `json:",omitempty"`

@@ -500,6 +500,7 @@ var renderCmd = &cobra.Command{
 													Width: product.Width,
 													Height: product.Height,
 													Depth: product.Depth,
+													Volume: product.Volume,
 													Weight: product.Weight,
 													Properties: product.Properties,
 												}}, product.Variations...)
@@ -555,6 +556,19 @@ var renderCmd = &cobra.Command{
 													}
 													if categoryFile.Dimensions.Depth.Max < variation.Depth {
 														categoryFile.Dimensions.Depth.Max = variation.Depth
+													}
+													// Volume
+													if categoryFile.Volume.Max == 0 {
+														categoryFile.Volume.Max = variation.Volume
+														if categoryFile.Volume.Min == 0 {
+															categoryFile.Volume.Min = categoryFile.Volume.Max
+														}
+													}
+													if categoryFile.Volume.Min > variation.Volume {
+														categoryFile.Volume.Min = variation.Volume
+													}
+													if categoryFile.Volume.Max < variation.Volume {
+														categoryFile.Volume.Max = variation.Volume
 													}
 													// Weight
 													if categoryFile.Weight.Max == 0 {
@@ -1006,6 +1020,7 @@ var renderCmd = &cobra.Command{
 									Width:        product.Width,
 									Height:       product.Height,
 									Depth:        product.Depth,
+									Volume:       product.Volume,
 									Weight:       product.Weight,
 									Availability: product.Availability,
 									Time:         product.Time,
@@ -1044,6 +1059,7 @@ var renderCmd = &cobra.Command{
 											Width: variation.Width,
 											Height: variation.Height,
 											Depth: variation.Depth,
+											Volume: variation.Volume,
 											Weight: variation.Weight,
 											Availability: variation.Availability,
 											Sku: variation.Sku,
@@ -1235,6 +1251,7 @@ var renderCmd = &cobra.Command{
 								productView.Path = "/" + path.Join(append(names, product.Name)...) + "/"
 								productView.Pattern = product.Pattern
 								productView.Dimensions = product.Dimensions
+								productView.Volume = product.Volume
 								productView.Weight = product.Weight
 								productView.Availability = product.Availability
 								if product.Time != nil {
@@ -1323,6 +1340,7 @@ var renderCmd = &cobra.Command{
 									Width:       product.Width,
 									Height:      product.Height,
 									Depth:       product.Depth,
+									Volume:      product.Volume,
 									Weight:      product.Weight,
 								}); err != nil {
 									logger.Warningf("%v", err)

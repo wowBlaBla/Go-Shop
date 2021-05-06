@@ -198,6 +198,12 @@ func postProductsHandler(c *fiber.Ctx) error {
 			depth = vv
 		}
 	}
+	var volume float64
+	if v, found := data.Value["Volume"]; found && len(v) > 0 {
+		if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+			volume = vv
+		}
+	}
 	var weight float64
 	if v, found := data.Value["Weight"]; found && len(v) > 0 {
 		if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
@@ -226,7 +232,7 @@ func postProductsHandler(c *fiber.Ctx) error {
 	if v, found := data.Value["Customization"]; found && len(v) > 0 {
 		customization = strings.TrimSpace(v[0])
 	}
-	product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes, Parameters: parameters, CustomParameters: customParameters, Variation: variation, BasePrice: basePrice, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, TimeId: timeId, Sku: sku, Content: content, Customization: customization}
+	product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes, Parameters: parameters, CustomParameters: customParameters, Variation: variation, BasePrice: basePrice, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Availability: availability, TimeId: timeId, Sku: sku, Content: content, Customization: customization}
 	if _, err := models.CreateProduct(common.Database, product); err == nil {
 		// Create new product automatically
 		if name == "" {
@@ -734,6 +740,12 @@ func putProductHandler(c *fiber.Ctx) error {
 					depth = vv
 				}
 			}
+			var volume float64
+			if v, found := data.Value["Volume"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					volume = vv
+				}
+			}
 			var weight float64
 			if v, found := data.Value["Weight"]; found && len(v) > 0 {
 				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
@@ -794,6 +806,8 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Width = width
 			product.Height = height
 			product.Depth = depth
+			oldVolume := product.Volume
+			product.Volume = volume
 			oldWeight := product.Weight
 			product.Weight = weight
 			oldAvailability := product.Availability
@@ -819,6 +833,9 @@ func putProductHandler(c *fiber.Ctx) error {
 						}
 						if !oldEnd.Equal(end) {
 							variation.End = product.End
+						}
+						if math.Abs(oldVolume - volume) > 0.01 {
+							variation.Volume = product.Volume
 						}
 						if math.Abs(oldWeight - weight) > 0.01 {
 							variation.Weight = product.Weight

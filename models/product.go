@@ -31,6 +31,7 @@ type Product struct {
 	Width float64 `sql:"type:decimal(8,2);"`
 	Height float64 `sql:"type:decimal(8,2);"`
 	Depth float64 `sql:"type:decimal(8,2);"`
+	Volume float64 `sql:"type:decimal(8,2);"`
 	Weight float64 `sql:"type:decimal(8,2);"`
 	Availability string
 	//Sending string

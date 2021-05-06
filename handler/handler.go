@@ -5635,6 +5635,7 @@ type ProductView struct {
 	Width float64 `json:",omitempty"`
 	Height float64 `json:",omitempty"`
 	Depth float64 `json:",omitempty"`
+	Volume float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
 	Availability string `json:",omitempty"`
 	Sending string `json:",omitempty"`
@@ -5731,6 +5732,7 @@ type VariationView struct {
 	Width float64 `json:",omitempty"`
 	Height float64 `json:",omitempty"`
 	Depth float64 `json:",omitempty"`
+	Volume float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
 	Availability string `json:",omitempty"`
 	//Sending string `json:",omitempty"`

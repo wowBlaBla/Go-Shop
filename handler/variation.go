@@ -121,7 +121,7 @@ func postVariationsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Variation{}).Select("variations.ID, variations.Name, variations.Title, variations.Thumbnail, variations.Description, variations.Base_Price, variations.Product_id, products.Title as ProductTitle, group_concat(properties.ID, ', ') as PropertiesIds, group_concat(properties.Title, ', ') as PropertiesTitles").Joins("left join products on products.id = variations.product_id").Joins("left join properties on properties.variation_id = variations.id").Group("variations.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Variation{}).Select("variations.ID, variations.Name, variations.Title, cache_variation.Thumbnail as Thumbnail, variations.Description, variations.Base_Price, variations.Product_id, products.Title as ProductTitle, cache_products.Thumbnail as ProductThumbnail, group_concat(properties.ID, ', ') as PropertiesIds, group_concat(properties.Title, ', ') as PropertiesTitles").Joins("left join cache_variation on variations.id = cache_variation.variation_id").Joins("left join products on products.id = variations.product_id").Joins("left join cache_products on variations.product_id = cache_products.product_id").Joins("left join properties on properties.variation_id = variations.id").Group("variations.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -297,6 +297,12 @@ func postVariationHandler(c *fiber.Ctx) error {
 					depth = vv
 				}
 			}
+			var volume float64
+			if v, found := data.Value["Volume"]; found && len(v) > 0 {
+				if vv, err := strconv.ParseFloat(v[0], 10); err == nil {
+					volume = vv
+				}
+			}
 			var weight float64
 			if v, found := data.Value["Weight"]; found && len(v) > 0 {
 				if vv, err := strconv.ParseFloat(v[0], 10); err == nil {
@@ -317,7 +323,7 @@ func postVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Sku"]; found && len(v) > 0 {
 				sku = strings.TrimSpace(v[0])
 			}
-			variation := &models.Variation{Name: name, Title: title, Description: description, Notes: notes, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Weight: weight, Availability: availability, TimeId: timeId, Sku: sku}
+			variation := &models.Variation{Name: name, Title: title, Description: description, Notes: notes, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Availability: availability, TimeId: timeId, Sku: sku}
 			if id, err := models.CreateVariation(common.Database, variation); err == nil {
 				if name == "" {
 					variation.Name = fmt.Sprintf("new-variation-%d", variation.ID)
@@ -477,6 +483,12 @@ func putVariationHandler(c *fiber.Ctx) error {
 					depth = vv
 				}
 			}
+			var volume float64
+			if v, found := data.Value["Volume"]; found && len(v) > 0 {
+				if vv, err := strconv.ParseFloat(v[0], 10); err == nil {
+					volume = vv
+				}
+			}
 			var weight float64
 			if v, found := data.Value["Weight"]; found && len(v) > 0 {
 				if vv, err := strconv.ParseFloat(v[0], 10); err == nil {
@@ -514,6 +526,7 @@ func putVariationHandler(c *fiber.Ctx) error {
 			variation.Width = width
 			variation.Height = height
 			variation.Depth = depth
+			variation.Volume = volume
 			variation.Weight = weight
 			variation.Availability = availability
 			variation.TimeId = timeId
@@ -631,6 +644,7 @@ type VariationsListItem struct {
 	BasePrice float64
 	ProductId uint
 	ProductTitle string
+	ProductThumbnail string
 	PropertiesIds string
 	PropertiesTitles string
 	//Options int

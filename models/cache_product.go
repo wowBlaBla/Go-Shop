@@ -14,6 +14,7 @@ type CacheProduct struct {
 	Variations string
 	CategoryID  uint
 	Price   float64 // min value
+	Volume float64
 	Width float64
 	Height float64
 	Depth float64
