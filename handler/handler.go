@@ -156,6 +156,7 @@ func GetFiber() *fiber.App {
 	v1.Post("/products", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("product created"), postProductsHandler)
 	v1.Post("/products/list", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), postProductsListHandler)
 	v1.Get("/products/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getProductHandler)
+	v1.Patch("/products/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("product updated"), patchProductHandler)
 	v1.Put("/products/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("product updated"), putProductHandler)
 	v1.Delete("/products/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("product deleted"), delProductHandler)
 	//
