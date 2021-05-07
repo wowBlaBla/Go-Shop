@@ -4,6 +4,7 @@ import "gorm.io/gorm"
 
 type Comment struct {
 	gorm.Model
+	Enabled bool
 	Uuid string
 	Title string
 	Body string

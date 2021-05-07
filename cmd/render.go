@@ -1263,23 +1263,30 @@ var renderCmd = &cobra.Command{
 										productFile.Tags = append(productFile.Tags, tag.Name)
 									}
 								}
-								productFile.Max = math.Round(product.Max * 100) / 100
-								productFile.Votes = product.Votes
+								//productFile.Max = math.Round(product.Max * 100) / 100
+								//productFile.Votes = product.Votes
+								var max, votes int
 								if comments, err := models.GetCommentsByProduct(common.Database, product.ID); err == nil {
 									for _, comment := range comments {
-										commentPF := common.CommentPF{
-											Id: comment.ID,
-											Uuid: comment.Uuid,
-											Title: comment.Title,
-											Body: comment.Body,
-											Max: comment.Max,
+										if comment.Enabled {
+											commentPF := common.CommentPF{
+												Id:    comment.ID,
+												Uuid:  comment.Uuid,
+												Title: comment.Title,
+												Body:  comment.Body,
+												Max:   comment.Max,
+											}
+											if user, err := models.GetUser(common.Database, int(comment.UserId)); err == nil {
+												commentPF.Author = fmt.Sprintf("%s %s", user.Name, user.Lastname)
+											}
+											productFile.Comments = append(productFile.Comments, commentPF)
+											max += comment.Max
+											votes++
 										}
-										if user, err := models.GetUser(common.Database, int(comment.UserId)); err == nil {
-											commentPF.Author = fmt.Sprintf("%s %s", user.Name, user.Lastname)
-										}
-										productFile.Comments = append(productFile.Comments, commentPF)
 									}
 								}
+								productFile.Max = math.Round((float64(max) / float64(votes)) * 100) / 100
+								productFile.Votes = votes
 								productFile.Content = product.Content
 								//
 								for _, language := range languages {
