@@ -623,49 +623,6 @@ func patchProductHandler(c *fiber.Ctx) error {
 	return c.JSON(HTTPMessage{"OK"})
 }
 
-type ProductMaxRequest struct {
-	Value int
-}
-
-// @security BasicAuth
-// PostProductMax godoc
-// @Summary Get product
-// @Accept json
-// @Produce json
-// @Param id path int true "Products ID"
-// @Success 200 {object} HTTPMessage
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/products/{id}/max [get]
-// @Tags product
-func postProductMaxHandler(c *fiber.Ctx) error {
-	var id int
-	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
-	}
-	if product, err := models.GetProductFull(common.Database, id); err == nil {
-		var request ProductMaxRequest
-		if err := c.BodyParser(&request); err != nil {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-		if request.Value < 0 && request.Value > 5 {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Value should be in [0, 5]"})
-		}
-		product.Max = (product.Max * float64(product.Votes) + float64(request.Value)) / (float64(product.Votes) + 1.0)
-		product.Votes++
-		if err = models.UpdateProduct(common.Database, product); err != nil {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-		return c.JSON(HTTPMessage{"OK"})
-	}else{
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
-}
-
 // @security BasicAuth
 // UpdateProduct godoc
 // @Summary Update product

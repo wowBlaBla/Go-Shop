@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/logger"
 	"github.com/yonnic/goshop/common"
@@ -16,6 +17,7 @@ type CommentsView []*CommentView
 
 type CommentView struct {
 	Id int
+	Enabled bool
 	CreatedAt time.Time
 	Title string
 	Body string
@@ -113,6 +115,7 @@ func getCommentHandler(c *fiber.Ctx) error {
 
 
 type NewComment struct {
+	Enabled bool
 	Title string
 	Body string
 	Max int
@@ -128,10 +131,10 @@ type NewComment struct {
 // @Success 200 {object} CommentView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
-// @Router /api/v1/comments [post]
+// @Router /api/v1/account/comments [post]
 // @Tags comment
 // @Tags product
-func postCommentHandler(c *fiber.Ctx) error {
+func postAccountCommentHandler(c *fiber.Ctx) error {
 	var iid int
 	if v := c.Query("iid"); v != "" {
 		iid, _ = strconv.Atoi(v)
@@ -199,6 +202,7 @@ func postCommentHandler(c *fiber.Ctx) error {
 	}
 	comment := &models.Comment{
 		Uuid: item.Uuid,
+		Enabled: true,
 		Title: request.Title,
 		Body: request.Body,
 		Max: request.Max,
@@ -226,6 +230,146 @@ func postCommentHandler(c *fiber.Ctx) error {
 	return c.JSON(view)
 }
 
+type CommentsListResponse struct {
+	Data []CommentsListItem
+	Filtered int64
+	Total int64
+}
+
+type CommentsListItem struct {
+	ID uint
+	Enabled bool
+	CreatedAt time.Time
+	Title string
+	Max float64
+	ProductId uint
+	ProductTitle string
+	ProductThumbnail string
+	UserId uint
+	UserName string
+	UserLastname string
+}
+
+// @security BasicAuth
+// SearchComments godoc
+// @Summary Search comments
+// @Accept json
+// @Produce json
+// @Param request body ListRequest true "body"
+// @Success 200 {object} CommentsListResponse
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/comments/list [post]
+// @Tags comments
+func postCommentsListHandler(c *fiber.Ctx) error {
+	var response CommentsListResponse
+	var request ListRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	if len(request.Sort) == 0 {
+		request.Sort["ID"] = "asc"
+	}
+	if request.Length == 0 {
+		request.Length = 10
+	}
+	// Filter
+	var keys1 []string
+	var values1 []interface{}
+	if len(request.Filter) > 0 {
+		for key, value := range request.Filter {
+			if key != "" && len(strings.TrimSpace(value)) > 0 {
+				switch key {
+				case "Max":
+					v := strings.TrimSpace(value)
+					if strings.Index(v, ">=") == 0 {
+						if vv, err := strconv.Atoi(v[2:]); err == nil {
+							keys1 = append(keys1, fmt.Sprintf("comments.%v >= ?", key))
+							values1 = append(values1, vv)
+						}
+					} else if strings.Index(v, "<=") == 0 {
+						if vv, err := strconv.Atoi(v[2:]); err == nil {
+							keys1 = append(keys1, fmt.Sprintf("comments.%v <= ?", key))
+							values1 = append(values1, vv)
+						}
+					} else if strings.Index(v, "!=") == 0 || strings.Index(v, "<>") == 0 {
+						if vv, err := strconv.Atoi(v[2:]); err == nil {
+							keys1 = append(keys1, fmt.Sprintf("comments.%v <> ?", key))
+							values1 = append(values1, vv)
+						}
+					} else if strings.Index(v, ">") == 0 {
+						if vv, err := strconv.Atoi(v[1:]); err == nil {
+							keys1 = append(keys1, fmt.Sprintf("comments.%v > ?", key))
+							values1 = append(values1, vv)
+						}
+					} else if strings.Index(v, "<") == 0 {
+						if vv, err := strconv.Atoi(v[1:]); err == nil {
+							keys1 = append(keys1, fmt.Sprintf("comments.%v < ?", key))
+							values1 = append(values1, vv)
+						}
+					} else {
+						if vv, err := strconv.Atoi(v); err == nil {
+							keys1 = append(keys1, fmt.Sprintf("comments.%v = ?", key))
+							values1 = append(values1, vv)
+						}
+					}
+				default:
+					keys1 = append(keys1, fmt.Sprintf("comments.%v like ?", key))
+					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
+				}
+			}
+		}
+	}
+	//logger.Infof("keys1: %+v, values1: %+v", keys1, values1)
+	//
+	// Sort
+	var order string
+	if len(request.Sort) > 0 {
+		var orders []string
+		for key, value := range request.Sort {
+			if key != "" && value != "" {
+				switch key {
+				default:
+					orders = append(orders, fmt.Sprintf("comments.%v %v", key, value))
+				}
+			}
+		}
+		order = strings.Join(orders, ", ")
+	}
+	//logger.Infof("order: %+v", order)
+	//
+	rows, err := common.Database.Debug().Model(&models.Comment{}).Select("comments.ID, comments.created_at as CreatedAt, comments.Enabled, comments.Title, comments.Max, comments.product_id as ProductId, products.Title as ProductTitle, cache_products.Thumbnail as ProductThumbnail, users.Name as UserName, users.Lastname as UserLastName, comments.user_id as UserId").Joins("left join products on comments.product_id = products.id").Joins("left join cache_products on comments.product_id = cache_products.product_id").Joins("left join users on comments.user_id = users.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	if err == nil {
+		if err == nil {
+			for rows.Next() {
+				var item CommentsListItem
+				if err = common.Database.ScanRows(rows, &item); err == nil {
+					response.Data = append(response.Data, item)
+				} else {
+					logger.Errorf("%v", err)
+				}
+			}
+		}else{
+			logger.Errorf("%v", err)
+		}
+		rows.Close()
+	}
+	rows, err = common.Database.Debug().Model(&models.Comment{}).Select("comments.ID, comments.Enabled, comments.Title, comments.Max, comments.product_id as ProductId, comments.user_id as UserId").Where(strings.Join(keys1, " and "), values1...).Rows()
+	if err == nil {
+		for rows.Next() {
+			response.Filtered ++
+		}
+		rows.Close()
+	}
+	if len(keys1) > 0 {
+		common.Database.Debug().Model(&models.Comment{}).Count(&response.Total)
+	}else{
+		response.Total = response.Filtered
+	}
+	c.Status(http.StatusOK)
+	return c.JSON(response)
+}
+
 // @security BasicAuth
 // UpdateComment godoc
 // @Summary Update comment
@@ -248,20 +392,6 @@ func putCommentHandler(c *fiber.Ctx) error {
 	if comment, err = models.GetComment(common.Database, id); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
-	}
-	//
-	var user *models.User
-	if v := c.Locals("user"); v != nil {
-		var ok bool
-		if user, ok = v.(*models.User); !ok {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Undefined user"})
-		}
-	}
-	//
-	if comment.UserId != user.ID {
-		c.Status(http.StatusForbidden)
-		return c.JSON(HTTPError{"You are not allowed to use that"})
 	}
 	//
 	var view CommentView
@@ -288,6 +418,7 @@ func putCommentHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(fiber.Map{"ERROR": "Max should be [0,5]"})
 	}
+	comment.Enabled = request.Enabled
 	comment.Title = request.Title
 	comment.Body = request.Body
 	comment.Max = request.Max

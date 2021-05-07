@@ -406,6 +406,42 @@ definitions:
       title:
         type: string
     type: object
+  handler.CommentsListItem:
+    properties:
+      createdAt:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      max:
+        type: number
+      productId:
+        type: integer
+      productThumbnail:
+        type: string
+      productTitle:
+        type: string
+      title:
+        type: string
+      userId:
+        type: integer
+      userLastname:
+        type: string
+      userName:
+        type: string
+    type: object
+  handler.CommentsListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.CommentsListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
   handler.CommentsView:
     items:
       $ref: '#/definitions/handler.CommentView'
@@ -4340,6 +4376,37 @@ paths:
       summary: Update comment
       tags:
       - comment
+  /api/v1/comments/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CommentsListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search comments
+      tags:
+      - comments
   /api/v1/contents:
     get:
       consumes:
@@ -6357,36 +6424,6 @@ paths:
       security:
       - BasicAuth: []
       summary: Update product
-      tags:
-      - product
-  /api/v1/products/{id}/max:
-    get:
-      consumes:
-      - application/json
-      parameters:
-      - description: Products ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.HTTPMessage'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Get product
       tags:
       - product
   /api/v1/products/list:
