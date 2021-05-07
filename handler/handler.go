@@ -156,6 +156,7 @@ func GetFiber() *fiber.App {
 	v1.Post("/products", authRequired, changed("product created"), postProductsHandler)
 	v1.Post("/products/list", authRequired, postProductsListHandler)
 	v1.Get("/products/:id", authRequired, getProductHandler)
+	v1.Patch("/products/:id", authRequired, patchProductHandler)
 	v1.Post("/products/:id/max", postProductMaxHandler)
 	v1.Put("/products/:id", authRequired, changed("product updated"), putProductHandler)
 	v1.Delete("/products/:id", authRequired, changed("product deleted"), delProductHandler)

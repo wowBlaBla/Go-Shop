@@ -374,10 +374,22 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	var values1 []interface{}
 	var keys2 []string
 	var values2 []interface{}
+	if request.Search != "" {
+		search := "%" + strings.TrimSpace(request.Search) + "%"
+		keys1 = append(keys1, "(products.Title like ? OR products.Description like ? OR products.Sku like ?)")
+		values1 = append(values1, search, search, search)
+	}
 	if len(request.Filter) > 0 {
 		for key, value := range request.Filter {
 			if key != "" && len(strings.TrimSpace(value)) > 0 {
 				switch key {
+				case "Enabled":
+					keys1 = append(keys1, fmt.Sprintf("products.%v = ?", key))
+					if strings.EqualFold(value, "true") {
+						values1 = append(values1, "1")
+					}else{
+						values1 = append(values1, "0")
+					}
 				case "Variations":
 					v := strings.TrimSpace(value)
 					if strings.Index(v, ">=") == 0 {
@@ -563,6 +575,52 @@ func getProductHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
+}
+
+type ProductPatchRequest struct {
+	Enabled string
+}
+
+// @security BasicAuth
+// PatchProduct godoc
+// @Summary patch product
+// @Accept json
+// @Produce json
+// @Param option body ProductPatchRequest true "body"
+// @Param id path int true "Product ID"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/products/{id} [patch]
+// @Tags product
+func patchProductHandler(c *fiber.Ctx) error {
+	var request ProductPatchRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
+	}
+	var product *models.Product
+	var err error
+	if product, err = models.GetProduct(common.Database, int(id)); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	if request.Enabled == "true" {
+		product.Enabled = true
+	}else if request.Enabled == "false" {
+		product.Enabled = false
+	}
+	if err = models.UpdateProduct(common.Database, product); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	return c.JSON(HTTPMessage{"OK"})
 }
 
 type ProductMaxRequest struct {

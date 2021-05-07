@@ -287,6 +287,7 @@ func postCategoriesAutocompleteHandler(c *fiber.Ctx) error {
 }
 
 type ListRequest struct{
+	Search string
 	Filter map[string]string
 	Sort map[string]string
 	Start int
