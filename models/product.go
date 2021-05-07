@@ -56,8 +56,6 @@ type Product struct {
 	//
 	//RelatedProducts []*Product `gorm:"many2many:products_related;"`
 	//
-	Max float64          `sql:"type:decimal(8,2);"`
-	Votes int
 	Customization string
 }
 
