@@ -298,6 +298,9 @@ var RootCmd = &cobra.Command{
 		if err := common.Database.AutoMigrate(&models.CacheValue{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
+		if err := common.Database.AutoMigrate(&models.CacheTag{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
 		if err := common.Database.AutoMigrate(&models.CacheTransport{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
@@ -366,6 +369,9 @@ var RootCmd = &cobra.Command{
 			logger.Errorf("%+v", err)
 		}
 		if err := common.Database.Exec(`update options set sort = id where sort is null or sort = 0`).Error; err != nil {
+			logger.Errorf("%+v", err)
+		}
+		if err := common.Database.Exec("update `values` set sort = id where sort is null or sort = 0").Error; err != nil {
 			logger.Errorf("%+v", err)
 		}
 		// Manual database migration
@@ -4111,7 +4117,7 @@ var RootCmd = &cobra.Command{
 			}
 		}
 		//
-		common.STORAGE, err = storage.NewLocalStorage(path.Join(dir, "hugo", "static"), common.Config.Resize.Quality)
+		common.STORAGE, err = storage.NewLocalStorage(path.Join(dir, "hugo"), common.Config.Resize.Quality)
 		if err != nil {
 			logger.Warningf("%v", err)
 		}

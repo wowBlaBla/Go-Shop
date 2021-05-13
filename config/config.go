@@ -73,6 +73,7 @@ type Config struct {
 	//
 	Products string
 	FlatUrl bool
+	AbsolutePrice bool
 	//
 	Resize ResizeConfig
 	//
@@ -85,6 +86,8 @@ type Config struct {
 	//
 	Currency string // usd, eur
 	Symbol string // $, €
+	Decimal string // , or .
+	Thousands string // . or ,
 	//
 	Payment PaymentConfig
 	Notification NotificationConfig

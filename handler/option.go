@@ -291,18 +291,6 @@ type OptionView struct {
 	Sort int
 }
 
-type ValuesView []ValueView
-
-type ValueView struct {
-	ID uint
-	Title string `json:",omitempty"`
-	Description string `json:",omitempty"`
-	Thumbnail string `json:",omitempty"`
-	Value string `json:",omitempty"`
-	Availability string `json:",omitempty"`
-	Sending string `json:",omitempty"`
-}
-
 // @security BasicAuth
 // GetOption godoc
 // @Summary Get option

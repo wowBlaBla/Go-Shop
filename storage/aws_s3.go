@@ -295,29 +295,15 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 	return locations, nil
 }
 
-func (storage *AWSS3Storage) DeleteImage(location, sizes string) error {
+func (storage *AWSS3Storage) DeleteImage(location string) error {
 	var err error
+	if err = storage.delete(path.Join(path.Dir(location), "resize")); err != nil {
+		logger.Warningf("%+v", err)
+	}
 	if err = storage.delete(location); err != nil {
 		return err
 	}
-	for _, size := range strings.Split(sizes, ",") {
-		pair := strings.Split(size, "x")
-		var width int
-		if width, err = strconv.Atoi(pair[0]); err != nil {
-			return err
-		}
-		var height int
-		if height, err = strconv.Atoi(pair[1]); err != nil {
-			return err
-		}
-		filename := path.Base(location)
-		filename = filename[:len(filename) - len(filepath.Ext(filename))]
-		filename = fmt.Sprintf("%s_%dx%d%s", filename, width, height, filepath.Ext(location))
-		if err = storage.delete(path.Join(path.Dir(location), "resize", filename)); err != nil {
-			logger.Warningf("%+v", err)
-		}
-	}
-	return storage.delete(location)
+	return nil
 }
 
 /*func (s3 *AWSS3Storage) Copy(src, dst string) error {

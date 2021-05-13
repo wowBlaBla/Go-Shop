@@ -202,7 +202,6 @@ func postAccountCommentHandler(c *fiber.Ctx) error {
 	}
 	comment := &models.Comment{
 		Uuid: item.Uuid,
-		Enabled: true,
 		Title: request.Title,
 		Body: request.Body,
 		Max: request.Max,
@@ -248,6 +247,7 @@ type CommentsListItem struct {
 	UserId uint
 	UserName string
 	UserLastname string
+	Author string
 }
 
 // @security BasicAuth
@@ -260,7 +260,7 @@ type CommentsListItem struct {
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/comments/list [post]
-// @Tags comments
+// @Tags comment
 func postCommentsListHandler(c *fiber.Ctx) error {
 	var response CommentsListResponse
 	var request ListRequest
@@ -268,7 +268,8 @@ func postCommentsListHandler(c *fiber.Ctx) error {
 		return err
 	}
 	if len(request.Sort) == 0 {
-		request.Sort["ID"] = "asc"
+		request.Sort = make(map[string]string)
+		request.Sort["ID"] = "desc"
 	}
 	if request.Length == 0 {
 		request.Length = 10
@@ -280,6 +281,19 @@ func postCommentsListHandler(c *fiber.Ctx) error {
 		for key, value := range request.Filter {
 			if key != "" && len(strings.TrimSpace(value)) > 0 {
 				switch key {
+				case "ProductTitle":
+					keys1 = append(keys1, fmt.Sprintf("products.%v like ?", "Title"))
+					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
+				case "UserName":
+					keys1 = append(keys1, fmt.Sprintf("users.%v like ?", "Name"))
+					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
+				case "UserLastname":
+					keys1 = append(keys1, fmt.Sprintf("users.%v like ?", "Lastname"))
+					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
+				case "Author":
+					keys1 = append(keys1, fmt.Sprintf("(users.%v like ? or users.%v like ?)", "Name", "Lastname"))
+					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
+					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
 				case "Max":
 					v := strings.TrimSpace(value)
 					if strings.Index(v, ">=") == 0 {
@@ -338,12 +352,14 @@ func postCommentsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Comment{}).Select("comments.ID, comments.created_at as CreatedAt, comments.Enabled, comments.Title, comments.Max, comments.product_id as ProductId, products.Title as ProductTitle, cache_products.Thumbnail as ProductThumbnail, users.Name as UserName, users.Lastname as UserLastName, comments.user_id as UserId").Joins("left join products on comments.product_id = products.id").Joins("left join cache_products on comments.product_id = cache_products.product_id").Joins("left join users on comments.user_id = users.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	response.Data = []CommentsListItem{}
+	rows, err := common.Database.Debug().Model(&models.Comment{}).Select("comments.ID, comments.created_at as CreatedAt, comments.Enabled, comments.Title, comments.Max, comments.product_id as ProductId, products.Title as ProductTitle, cache_products.Thumbnail as ProductThumbnail, users.Name as UserName, users.Lastname as UserLastname, comments.user_id as UserId").Joins("left join products on comments.product_id = products.id").Joins("left join cache_products on comments.product_id = cache_products.product_id").Joins("left join users on comments.user_id = users.id").Where(strings.Join(keys1, " and "), values1...).Group("comments.id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
 				var item CommentsListItem
 				if err = common.Database.ScanRows(rows, &item); err == nil {
+					item.Author = fmt.Sprintf("%s %s", item.UserName, item.UserLastname)
 					response.Data = append(response.Data, item)
 				} else {
 					logger.Errorf("%v", err)
@@ -354,7 +370,7 @@ func postCommentsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Comment{}).Select("comments.ID, comments.Enabled, comments.Title, comments.Max, comments.product_id as ProductId, comments.user_id as UserId").Where(strings.Join(keys1, " and "), values1...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Comment{}).Select("comments.ID, comments.Enabled, comments.Title, comments.Max, comments.product_id as ProductId, comments.user_id as UserId").Joins("left join products on comments.product_id = products.id").Joins("left join cache_products on comments.product_id = cache_products.product_id").Joins("left join users on comments.user_id = users.id").Where(strings.Join(keys1, " and "), values1...).Group("comments.id").Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -368,6 +384,52 @@ func postCommentsListHandler(c *fiber.Ctx) error {
 	}
 	c.Status(http.StatusOK)
 	return c.JSON(response)
+}
+
+type CommentPatchRequest struct {
+	Enabled string
+}
+
+// @security BasicAuth
+// PatchComment godoc
+// @Summary patch comment
+// @Accept json
+// @Produce json
+// @Param option body CommentPatchRequest true "body"
+// @Param id path int true "Comment ID"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/comments/{id} [patch]
+// @Tags comment
+func patchCommentHandler(c *fiber.Ctx) error {
+	var request CommentPatchRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
+	}
+	var comment *models.Comment
+	var err error
+	if comment, err = models.GetComment(common.Database, int(id)); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	if request.Enabled == "true" {
+		comment.Enabled = true
+	}else if request.Enabled == "false" {
+		comment.Enabled = false
+	}
+	if err = models.UpdateComment(common.Database, comment); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	return c.JSON(HTTPMessage{"OK"})
 }
 
 // @security BasicAuth

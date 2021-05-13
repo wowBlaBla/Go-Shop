@@ -10,6 +10,7 @@ type Tag struct {
 	Hidden bool
 	Name string
 	Title string
+	Thumbnail string
 	Description string
 	//
 	Products  []*Product  `gorm:"many2many:products_tags;"`

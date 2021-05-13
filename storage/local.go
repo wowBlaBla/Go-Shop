@@ -71,8 +71,10 @@ func (local *LocalStorage) copy(src, dst string) error {
 
 // PutFile src - full local path to file, dst - relative path to file
 func (local *LocalStorage) PutFile(src, location string) (string, error) {
-	if err := local.copy(src, path.Join(local.root, location)); err != nil {
-		return location, err
+	for _, suffix := range []string{"public", "static"} {
+		if err := local.copy(src, path.Join(local.root, location, suffix)); err != nil {
+			return location, err
+		}
 	}
 	return location, nil
 }
@@ -80,8 +82,10 @@ func (local *LocalStorage) PutFile(src, location string) (string, error) {
 func (local *LocalStorage) PutImage(src, location, sizes string) ([]string, error) {
 	logger.Infof("PutImages: %+v, %+v, %+v", src, location, sizes)
 	var locations []string
-	if err := local.copy(src, path.Join(local.root, location)); err != nil {
-		return locations, err
+	for _, suffix := range []string{"public", "static"} {
+		if err := local.copy(src, path.Join(local.root, suffix, location)); err != nil {
+			return locations, err
+		}
 	}
 	locations = append(locations, "/" + location)
 	//
@@ -92,10 +96,12 @@ func (local *LocalStorage) PutImage(src, location, sizes string) ([]string, erro
 		}
 		var img image.Image
 		ext := strings.ToLower(filepath.Ext(src))
-		if p := path.Join(local.root, path.Join(path.Dir(location), "resize")); len(p) > 0 {
-			if _, err := os.Stat(p); err != nil {
-				if err = os.MkdirAll(p, 0755); err != nil {
-					logger.Warningf("%v", err)
+		for _, suffix := range []string{"public", "static"} {
+			if p := path.Join(local.root, suffix, path.Join(path.Dir(location), "resize")); len(p) > 0 {
+				if _, err := os.Stat(p); err != nil {
+					if err = os.MkdirAll(p, 0755); err != nil {
+						logger.Warningf("%v", err)
+					}
 				}
 			}
 		}
@@ -113,7 +119,7 @@ func (local *LocalStorage) PutImage(src, location, sizes string) ([]string, erro
 			filename = filename[:len(filename) - len(filepath.Ext(filename))]
 			filename = fmt.Sprintf("%s_%dx%d%s", filename, width, height, filepath.Ext(src))
 			//
-			dst := path.Join(local.root, path.Join(path.Dir(location), "resize", filename))
+			dst := path.Join(local.root, "static", path.Join(path.Dir(location), "resize", filename))
 			//
 			//dst := path.Join(path.Dir(src), "resize", filename)
 			if fi2, err := os.Stat(dst); err != nil || !fi1.ModTime().Equal(fi2.ModTime()) {
@@ -153,6 +159,9 @@ func (local *LocalStorage) PutImage(src, location, sizes string) ([]string, erro
 				}
 				if err = os.Chtimes(dst, fi1.ModTime(), fi1.ModTime()); err != nil {
 					return locations, err
+				}
+				if err := local.copy(dst, path.Join(local.root, "public", path.Join(path.Dir(location), "resize", filename))); err != nil {
+					logger.Warningf("%+v", err)
 				}
 			}
 			locations = append(locations, fmt.Sprintf("/%s %dw", path.Join(path.Dir(location), "resize", filename), width))

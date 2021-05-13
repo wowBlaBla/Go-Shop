@@ -7,6 +7,7 @@ import (
 type Property struct {
 	gorm.Model
 	Type string // select / radio
+	Size string // small / medium / large
 	Name        string
 	Title       string
 	ProductId uint

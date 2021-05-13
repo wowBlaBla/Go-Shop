@@ -134,7 +134,7 @@ var renderCmd = &cobra.Command{
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheValue{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheTransport{})
 		//
-		common.STORAGE, err = storage.NewLocalStorage(path.Join(dir, "hugo", "static"), common.Config.Resize.Quality)
+		common.STORAGE, err = storage.NewLocalStorage(path.Join(dir, "hugo"), common.Config.Resize.Quality)
 		if err != nil {
 			logger.Warningf("%+v", err)
 		}
@@ -1152,7 +1152,7 @@ var renderCmd = &cobra.Command{
 											variationView.End = &variation.End
 										}
 
-										if basePriceMin > variation.BasePrice || basePriceMin == 0 {
+										if basePriceMin > variation.BasePrice || basePriceMin < 0.01 {
 											basePriceMin = variation.BasePrice
 										}
 										// Thumbnail
@@ -1175,6 +1175,7 @@ var renderCmd = &cobra.Command{
 											propertyView := common.PropertyPF{
 												Id:    property.ID,
 												Type:  property.Type,
+												Size:  property.Size,
 												Name:  property.Name,
 												Title: property.Title,
 											}
@@ -1285,7 +1286,9 @@ var renderCmd = &cobra.Command{
 										}
 									}
 								}
-								productFile.Max = math.Round((float64(max) / float64(votes)) * 100) / 100
+								if max > 0 && votes > 0 {
+									productFile.Max = math.Round((float64(max) / float64(votes)) * 100) / 100
+								}
 								productFile.Votes = votes
 								productFile.Content = product.Content
 								//

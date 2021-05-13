@@ -7,7 +7,12 @@ import (
 	"github.com/google/logger"
 	"github.com/yonnic/goshop/common"
 	"github.com/yonnic/goshop/models"
+	"io"
 	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -21,6 +26,7 @@ type TagView struct{
 	Enabled bool
 	Name string
 	Title string
+	Thumbnail string `json:",omitempty"`
 	Description string
 	Hidden bool
 }
@@ -77,49 +83,98 @@ type NewTag struct {
 // @Tags tag
 func postTagHandler(c *fiber.Ctx) error {
 	var view TagView
-	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
-			var request NewTag
-			if err := c.BodyParser(&request); err != nil {
-				return err
+	data, err := c.Request().MultipartForm()
+	if err != nil {
+		return err
+	}
+	var enabled bool
+	if v, found := data.Value["Enabled"]; found && len(v) > 0 {
+		enabled, _ = strconv.ParseBool(v[0])
+	}
+	var title string
+	if v, found := data.Value["Title"]; found && len(v) > 0 {
+		title = strings.TrimSpace(v[0])
+	}
+	if title == "" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "Title is not defined"})
+	}
+	var name string
+	if v, found := data.Value["Name"]; found && len(v) > 0 {
+		name = strings.TrimSpace(v[0])
+	}
+	if name == "" {
+		name = reNotAbc.ReplaceAllString(strings.ToLower(name), "-")
+	}
+	var description string
+	if v, found := data.Value["Description"]; found && len(v) > 0 {
+		description = strings.TrimSpace(v[0])
+	}
+	if len(description) > 256 {
+		description = description[0:255]
+	}
+	if tags, err := models.GetTagsByName(common.Database, name); err == nil && len(tags) > 0 {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{"Tag exists"})
+	}
+	tag := &models.Tag{Enabled: enabled, Title: title, Name: name, Description: description}
+	if id, err := models.CreateTag(common.Database, tag); err == nil {
+		if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
+			p := path.Join(dir, "storage", "tags")
+			if _, err := os.Stat(p); err != nil {
+				if err = os.MkdirAll(p, 0755); err != nil {
+					logger.Errorf("%v", err)
+				}
 			}
-			request.Title = strings.TrimSpace(request.Title)
-			if request.Title == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(fiber.Map{"ERROR": "Title is not defined"})
+			filename := fmt.Sprintf("%d-%s-thumbnail%s", id, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(tag.Title, "-"), path.Ext(v[0].Filename))
+			if p := path.Join(p, filename); len(p) > 0 {
+				if in, err := v[0].Open(); err == nil {
+					out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
+					if err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					defer out.Close()
+					if _, err := io.Copy(out, in); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					tag.Thumbnail = "/" + path.Join("tags", filename)
+					if err = models.UpdateTag(common.Database, tag); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					//
+					if p1 := path.Join(dir, "storage", "tags", filename); len(p1) > 0 {
+						if fi, err := os.Stat(p1); err == nil {
+							filename := filepath.Base(p1)
+							filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+							logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "tags", filename), fi.Size())
+							var paths string
+							if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "tags", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+								paths = strings.Join(thumbnails, ",")
+							} else {
+								logger.Warningf("%v", err)
+							}
+							// Cache
+							if _, err = models.CreateCacheTag(common.Database, &models.CacheTag{
+								TagID:   tag.ID,
+								Title:     tag.Title,
+								Name:     tag.Name,
+								Thumbnail: paths,
+							}); err != nil {
+								logger.Warningf("%v", err)
+							}
+						}
+					}
+				}
 			}
-			if request.Name == "" {
-				request.Name = strings.TrimSpace(request.Name)
-				request.Name = reNotAbc.ReplaceAllString(strings.ToLower(request.Title), "-")
-			}
-			if len(request.Description) > 256 {
-				request.Description = request.Description[0:255]
-			}
-			if tags, err := models.GetTagsByName(common.Database, request.Name); err == nil && len(tags) > 0 {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Option exists"})
-			}
-			tag := &models.Tag {
-				Enabled: request.Enabled,
-				Hidden: request.Hidden,
-				Name: request.Name,
-				Title: request.Title,
-				Description: request.Description,
-			}
-			if _, err := models.CreateTag(common.Database, tag); err != nil {
+		}
+		if bts, err := json.Marshal(tag); err == nil {
+			if err = json.Unmarshal(bts, &view); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
-			if bts, err := json.Marshal(tag); err == nil {
-				if err = json.Unmarshal(bts, &view); err != nil {
-					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{err.Error()})
-				}
-			}
-			return c.JSON(view)
-		} else {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Unsupported Content-Type"})
 		}
 	}
 	return c.JSON(view)
@@ -138,6 +193,7 @@ type TagsListItem struct {
 	Name string
 	Title string
 	Description string
+	Thumbnail string
 }
 
 // @security BasicAuth
@@ -197,7 +253,7 @@ func postTagsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Tag{}).Select("tags.ID, tags.Enabled, tags.Hidden, tags.Name, tags.Title, tags.Description").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Tag{}).Select("tags.ID, tags.Enabled, tags.Hidden, tags.Name, tags.Title, cache_tags.Thumbnail as Thumbnail, tags.Description").Joins("left join cache_tags on cache_tags.tag_id = tags.ID").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -213,7 +269,7 @@ func postTagsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Tag{}).Select("tags.ID, tags.Enabled, tags.Hidden, tags.Name, tags.Title, tags.Description").Where(strings.Join(keys1, " and "), values1...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Tag{}).Select("tags.ID, tags.Enabled, tags.Hidden, tags.Name, tags.Title, cache_tags.Thumbnail as Thumbnail, tags.Description").Joins("left join cache_tags on cache_tags.tag_id = tags.ID").Where(strings.Join(keys1, " and "), values1...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -241,19 +297,26 @@ func postTagsListHandler(c *fiber.Ctx) error {
 // @Router /api/v1/tags/{id} [get]
 // @Tags tag
 func getTagHandler(c *fiber.Ctx) error {
+	var tag *models.Tag
 	var id int
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)
+		var err error
+		if tag, err = models.GetTag(common.Database, id); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "Tag ID is not defined"})
 	}
-	if tag, err := models.GetTag(common.Database, id); err == nil {
-		var view TagView
-		if bts, err := json.MarshalIndent(tag, "", "   "); err == nil {
-			if err = json.Unmarshal(bts, &view); err == nil {
-				return c.JSON(view)
-			}else{
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
+	var view TagView
+	if bts, err := json.Marshal(tag); err == nil {
+		if err = json.Unmarshal(bts, &view); err == nil {
+			if cache, err := models.GetCacheTagByTagId(common.Database, tag.ID); err == nil {
+				view.Thumbnail = strings.Split(cache.Thumbnail, ",")[0]
 			}
+			return c.JSON(view)
 		}else{
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
@@ -277,10 +340,7 @@ func getTagHandler(c *fiber.Ctx) error {
 // @Router /api/v1/tags/{id} [put]
 // @Tags tag
 func putTagHandler(c *fiber.Ctx) error {
-	var request TagView
-	if err := c.BodyParser(&request); err != nil {
-		return err
-	}
+	var view TagView
 	var id int
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)
@@ -294,24 +354,115 @@ func putTagHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
-	request.Title = strings.TrimSpace(request.Title)
-	if request.Title == "" {
+	data, err := c.Request().MultipartForm()
+	if err != nil {
+		return err
+	}
+	var enabled bool
+	if v, found := data.Value["Enabled"]; found && len(v) > 0 {
+		enabled, _ = strconv.ParseBool(v[0])
+	}
+	var title string
+	if v, found := data.Value["Title"]; found && len(v) > 0 {
+		title = strings.TrimSpace(v[0])
+	}
+	if title == "" {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(fiber.Map{"ERROR": "Title is not defined"})
 	}
-	if len(request.Description) > 256 {
-		request.Description = request.Description[0:255]
+	var name string
+	if v, found := data.Value["Name"]; found && len(v) > 0 {
+		name = strings.TrimSpace(v[0])
 	}
-	tag.Enabled = request.Enabled
-	tag.Title = request.Title
-	tag.Description = request.Description
-	tag.Hidden = request.Hidden
+	if name == "" {
+		name = reNotAbc.ReplaceAllString(strings.ToLower(name), "-")
+	}
+	var description string
+	if v, found := data.Value["Description"]; found && len(v) > 0 {
+		description = strings.TrimSpace(v[0])
+	}
+	if len(description) > 256 {
+		description = description[0:255]
+	}
+	tag.Enabled = enabled
+	tag.Title = title
+	tag.Name = name
+	tag.Description = description
+	if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
+		// To delete existing
+		if tag.Thumbnail != "" {
+			if err = os.Remove(path.Join(dir, tag.Thumbnail)); err != nil {
+				logger.Errorf("%v", err)
+			}
+			tag.Thumbnail = ""
+		}
+	}else if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
+		p := path.Join(dir, "storage", "tags")
+		if _, err := os.Stat(p); err != nil {
+			if err = os.MkdirAll(p, 0755); err != nil {
+				logger.Errorf("%v", err)
+			}
+		}
+		filename := fmt.Sprintf("%d-%s-thumbnail%s", id, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(tag.Title, "-"), path.Ext(v[0].Filename))
+		if p := path.Join(p, filename); len(p) > 0 {
+			if in, err := v[0].Open(); err == nil {
+				out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
+				if err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+				defer out.Close()
+				if _, err := io.Copy(out, in); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+				tag.Thumbnail = "/" + path.Join("tags", filename)
+				if err = models.UpdateTag(common.Database, tag); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+				//
+				if p1 := path.Join(dir, "storage", "tags", filename); len(p1) > 0 {
+					if fi, err := os.Stat(p1); err == nil {
+						filename := filepath.Base(p1)
+						filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+						logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "tags", filename), fi.Size())
+						var paths string
+						if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "tags", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+							paths = strings.Join(thumbnails, ",")
+						} else {
+							logger.Warningf("%v", err)
+						}
+						// Cache
+						if err = models.DeleteCacheTagByTagId(common.Database, tag.ID); err != nil {
+							logger.Warningf("%v", err)
+						}
+						if _, err = models.CreateCacheTag(common.Database, &models.CacheTag{
+							TagID:   tag.ID,
+							Title:     tag.Title,
+							Name:     tag.Name,
+							Thumbnail: paths,
+						}); err != nil {
+							logger.Warningf("%v", err)
+						}
+					}
+				}
+			}
+		}
+	}
+	//
 	if err := models.UpdateTag(common.Database, tag); err == nil {
-		return c.JSON(TagView{ID: tag.ID, Name: tag.Name, Title: tag.Title, Description: tag.Description})
+		if bts, err := json.Marshal(tag); err == nil {
+			if err = json.Unmarshal(bts, &view); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}
 	}else{
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
+	return c.JSON(view)
 }
 
 // @security BasicAuth
@@ -331,6 +482,9 @@ func delTagHandler(c *fiber.Ctx) error {
 		id, _ = strconv.Atoi(v)
 	}
 	if tag, err := models.GetTag(common.Database, id); err == nil {
+		if tag.Thumbnail != "" {
+			//common.STORAGE.DeleteImage()
+		}
 		if err = models.DeleteTag(common.Database, tag); err == nil {
 			return c.JSON(HTTPMessage{MESSAGE: "OK"})
 		}else{

@@ -14,6 +14,7 @@ import (
 
 type NewProperty struct {
 	Type      string
+	Size string
 	Name      string
 	Title     string
 	OptionId  uint
@@ -45,6 +46,7 @@ func postPropertyHandler(c *fiber.Ctx) error {
 	//
 	property := &models.Property{
 		Type: request.Type,
+		Size: request.Size,
 		Name:        request.Name,
 		Title:       request.Title,
 		OptionId:    request.OptionId,
@@ -284,6 +286,7 @@ func postPropertiesListHandler(c *fiber.Ctx) error {
 type PropertyView struct {
 	ID uint
 	Type string
+	Size string
 	Name string
 	Title string
 	OptionId uint
@@ -339,7 +342,7 @@ func getPropertyHandler(c *fiber.Ctx) error {
 // @Router /api/v1/properties/{id} [put]
 // @Tags property
 func putPropertyHandler(c *fiber.Ctx) error {
-	var view RateView
+	var view PropertyView
 	var id int
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)
@@ -358,6 +361,7 @@ func putPropertyHandler(c *fiber.Ctx) error {
 				return err
 			}
 			property.Type = request.Type
+			property.Size = request.Size
 			property.Title = request.Title
 			property.Sku = request.Sku
 			property.Filtering = request.Filtering

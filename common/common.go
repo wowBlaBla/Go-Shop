@@ -33,7 +33,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210507150141"
+	COMPILED = "20210513122356"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -314,9 +314,10 @@ type PricePF struct {
 type PropertyPF struct {
 	Id uint
 	Type string
+	Size string `json:",omitempty"`
 	Name string
 	Title string
-	Description string`json:",omitempty"`
+	Description string `json:",omitempty"`
 	Values []ValuePF
 }
 

@@ -406,6 +406,64 @@ var doc = `{
                 }
             }
         },
+        "/api/v1/account/comments": {
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "comment",
+                    "product"
+                ],
+                "summary": "Create comment",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Item Id",
+                        "name": "iid",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "option",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.NewComment"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.CommentView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/account/orders": {
             "get": {
                 "consumes": [
@@ -1689,62 +1747,6 @@ var doc = `{
                         }
                     }
                 }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "comment",
-                    "product"
-                ],
-                "summary": "Create comment",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Item Id",
-                        "name": "iid",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "description": "body",
-                        "name": "option",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.NewComment"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.CommentView"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
             }
         },
         "/api/v1/comments/list": {
@@ -1761,7 +1763,7 @@ var doc = `{
                     "application/json"
                 ],
                 "tags": [
-                    "comments"
+                    "comment"
                 ],
                 "summary": "Search comments",
                 "parameters": [
@@ -1916,6 +1918,61 @@ var doc = `{
                 ],
                 "summary": "Delete comment",
                 "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Comment ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "comment"
+                ],
+                "summary": "patch comment",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "option",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CommentPatchRequest"
+                        }
+                    },
                     {
                         "type": "integer",
                         "description": "Comment ID",
@@ -3282,43 +3339,6 @@ var doc = `{
             }
         },
         "/api/v1/menus": {
-            "get": {
-                "security": [
-                    {
-                        "BasicAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "menu"
-                ],
-                "summary": "Get menus",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.MenusView"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handler.HTTPError"
-                        }
-                    }
-                }
-            },
             "post": {
                 "security": [
                     {
@@ -5185,6 +5205,61 @@ var doc = `{
                     {
                         "type": "integer",
                         "description": "Products ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product"
+                ],
+                "summary": "patch product",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "option",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.ProductPatchRequest"
+                        }
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Product ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -9390,11 +9465,17 @@ var doc = `{
         "handler.BasicSettingsView": {
             "type": "object",
             "properties": {
+                "absolutePrice": {
+                    "type": "boolean"
+                },
                 "currency": {
                     "type": "string"
                 },
                 "debug": {
                     "type": "boolean"
+                },
+                "decimal": {
+                    "type": "string"
                 },
                 "flatUrl": {
                     "type": "boolean"
@@ -9425,6 +9506,9 @@ var doc = `{
                     "$ref": "#/definitions/config.StorageConfig"
                 },
                 "symbol": {
+                    "type": "string"
+                },
+                "thousands": {
                     "type": "string"
                 },
                 "url": {
@@ -9663,6 +9747,14 @@ var doc = `{
                 }
             }
         },
+        "handler.CommentPatchRequest": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.CommentView": {
             "type": "object",
             "properties": {
@@ -9671,6 +9763,9 @@ var doc = `{
                 },
                 "createdAt": {
                     "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
                 },
                 "id": {
                     "type": "integer"
@@ -9686,6 +9781,9 @@ var doc = `{
         "handler.CommentsListItem": {
             "type": "object",
             "properties": {
+                "author": {
+                    "type": "string"
+                },
                 "createdAt": {
                     "type": "string"
                 },
@@ -10442,6 +10540,9 @@ var doc = `{
         "handler.InfoView": {
             "type": "object",
             "properties": {
+                "absolutePrice": {
+                    "type": "boolean"
+                },
                 "application": {
                     "type": "string"
                 },
@@ -10450,6 +10551,9 @@ var doc = `{
                 },
                 "debug": {
                     "type": "boolean"
+                },
+                "decimal": {
+                    "type": "string"
                 },
                 "expirationAt": {
                     "type": "string"
@@ -10475,6 +10579,9 @@ var doc = `{
                     "type": "string"
                 },
                 "started": {
+                    "type": "string"
+                },
+                "thousands": {
                     "type": "string"
                 },
                 "user": {
@@ -10622,6 +10729,9 @@ var doc = `{
                 },
                 "length": {
                     "type": "integer"
+                },
+                "search": {
+                    "type": "string"
                 },
                 "sort": {
                     "type": "object",
@@ -10776,12 +10886,6 @@ var doc = `{
                 }
             }
         },
-        "handler.MenusView": {
-            "type": "array",
-            "items": {
-                "$ref": "#/definitions/handler.MenuView"
-            }
-        },
         "handler.MollieOrderView": {
             "type": "object",
             "properties": {
@@ -10866,6 +10970,9 @@ var doc = `{
             "properties": {
                 "body": {
                     "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
                 },
                 "max": {
                     "type": "integer"
@@ -11132,6 +11239,9 @@ var doc = `{
                         "$ref": "#/definitions/handler.NewRate"
                     }
                 },
+                "size": {
+                    "type": "string"
+                },
                 "sku": {
                     "type": "string"
                 },
@@ -11255,6 +11365,9 @@ var doc = `{
         "handler.NewValue": {
             "type": "object",
             "properties": {
+                "sort": {
+                    "type": "integer"
+                },
                 "thumbnail": {
                     "type": "string"
                 },
@@ -11816,6 +11929,14 @@ var doc = `{
                 }
             }
         },
+        "handler.ProductPatchRequest": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.ProductShortView": {
             "type": "object",
             "properties": {
@@ -12045,6 +12166,9 @@ var doc = `{
                 "vendorId": {
                     "type": "integer"
                 },
+                "volume": {
+                    "type": "number"
+                },
                 "weight": {
                     "type": "number"
                 },
@@ -12130,6 +12254,9 @@ var doc = `{
         "handler.ProductsListItem": {
             "type": "object",
             "properties": {
+                "basePrice": {
+                    "type": "number"
+                },
                 "categoryId": {
                     "type": "integer"
                 },
@@ -12263,6 +12390,9 @@ var doc = `{
                 },
                 "optionId": {
                     "type": "integer"
+                },
+                "size": {
+                    "type": "string"
                 },
                 "sku": {
                     "type": "string"
@@ -13022,6 +13152,14 @@ var doc = `{
                 }
             }
         },
+        "handler.ValuePatchRequest": {
+            "type": "object",
+            "properties": {
+                "sort": {
+                    "type": "integer"
+                }
+            }
+        },
         "handler.ValueView": {
             "type": "object",
             "properties": {
@@ -13036,6 +13174,9 @@ var doc = `{
                 },
                 "sending": {
                     "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
                 },
                 "thumbnail": {
                     "type": "string"
@@ -13056,6 +13197,9 @@ var doc = `{
                 },
                 "optionTitle": {
                     "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
                 },
                 "thumbnail": {
                     "type": "string"
@@ -13264,6 +13408,9 @@ var doc = `{
                 "title": {
                     "type": "string"
                 },
+                "volume": {
+                    "type": "number"
+                },
                 "weight": {
                     "type": "number"
                 },
@@ -13289,6 +13436,9 @@ var doc = `{
                 },
                 "productId": {
                     "type": "integer"
+                },
+                "productThumbnail": {
+                    "type": "string"
                 },
                 "productTitle": {
                     "type": "string"
@@ -13827,6 +13977,10 @@ var doc = `{
                         "$ref": "#/definitions/models.Rate"
                     }
                 },
+                "size": {
+                    "description": "small / medium / large",
+                    "type": "string"
+                },
                 "sku": {
                     "type": "string"
                 },
@@ -13886,6 +14040,10 @@ var doc = `{
                     "type": "string"
                 },
                 "optionId": {
+                    "type": "integer"
+                },
+                "sort": {
+                    "description": "Sending string",
                     "type": "integer"
                 },
                 "thumbnail": {

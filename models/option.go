@@ -29,7 +29,7 @@ func GetOptionsFull(connector *gorm.DB) ([]*Option, error) {
 func GetOptions(connector *gorm.DB) ([]*Option, error) {
 	db := connector
 	var options []*Option
-	db.Debug().Find(&options).Order("Sort asc, ID asc")
+	db.Debug().Order("Sort asc, ID asc").Find(&options)
 	if err := db.Error; err != nil {
 		return nil, err
 	}

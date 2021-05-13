@@ -58,10 +58,24 @@ func getValuesHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ERROR": "Something went wrong"})
 }
 
+type ValuesView []ValueView
+
+type ValueView struct {
+	ID uint
+	Title string `json:",omitempty"`
+	Description string `json:",omitempty"`
+	Thumbnail string `json:",omitempty"`
+	Value string `json:",omitempty"`
+	Availability string `json:",omitempty"`
+	Sending string `json:",omitempty"`
+	Sort int `json:",omitempty"`
+}
+
 type NewValue struct {
 	Title string
 	Thumbnail string
 	Value string
+	Sort int
 }
 
 // @security BasicAuth
@@ -122,8 +136,17 @@ func postValueHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Availability"]; found && len(v) > 0 {
 				availability = strings.TrimSpace(v[0])
 			}
-			value := &models.Value{Title: title, Description: description, Value: val, OptionId: option.ID, Availability: availability}
+			var sort int
+			if v, found := data.Value["Sort"]; found && len(v) > 0 {
+				sort, _ = strconv.Atoi(v[0])
+			}
+			value := &models.Value{Title: title, Description: description, Value: val, OptionId: option.ID, Availability: availability, Sort: sort}
 			if id, err := models.CreateValue(common.Database, value); err == nil {
+				value.Sort = int(id)
+				if err = models.UpdateValue(common.Database, value); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
 				if v, found := data.File["Thumbnail"]; found && len(v) > 0 {
 					p := path.Join(dir, "storage", "values")
 					if _, err := os.Stat(p); err != nil {
@@ -205,6 +228,7 @@ type ValuesListItem struct {
 	Title string
 	Thumbnail string
 	Value string
+	Sort int `json:",omitempty"`
 }
 
 // @security BasicAuth
@@ -230,7 +254,7 @@ func postValuesListHandler(c *fiber.Ctx) error {
 		return err
 	}
 	if len(request.Sort) == 0 {
-		request.Sort["ID"] = "desc"
+		request.Sort["Sort"] = "asc"
 	}
 	if request.Length == 0 {
 		request.Length = 10
@@ -276,7 +300,7 @@ func postValuesListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Value{}).Select("`values`.ID, `values`.Title, cache_values.Thumbnail as Thumbnail, `values`.Value, options.Title as OptionTitle").Joins("left join cache_values on cache_values.value_id = `values`.ID").Joins("left join options on options.id = `values`.Option_Id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Value{}).Select("`values`.ID, `values`.Title, cache_values.Thumbnail as Thumbnail, `values`.Value, options.Title as OptionTitle, `values`.Sort").Joins("left join cache_values on cache_values.value_id = `values`.ID").Joins("left join options on options.id = `values`.Option_Id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -292,7 +316,7 @@ func postValuesListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Value{}).Select("`values`.ID, `values`.Title, `values`.Thumbnail, `values`.Value, options.Title as OptionTitle").Joins("left join options on options.id = `values`.Option_Id").Where(strings.Join(keys1, " and "), values1...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Value{}).Select("`values`.ID, `values`.Title, `values`.Thumbnail, `values`.Value, options.Title as OptionTitle, `values`.Sort").Joins("left join options on options.id = `values`.Option_Id").Where(strings.Join(keys1, " and "), values1...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -338,7 +362,7 @@ func getValueHandler(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"ERROR": "Value ID is not defined"})
 	}
 	var view ValueView
-	if bts, err := json.MarshalIndent(value, "", "   "); err == nil {
+	if bts, err := json.Marshal(value); err == nil {
 		if err = json.Unmarshal(bts, &view); err == nil {
 			if cache, err := models.GetCacheValueByValueId(common.Database, value.ID); err == nil {
 				view.Thumbnail = strings.Split(cache.Thumbnail, ",")[0]
@@ -348,6 +372,49 @@ func getValueHandler(c *fiber.Ctx) error {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
 		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
+type ValuePatchRequest struct {
+	Sort int
+}
+
+// @security BasicAuth
+// PatchValue godoc
+// @Summary patch value
+// @Accept json
+// @Produce json
+// @Param value body ValuePatchRequest true "body"
+// @Param id path int true "Value ID"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/values/{id} [put]
+// @Tags value
+func patchValueHandler(c *fiber.Ctx) error {
+	var request ValuePatchRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
+	}
+	var value *models.Value
+	var err error
+	if value, err = models.GetValue(common.Database, int(id)); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	value.Sort = request.Sort
+	if err := models.UpdateValue(common.Database, value); err == nil {
+		return c.JSON(HTTPMessage{"OK"})
 	}else{
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
@@ -412,11 +479,16 @@ func putValueHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Availability"]; found && len(v) > 0 {
 				availability = strings.TrimSpace(v[0])
 			}
+			var sort int
+			if v, found := data.Value["Sort"]; found && len(v) > 0 {
+				sort, _ = strconv.Atoi(v[0])
+			}
 			value.Title = title
 			value.Description = description
 			value.Value = val
 			value.Availability = availability
 			//value.Sending = sending
+			value.Sort = sort
 			//
 			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
 				// To delete existing
@@ -456,7 +528,7 @@ func putValueHandler(c *fiber.Ctx) error {
 			}
 			//
 			if err := models.UpdateValue(common.Database, value); err == nil {
-				return c.JSON(ValueView{ID: value.ID, Title: value.Title, Thumbnail: value.Thumbnail, Value: value.Value})
+				return c.JSON(ValueView{ID: value.ID, Title: value.Title, Thumbnail: value.Thumbnail, Value: value.Value, Sort: value.Sort})
 			}else{
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})

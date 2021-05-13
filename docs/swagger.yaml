@@ -213,10 +213,14 @@ definitions:
     type: object
   handler.BasicSettingsView:
     properties:
+      absolutePrice:
+        type: boolean
       currency:
         type: string
       debug:
         type: boolean
+      decimal:
+        type: string
       flatUrl:
         type: boolean
       notification:
@@ -238,6 +242,8 @@ definitions:
         $ref: '#/definitions/config.StorageConfig'
         type: object
       symbol:
+        type: string
+      thousands:
         type: string
       url:
         type: string
@@ -393,12 +399,19 @@ definitions:
       status:
         type: string
     type: object
+  handler.CommentPatchRequest:
+    properties:
+      enabled:
+        type: string
+    type: object
   handler.CommentView:
     properties:
       body:
         type: string
       createdAt:
         type: string
+      enabled:
+        type: boolean
       id:
         type: integer
       max:
@@ -408,6 +421,8 @@ definitions:
     type: object
   handler.CommentsListItem:
     properties:
+      author:
+        type: string
       createdAt:
         type: string
       enabled:
@@ -902,12 +917,16 @@ definitions:
     type: object
   handler.InfoView:
     properties:
+      absolutePrice:
+        type: boolean
       application:
         type: string
       authorization:
         type: string
       debug:
         type: boolean
+      decimal:
+        type: string
       expirationAt:
         type: string
       hasChanges:
@@ -924,6 +943,8 @@ definitions:
       preview:
         type: string
       started:
+        type: string
+      thousands:
         type: string
       user:
         $ref: '#/definitions/handler.UserView'
@@ -1022,6 +1043,8 @@ definitions:
         type: object
       length:
         type: integer
+      search:
+        type: string
       sort:
         additionalProperties:
           type: string
@@ -1122,10 +1145,6 @@ definitions:
       total:
         type: integer
     type: object
-  handler.MenusView:
-    items:
-      $ref: '#/definitions/handler.MenuView'
-    type: array
   handler.MollieOrderView:
     properties:
       checkout:
@@ -1182,6 +1201,8 @@ definitions:
     properties:
       body:
         type: string
+      enabled:
+        type: boolean
       max:
         type: integer
       title:
@@ -1355,6 +1376,8 @@ definitions:
         items:
           $ref: '#/definitions/handler.NewRate'
         type: array
+      size:
+        type: string
       sku:
         type: string
       title:
@@ -1435,6 +1458,8 @@ definitions:
     type: object
   handler.NewValue:
     properties:
+      sort:
+        type: integer
       thumbnail:
         type: string
       title:
@@ -1803,6 +1828,11 @@ definitions:
       variationId:
         type: integer
     type: object
+  handler.ProductPatchRequest:
+    properties:
+      enabled:
+        type: string
+    type: object
   handler.ProductShortView:
     properties:
       description:
@@ -1954,6 +1984,8 @@ definitions:
         type: array
       vendorId:
         type: integer
+      volume:
+        type: number
       weight:
         type: number
       width:
@@ -2010,6 +2042,8 @@ definitions:
     type: object
   handler.ProductsListItem:
     properties:
+      basePrice:
+        type: number
       categoryId:
         type: integer
       description:
@@ -2098,6 +2132,8 @@ definitions:
         type: string
       optionId:
         type: integer
+      size:
+        type: string
       sku:
         type: string
       title:
@@ -2594,6 +2630,11 @@ definitions:
       vat:
         type: string
     type: object
+  handler.ValuePatchRequest:
+    properties:
+      sort:
+        type: integer
+    type: object
   handler.ValueView:
     properties:
       availability:
@@ -2604,6 +2645,8 @@ definitions:
         type: integer
       sending:
         type: string
+      sort:
+        type: integer
       thumbnail:
         type: string
       title:
@@ -2617,6 +2660,8 @@ definitions:
         type: integer
       optionTitle:
         type: string
+      sort:
+        type: integer
       thumbnail:
         type: string
       title:
@@ -2753,6 +2798,8 @@ definitions:
         type: integer
       title:
         type: string
+      volume:
+        type: number
       weight:
         type: number
       width:
@@ -2770,6 +2817,8 @@ definitions:
         type: string
       productId:
         type: integer
+      productThumbnail:
+        type: string
       productTitle:
         type: string
       propertiesIds:
@@ -3123,6 +3172,9 @@ definitions:
         items:
           $ref: '#/definitions/models.Rate'
         type: array
+      size:
+        description: small / medium / large
+        type: string
       sku:
         type: string
       title:
@@ -3163,6 +3215,9 @@ definitions:
       description:
         type: string
       optionId:
+        type: integer
+      sort:
+        description: Sending string
         type: integer
       thumbnail:
         type: string
@@ -3423,6 +3478,43 @@ paths:
       tags:
       - profile
       - frontend
+  /api/v1/account/comments:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Item Id
+        in: query
+        name: iid
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewComment'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.CommentView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create comment
+      tags:
+      - comment
+      - product
   /api/v1/account/orders:
     get:
       consumes:
@@ -4246,42 +4338,6 @@ paths:
       summary: Get comments
       tags:
       - comment
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Item Id
-        in: query
-        name: iid
-        required: true
-        type: integer
-      - description: body
-        in: body
-        name: option
-        required: true
-        schema:
-          $ref: '#/definitions/handler.NewComment'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.CommentView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Create comment
-      tags:
-      - comment
-      - product
   /api/v1/comments/{id}:
     delete:
       consumes:
@@ -4339,6 +4395,41 @@ paths:
       security:
       - BasicAuth: []
       summary: Get comment
+      tags:
+      - comment
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CommentPatchRequest'
+      - description: Comment ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: patch comment
       tags:
       - comment
     put:
@@ -4406,7 +4497,7 @@ paths:
       - BasicAuth: []
       summary: Search comments
       tags:
-      - comments
+      - comment
   /api/v1/contents:
     get:
       consumes:
@@ -5248,29 +5339,6 @@ paths:
       - BasicAuth: []
       summary: Get me
   /api/v1/menus:
-    get:
-      consumes:
-      - application/json
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.MenusView'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handler.HTTPError'
-      security:
-      - BasicAuth: []
-      summary: Get menus
-      tags:
-      - menu
     post:
       consumes:
       - application/json
@@ -6390,6 +6458,41 @@ paths:
       security:
       - BasicAuth: []
       summary: Get product
+      tags:
+      - product
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ProductPatchRequest'
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: patch product
       tags:
       - product
     put:
