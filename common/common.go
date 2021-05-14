@@ -33,7 +33,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210513122356"
+	COMPILED = "20210514175327"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -204,7 +204,8 @@ type ProductFile struct {
 	Url        string `json:",omitempty"`
 	Aliases    []string `json:",omitempty"`
 	Date       time.Time
-	Tags       []string
+	//Tags       []string
+	Tags []TagPF `json:",omitempty"`
 	Canonical  string `json:",omitempty"`
 	Categories []string
 	CategoryId uint
@@ -225,12 +226,20 @@ type ProductFile struct {
 	Content string
 }
 
+type TagPF struct {
+	Id         uint
+	Name       string
+	Title      string
+	Thumbnail  string `json:",omitempty"`
+}
+
 type ProductPF struct {
 	Id         uint `json:"Id"`
 	CategoryId uint
 	Path       string
 	Name       string
 	Title      string
+	Description string `json:",omitempty"`
 	Thumbnail  string `json:",omitempty"`
 	Files     []FilePF
 	Images     []string
@@ -358,7 +367,7 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Url        string `json:",omitempty"`
 		Aliases    []string `json:",omitempty"`
 		Date       time.Time
-		Tags       []string
+		Tags       []TagPF
 		Canonical  string
 		Categories []string
 		CategoryId  uint
@@ -444,6 +453,81 @@ func ReadProductFile(p string) (*ProductFile, error) {
 
 func WriteProductFile(p string, productFile *ProductFile) error {
 	bts, err := productFile.MarshalJSON()
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(p, bts, 0644)
+}
+
+/* Tag */
+type TagFile struct {
+	ID        uint
+	Name      string
+	Title     string
+	Thumbnail string
+	Type         string
+	//
+	Content string
+}
+
+func (o *TagFile) MarshalJSON() ([]byte, error) {
+	if bts, err := json.MarshalIndent(&struct {
+		ID        uint
+		Name      string
+		Title     string
+		Thumbnail string
+		Type         string
+	}{
+		ID:         o.ID,
+		Name:       o.Name,
+		Title:      o.Title,
+		Thumbnail:  o.Thumbnail,
+		Type: o.Type,
+	}, "", "   "); err == nil {
+		bts = append(bts, "\n\n"...)
+		bts = append(bts, o.Content...)
+		return bts, nil
+	}else{
+		return []byte{}, err
+	}
+}
+
+func (o *TagFile) UnmarshalJSON(data []byte) error {
+	type Alias TagFile
+	v := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(o),
+	}
+	n := bytes.Index(data, []byte("\n\n"))
+	if n > -1 {
+		if err := json.Unmarshal(data[:n], &v); err != nil {
+			return err
+		}
+		v.Content = strings.TrimSpace(string(data[n:]))
+	}else{
+		return json.Unmarshal(data, &v)
+	}
+	return nil
+}
+
+func ReadTagFile(p string) (*TagFile, error) {
+	if _, err := os.Stat(p); err != nil {
+		return nil, err
+	}
+	bts, err := ioutil.ReadFile(p)
+	if err != nil {
+		return nil, err
+	}
+	tagFile := &TagFile{}
+	if err = tagFile.UnmarshalJSON(bts); err != nil {
+		return nil, err
+	}
+	return tagFile, nil
+}
+
+func WriteTagFile(p string, tagFile *TagFile) error {
+	bts, err := tagFile.MarshalJSON()
 	if err != nil {
 		return err
 	}

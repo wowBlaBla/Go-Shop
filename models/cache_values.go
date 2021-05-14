@@ -36,3 +36,12 @@ func HasCacheValueByValueId(connector *gorm.DB, valueId uint) bool {
 	db.Model(CacheValue{}).Where("value_id = ?", valueId).Count(&count)
 	return count > 0
 }
+
+func DeleteCacheValueByValueId(connector *gorm.DB, valueId uint) error {
+	db := connector
+	db.Unscoped().Where("value_id = ?", valueId).Delete(&CacheValue{})
+	if err := db.Error; err != nil {
+		return err
+	}
+	return nil
+}

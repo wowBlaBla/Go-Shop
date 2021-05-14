@@ -4,7 +4,7 @@ type Storage interface {
 	PutFile(src, location string) (string, error)
 	DeleteFile(location string) error
 	PutImage(src, location, sizes string) ([]string, error)
-	DeleteImage(location string) error
+	DeleteImage(location, sizes string) error
 	//
 	//Copy(src, dst string) error
 	//ImageResize(src, sizes string) ([]Image, error)

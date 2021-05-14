@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // @security BasicAuth
@@ -185,11 +186,14 @@ func postValueHandler(c *fiber.Ctx) error {
 										logger.Warningf("%v", err)
 									}
 									// Cache
+									if err = models.DeleteCacheValueByValueId(common.Database, value.ID); err != nil {
+										logger.Warningf("%v", err)
+									}
 									if _, err = models.CreateCacheValue(common.Database, &models.CacheValue{
-										ValueID:   value.ID,
+										ValueID: value.ID,
 										Title:     value.Title,
 										Thumbnail: paths,
-										Value:     value.Value,
+										Value: value.Value,
 									}); err != nil {
 										logger.Warningf("%v", err)
 									}
@@ -508,6 +512,10 @@ func putValueHandler(c *fiber.Ctx) error {
 				filename := fmt.Sprintf("%d-%s-thumbnail%s", id, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(value.Title, "-"), path.Ext(v[0].Filename))
 				if p := path.Join(p, filename); len(p) > 0 {
 					if in, err := v[0].Open(); err == nil {
+						var mod time.Time
+						if fi, err := os.Stat(p); err == nil {
+							mod = fi.ModTime()
+						}
 						out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
 						if err != nil {
 							c.Status(http.StatusInternalServerError)
@@ -522,6 +530,35 @@ func putValueHandler(c *fiber.Ctx) error {
 						if err = models.UpdateValue(common.Database, value); err != nil {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
+						}
+						//
+						if p1 := path.Join(dir, "storage", "values", filename); len(p1) > 0 {
+							if fi, err := os.Stat(p1); err == nil {
+								filename := filepath.Base(p1)
+								if mod.IsZero() {
+									mod = fi.ModTime()
+								}
+								filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], mod.Unix(), filepath.Ext(filename))
+								logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
+								var paths string
+								if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+									paths = strings.Join(thumbnails, ",")
+								} else {
+									logger.Warningf("%v", err)
+								}
+								// Cache
+								if err = models.DeleteCacheValueByValueId(common.Database, value.ID); err != nil {
+									logger.Warningf("%v", err)
+								}
+								if _, err = models.CreateCacheValue(common.Database, &models.CacheValue{
+									ValueID: value.ID,
+									Title:     value.Title,
+									Thumbnail: paths,
+									Value: value.Value,
+								}); err != nil {
+									logger.Warningf("%v", err)
+								}
+							}
 						}
 					}
 				}
@@ -553,34 +590,34 @@ func putValueHandler(c *fiber.Ctx) error {
 // @Router /api/v1/values/{id} [delete]
 // @Tags value
 func delValueHandler(c *fiber.Ctx) error {
-	var value *models.Value
 	var id int
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)
-		var err error
-		if value, err = models.GetValue(common.Database, id); err == nil {
-			//
-			if value.Thumbnail != "" {
-				p := path.Join(dir, "hugo", value.Thumbnail)
-				if _, err := os.Stat(p); err == nil {
-					if err = os.Remove(p); err != nil {
-						logger.Errorf("%v", err.Error())
-					}
-				}
+	}
+	if value, err := models.GetValue(common.Database, id); err == nil {
+		if value.Thumbnail != "" {
+			if err = models.DeleteCacheValueByValueId(common.Database, value.ID); err != nil {
+				logger.Warningf("%v", err)
 			}
-			//
-			if err = models.DeleteValue(common.Database, value); err == nil {
-				return c.JSON(HTTPMessage{MESSAGE: "OK"})
-			}else{
+			if err = common.STORAGE.DeleteImage(path.Join("images", value.Thumbnail), common.Config.Resize.Thumbnail.Size); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
-		} else {
+		}
+		p := path.Join(dir, "storage", value.Thumbnail)
+		if _, err := os.Stat(p); err == nil {
+			if err = os.Remove(p); err != nil {
+				logger.Errorf("%v", err.Error())
+			}
+		}
+		if err = models.DeleteValue(common.Database, value); err == nil {
+			return c.JSON(HTTPMessage{MESSAGE: "OK"})
+		}else{
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
 		}
 	}else{
 		c.Status(http.StatusInternalServerError)
-		return c.JSON(fiber.Map{"ERROR": "Value ID is not defined"})
+		return c.JSON(HTTPError{err.Error()})
 	}
 }

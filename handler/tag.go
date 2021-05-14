@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Tags
@@ -253,7 +254,7 @@ func postTagsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Tag{}).Select("tags.ID, tags.Enabled, tags.Hidden, tags.Name, tags.Title, cache_tags.Thumbnail as Thumbnail, tags.Description").Joins("left join cache_tags on cache_tags.tag_id = tags.ID").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Tag{}).Select("tags.ID, tags.Enabled, tags.Hidden, tags.Name, tags.Title, cache_tags.Thumbnail as Thumbnail, tags.Description").Joins("left join cache_tags on cache_tags.tag_id = tags.ID").Where(strings.Join(keys1, " and "), values1...).Group("tags.Id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -269,7 +270,7 @@ func postTagsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Tag{}).Select("tags.ID, tags.Enabled, tags.Hidden, tags.Name, tags.Title, cache_tags.Thumbnail as Thumbnail, tags.Description").Joins("left join cache_tags on cache_tags.tag_id = tags.ID").Where(strings.Join(keys1, " and "), values1...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Tag{}).Select("tags.ID, tags.Enabled, tags.Hidden, tags.Name, tags.Title, cache_tags.Thumbnail as Thumbnail, tags.Description").Joins("left join cache_tags on cache_tags.tag_id = tags.ID").Where(strings.Join(keys1, " and "), values1...).Group("tags.Id").Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -406,6 +407,10 @@ func putTagHandler(c *fiber.Ctx) error {
 		filename := fmt.Sprintf("%d-%s-thumbnail%s", id, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(tag.Title, "-"), path.Ext(v[0].Filename))
 		if p := path.Join(p, filename); len(p) > 0 {
 			if in, err := v[0].Open(); err == nil {
+				var mod time.Time
+				if fi, err := os.Stat(p); err == nil {
+					mod = fi.ModTime()
+				}
 				out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
 				if err != nil {
 					c.Status(http.StatusInternalServerError)
@@ -425,7 +430,10 @@ func putTagHandler(c *fiber.Ctx) error {
 				if p1 := path.Join(dir, "storage", "tags", filename); len(p1) > 0 {
 					if fi, err := os.Stat(p1); err == nil {
 						filename := filepath.Base(p1)
-						filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+						if mod.IsZero() {
+							mod = fi.ModTime()
+						}
+						filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], mod.Unix(), filepath.Ext(filename))
 						logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "tags", filename), fi.Size())
 						var paths string
 						if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "tags", filename), common.Config.Resize.Thumbnail.Size); err == nil {
@@ -483,7 +491,19 @@ func delTagHandler(c *fiber.Ctx) error {
 	}
 	if tag, err := models.GetTag(common.Database, id); err == nil {
 		if tag.Thumbnail != "" {
-			//common.STORAGE.DeleteImage()
+			if err = models.DeleteCacheTagByTagId(common.Database, tag.ID); err != nil {
+				logger.Warningf("%v", err)
+			}
+			if err = common.STORAGE.DeleteImage(path.Join("images", tag.Thumbnail), common.Config.Resize.Thumbnail.Size); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}
+		p := path.Join(dir, "storage", tag.Thumbnail)
+		if _, err := os.Stat(p); err == nil {
+			if err = os.Remove(p); err != nil {
+				logger.Errorf("%v", err.Error())
+			}
 		}
 		if err = models.DeleteTag(common.Database, tag); err == nil {
 			return c.JSON(HTTPMessage{MESSAGE: "OK"})
