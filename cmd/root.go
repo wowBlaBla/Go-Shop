@@ -304,6 +304,9 @@ var RootCmd = &cobra.Command{
 		if err := common.Database.AutoMigrate(&models.CacheTransport{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
+		if err := common.Database.AutoMigrate(&models.CacheComment{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
 		//
 		if err := common.Database.AutoMigrate(&models.BillingProfile{}); err != nil {
 			logger.Warningf("%+v", err)

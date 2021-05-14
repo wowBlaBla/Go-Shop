@@ -9,6 +9,7 @@ type Comment struct {
 	Title string
 	Body string
 	Max int
+	Images string
 	Product            *Product `gorm:"foreignKey:ProductId"`
 	ProductId          uint
 	//

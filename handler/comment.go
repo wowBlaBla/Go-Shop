@@ -7,7 +7,13 @@ import (
 	"github.com/google/logger"
 	"github.com/yonnic/goshop/common"
 	"github.com/yonnic/goshop/models"
+	"io"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -177,34 +183,64 @@ func postAccountCommentHandler(c *fiber.Ctx) error {
 	}
 	//
 	var view CommentView
-	var request NewComment
-	if err := c.BodyParser(&request); err != nil {
-		return err
+	var title, body string
+	var max int
+	var data *multipart.Form
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
+			var request NewComment
+			if err := c.BodyParser(&request); err != nil {
+				return err
+			}
+			title = strings.TrimSpace(request.Title)
+			body = strings.TrimSpace(request.Title)
+			max = request.Max
+		}else if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
+			data, err = c.Request().MultipartForm()
+			if err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			if v, found := data.Value["Title"]; found && len(v) > 0 {
+				title = strings.TrimSpace(v[0])
+			}
+			if v, found := data.Value["Body"]; found && len(v) > 0 {
+				body = strings.TrimSpace(v[0])
+			}
+			if v, found := data.Value["Max"]; found && len(v) > 0 {
+				if vv, err := strconv.Atoi(strings.TrimSpace(v[0])); err == nil {
+					max = vv
+				}
+			}
+		}
 	}
-	request.Title = strings.TrimSpace(request.Title)
-	if request.Title == "" {
+
+	if title == "" {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(fiber.Map{"ERROR": "Title required"})
-	}else if len(request.Title) > 1024 {
+	}else if len(title) > 1024 {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(fiber.Map{"ERROR": "Title is too big"})
 	}
-	if request.Body == "" {
+
+	if body == "" {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(fiber.Map{"ERROR": "Body required"})
-	}else if len(request.Body) > 4096 {
+	}else if len(body) > 4096 {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(fiber.Map{"ERROR": "Body is too big"})
 	}
-	if request.Max < 0 || request.Max > 5 {
+
+	if max < 0 || max > 5 {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(fiber.Map{"ERROR": "Max should be [0,5]"})
 	}
+
 	comment := &models.Comment{
 		Uuid: item.Uuid,
-		Title: request.Title,
-		Body: request.Body,
-		Max: request.Max,
+		Title: title,
+		Body: body,
+		Max: max,
 		Product: product,
 		User: user,
 	}
@@ -212,6 +248,70 @@ func postAccountCommentHandler(c *fiber.Ctx) error {
 	if id, err = models.CreateComment(common.Database, comment); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
+	}
+	//
+	if data != nil {
+		var images []string
+		var images2 []string
+		if v, found := data.File["Images"]; found && len(v) > 0 {
+			for i, vv := range v {
+				p := path.Join(dir, "storage", "comments")
+				if _, err := os.Stat(p); err != nil {
+					if err = os.MkdirAll(p, 0755); err != nil {
+						logger.Errorf("%v", err)
+					}
+				}
+				title := regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(comment.Title, "-")
+				if len(title) > 24 {
+					title = title[:24]
+				}
+				filename := fmt.Sprintf("%d-%s-%d-%s", id, title, i, path.Ext(v[0].Filename))
+				if p := path.Join(p, filename); len(p) > 0 {
+					if in, err := vv.Open(); err == nil {
+						out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
+						if err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+						defer out.Close()
+						if _, err := io.Copy(out, in); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+						images = append(images, "/" + path.Join("comments", filename))
+						//
+						if p1 := path.Join(dir, "storage", "values", filename); len(p1) > 0 {
+							if fi, err := os.Stat(p1); err == nil {
+								filename := filepath.Base(p1)
+								filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+								logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
+								if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+									images2 = append(images2, strings.Join(thumbnails, ","))
+								} else {
+									logger.Warningf("%v", err)
+								}
+
+							}
+						}
+					}
+				}
+			}
+		}
+		comment.Images = strings.Join(images, ",")
+		if err = models.UpdateComment(common.Database, comment); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+		// Cache
+		if _, err = models.CreateCacheComment(common.Database, &models.CacheComment{
+			CommentID:   comment.ID,
+			Title:     comment.Title,
+			Body:     comment.Body,
+			Max:     comment.Max,
+			Images: strings.Join(images2, ";"),
+		}); err != nil {
+			logger.Warningf("%v", err)
+		}
 	}
 	//
 	item.CommentId = id
