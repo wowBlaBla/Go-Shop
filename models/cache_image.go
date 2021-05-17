@@ -32,3 +32,12 @@ func CreateCacheImage(connector *gorm.DB, image *CacheImage) (uint, error) {
 	}
 	return image.ID, nil
 }
+
+func DeleteCacheImageByImageId(connector *gorm.DB, imageId uint) error {
+	db := connector
+	db.Unscoped().Where("image_id = ?", imageId).Delete(&CacheImage{})
+	if err := db.Error; err != nil {
+		return err
+	}
+	return nil
+}

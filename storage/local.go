@@ -79,6 +79,15 @@ func (local *LocalStorage) PutFile(src, location string) (string, error) {
 	return location, nil
 }
 
+func (local *LocalStorage) DeleteFile(location string) error {
+	for _, suffix := range []string{"public", "static"} {
+		if err := os.RemoveAll(path.Join(local.root, suffix, location)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (local *LocalStorage) PutImage(src, location, sizes string) ([]string, error) {
 	logger.Infof("PutImages: %+v, %+v, %+v", src, location, sizes)
 	var locations []string
@@ -168,6 +177,34 @@ func (local *LocalStorage) PutImage(src, location, sizes string) ([]string, erro
 		}
 	}
 	return locations, nil
+}
+
+func (local *LocalStorage) DeleteImage(location string, sizes string) error {
+	var err error
+	for _, suffix := range []string{"public", "static"} {
+		for _, size := range strings.Split(sizes, ",") {
+			pair := strings.Split(size, "x")
+			var width int
+			if width, err = strconv.Atoi(pair[0]); err != nil {
+				return err
+			}
+			var height int
+			if height, err = strconv.Atoi(pair[1]); err != nil {
+				return err
+			}
+			filename := path.Base(location)
+			filename = filename[:len(filename)-len(filepath.Ext(filename))]
+			filename = fmt.Sprintf("%s_%dx%d%s", filename, width, height, filepath.Ext(location))
+			//
+			if err := os.RemoveAll(path.Join(local.root, suffix, path.Join(path.Dir(location), "resize", filename))); err != nil {
+				logger.Warningf("%+v", err)
+			}
+		}
+		if err := os.RemoveAll(path.Join(local.root, suffix, location)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (local *LocalStorage) ImageResize(src, sizes string) ([]Image, error) {

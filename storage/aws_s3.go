@@ -164,7 +164,7 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 				Size:     fi1.Size(),
 				Modified: fi1.ModTime(),
 			}
-			locations = append(locations, storage.rw(url))
+			locations = append(locations, storage.rw(fmt.Sprintf("%s?%s", url, strconv.FormatInt(time.Now().Unix(), 36))))
 		} else {
 			return locations, err
 		}
@@ -254,7 +254,7 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 						Size: fi1.Size(),
 						Modified: fi1.ModTime(),
 					}
-					locations = append(locations, fmt.Sprintf("%s %dw", storage.rw(url), width))
+					locations = append(locations, fmt.Sprintf("%s?%s %dw", storage.rw(url), strconv.FormatInt(time.Now().Unix(), 36), width))
 					if err = os.Remove(dst2); err != nil {
 						logger.Warningf("%v", err)
 					}
@@ -267,7 +267,7 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 					var item *AWSS3StorageItem
 					if err = json.Unmarshal(bts, &item); err == nil {
 						//logger.Infof("item: %+v", item)
-						locations = append(locations, fmt.Sprintf("%s %dw", storage.rw(item.Url), width))
+						locations = append(locations, fmt.Sprintf("%s?%s %dw", storage.rw(item.Url), strconv.FormatInt(time.Now().Unix(), 36), width))
 					} else {
 						logger.Warningf("%v", err)
 					}
@@ -295,15 +295,29 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 	return locations, nil
 }
 
-func (storage *AWSS3Storage) DeleteImage(location string) error {
+func (storage *AWSS3Storage) DeleteImage(location, sizes string) error {
 	var err error
-	if err = storage.delete(path.Join(path.Dir(location), "resize")); err != nil {
-		logger.Warningf("%+v", err)
-	}
 	if err = storage.delete(location); err != nil {
 		return err
 	}
-	return nil
+	for _, size := range strings.Split(sizes, ",") {
+		pair := strings.Split(size, "x")
+		var width int
+		if width, err = strconv.Atoi(pair[0]); err != nil {
+			return err
+		}
+		var height int
+		if height, err = strconv.Atoi(pair[1]); err != nil {
+			return err
+		}
+		filename := path.Base(location)
+		filename = filename[:len(filename) - len(filepath.Ext(filename))]
+		filename = fmt.Sprintf("%s_%dx%d%s", filename, width, height, filepath.Ext(location))
+		if err = storage.delete(path.Join(path.Dir(location), "resize", filename)); err != nil {
+			logger.Warningf("%+v", err)
+		}
+	}
+	return storage.delete(location)
 }
 
 /*func (s3 *AWSS3Storage) Copy(src, dst string) error {

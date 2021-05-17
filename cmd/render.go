@@ -28,6 +28,9 @@ import (
 var (
 	VALUES = cmap.New()
 	reKV = regexp.MustCompile(`^([^\:]+):\s*(.*)$`)
+	reTags = regexp.MustCompile(`<.*?>`)
+	reSpace = regexp.MustCompile(`\s{2,}`)
+	reTrimEmail = regexp.MustCompile(`^(.+)@.*$`)
 )
 
 var renderCmd = &cobra.Command{
@@ -132,6 +135,7 @@ var renderCmd = &cobra.Command{
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheImage{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheVariation{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheValue{})
+		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheTag{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheTransport{})
 		//
 		common.STORAGE, err = storage.NewLocalStorage(path.Join(dir, "hugo"), common.Config.Resize.Quality)
@@ -159,6 +163,64 @@ var renderCmd = &cobra.Command{
 				}
 			}
 		}*/
+		// Tags
+		if tags, err := models.GetTags(common.Database); err == nil {
+			if remove {
+				if err := os.RemoveAll(path.Join(output, "tags")); err != nil {
+					logger.Infof("%v", err)
+				}
+			}
+			// Payload
+			for _, tag := range tags {
+				if p1 := path.Join(output, "tags", tag.Name); len(p1) > 0 {
+					if _, err := os.Stat(p1); err != nil {
+						if err = os.MkdirAll(p1, 0755); err != nil {
+							logger.Errorf("%v", err)
+						}
+					}
+					for _, language := range languages {
+						if p2 := path.Join(p1, fmt.Sprintf("_index%s.html", language.Suffix)); len(p2) > 0 {
+							content := tag.Description
+							tagFile := &common.TagFile{
+								ID:      tag.ID,
+								Name:   tag.Name,
+								Title:   tag.Title,
+								Type:    "tags",
+								Content: content,
+							}
+							//
+							// Thumbnail
+							if tag.Thumbnail != "" {
+								if p1 := path.Join(dir, "storage", tag.Thumbnail); len(p1) > 0 {
+									if fi, err := os.Stat(p1); err == nil {
+										filename := filepath.Base(p1)
+										filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+										logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "tags", filename), fi.Size())
+										if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "tags", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+											tagFile.Thumbnail = strings.Join(thumbnails, ",")
+										} else {
+											logger.Warningf("%v", err)
+										}
+										//
+										if _, err = models.CreateCacheTag(common.Database, &models.CacheTag{
+											TagID:   tag.ID,
+											Title:     tag.Title,
+											Name:     tag.Name,
+											Thumbnail: tagFile.Thumbnail,
+										}); err != nil {
+											logger.Warningf("%v", err)
+										}
+									}
+								}
+							}
+							if err = common.WriteTagFile(p2, tagFile); err != nil {
+								logger.Warningf("%v", err)
+							}
+						}
+					}
+				}
+			}
+		}
 		// Widgets
 		var allWidgets []common.WidgetCF
 		if widgets, err := models.GetWidgetsByApplyTo(common.Database, "all"); err == nil {
@@ -854,6 +916,11 @@ var renderCmd = &cobra.Command{
 									Name:       product.Name,
 									Title:      product.Title,
 								}
+								productView.Description = reTags.ReplaceAllString(product.Description, "")
+								productView.Description = reSpace.ReplaceAllString(product.Description, " ")
+								if len(productView.Description) > 160 {
+									productView.Description = productView.Description[:160]
+								}
 								// Process thumbnail
 								//var thumbnails []string
 								if product.Image != nil {
@@ -1259,9 +1326,15 @@ var renderCmd = &cobra.Command{
 									productView.Time = product.Time.Title
 								}
 								productFile.Product = productView
-								for _, tag := range product.Tags {
-									if tag.Enabled {
-										productFile.Tags = append(productFile.Tags, tag.Name)
+								for _, productTag := range product.Tags {
+									if productTag.Enabled {
+										tag := common.TagPF{Id: productTag.ID, Name: productTag.Name, Title: productTag.Title}
+										if productTag.Thumbnail != "" {
+											if cache, err := models.GetCacheTagByTagId(common.Database, productTag.ID); err == nil {
+												tag.Thumbnail = cache.Thumbnail
+											}
+										}
+										productFile.Tags = append(productFile.Tags, tag)
 									}
 								}
 								//productFile.Max = math.Round(product.Max * 100) / 100
@@ -1277,8 +1350,17 @@ var renderCmd = &cobra.Command{
 												Body:  comment.Body,
 												Max:   comment.Max,
 											}
+											if cache, err := models.GetCacheCommentByCommentId(common.Database, comment.ID); err == nil {
+												if cache.Images != "" {
+													commentPF.Images = strings.Split(cache.Images, ";")
+												}
+											}
 											if user, err := models.GetUser(common.Database, int(comment.UserId)); err == nil {
-												commentPF.Author = fmt.Sprintf("%s %s", user.Name, user.Lastname)
+												if user.Name != "" || user.Lastname != "" {
+													commentPF.Author = strings.TrimSpace(fmt.Sprintf("%s %s", user.Name, user.Lastname))
+												}else {
+													commentPF.Author = reTrimEmail.ReplaceAllString(user.Email, "$1")
+												}
 											}
 											productFile.Comments = append(productFile.Comments, commentPF)
 											max += comment.Max

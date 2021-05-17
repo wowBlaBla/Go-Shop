@@ -4,9 +4,11 @@ import "gorm.io/gorm"
 
 type Image struct {
 	gorm.Model
+	Type string // "products", "variations"
 	Name string
 	Path string
 	Url string
+	Location string
 	Width int
 	Height int
 	Size int64

@@ -251,10 +251,14 @@ func postAccountCommentHandler(c *fiber.Ctx) error {
 	}
 	//
 	if data != nil {
-		var images []string
-		var images2 []string
-		if v, found := data.File["Images"]; found && len(v) > 0 {
-			for i, vv := range v {
+		var originals []string
+		var resizes []string
+		if images, found := data.File["Images"]; found && len(images) > 0 {
+			for i, image := range images {
+				if image.Size > 1024 * 1024 * 3 {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{"Maximum image size 3Mb"})
+				}
 				p := path.Join(dir, "storage", "comments")
 				if _, err := os.Stat(p); err != nil {
 					if err = os.MkdirAll(p, 0755); err != nil {
@@ -265,9 +269,9 @@ func postAccountCommentHandler(c *fiber.Ctx) error {
 				if len(title) > 24 {
 					title = title[:24]
 				}
-				filename := fmt.Sprintf("%d-%s-%d-%s", id, title, i, path.Ext(v[0].Filename))
+				filename := fmt.Sprintf("%d-%s-%d-%s", id, title, i + 1, path.Ext(image.Filename))
 				if p := path.Join(p, filename); len(p) > 0 {
-					if in, err := vv.Open(); err == nil {
+					if in, err := image.Open(); err == nil {
 						out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
 						if err != nil {
 							c.Status(http.StatusInternalServerError)
@@ -278,15 +282,15 @@ func postAccountCommentHandler(c *fiber.Ctx) error {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
 						}
-						images = append(images, "/" + path.Join("comments", filename))
+						originals = append(originals, "/" + path.Join("comments", filename))
 						//
-						if p1 := path.Join(dir, "storage", "values", filename); len(p1) > 0 {
+						if p1 := path.Join(dir, "storage", "comments", filename); len(p1) > 0 {
 							if fi, err := os.Stat(p1); err == nil {
 								filename := filepath.Base(p1)
 								filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-								logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-								if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
-									images2 = append(images2, strings.Join(thumbnails, ","))
+								logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "comments", filename), fi.Size())
+								if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "comments", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+									resizes = append(resizes, strings.Join(thumbnails, ","))
 								} else {
 									logger.Warningf("%v", err)
 								}
@@ -297,7 +301,7 @@ func postAccountCommentHandler(c *fiber.Ctx) error {
 				}
 			}
 		}
-		comment.Images = strings.Join(images, ",")
+		comment.Images = strings.Join(originals, ",")
 		if err = models.UpdateComment(common.Database, comment); err != nil {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
@@ -308,7 +312,7 @@ func postAccountCommentHandler(c *fiber.Ctx) error {
 			Title:     comment.Title,
 			Body:     comment.Body,
 			Max:     comment.Max,
-			Images: strings.Join(images2, ";"),
+			Images: strings.Join(resizes, ";"),
 		}); err != nil {
 			logger.Warningf("%v", err)
 		}
