@@ -29,6 +29,7 @@ type Variation struct {
 	Depth float64 `sql:"type:decimal(8,2);"`
 	Volume float64 `sql:"type:decimal(8,2);"`
 	Weight float64 `sql:"type:decimal(8,2);"`
+	Packages int
 	Availability string
 	//Sending string
 	Sku string
@@ -64,7 +65,7 @@ func GetVariationsByProductAndName(connector *gorm.DB, productId uint, name stri
 func GetVariation(connector *gorm.DB, id int) (*Variation, error) {
 	db := connector
 	var variation Variation
-	if err := db.Preload("Properties").Preload("Properties.Option").Preload("Properties.Rates").Preload("Properties.Rates.Value").Preload("Prices").Preload("Prices.Rates").Preload("Prices.Rates.Property").Preload("Prices.Rates.Value").Preload("Images").Preload("Files").First(&variation, id).Error; err != nil {
+	if err := db.Debug().Preload("Properties").Preload("Properties.Option").Preload("Properties.Rates").Preload("Properties.Rates.Value").Preload("Prices").Preload("Prices.Rates").Preload("Prices.Rates.Property").Preload("Prices.Rates.Value").Preload("Images").Preload("Files").First(&variation, id).Error; err != nil {
 		return nil, err
 	}
 	// Customization

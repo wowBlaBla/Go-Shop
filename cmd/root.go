@@ -289,6 +289,9 @@ var RootCmd = &cobra.Command{
 		if err := common.Database.AutoMigrate(&models.CacheProduct{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
+		if err := common.Database.AutoMigrate(&models.CacheFile{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
 		if err := common.Database.AutoMigrate(&models.CacheImage{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
@@ -302,6 +305,9 @@ var RootCmd = &cobra.Command{
 			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.CacheTransport{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.CacheVendor{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
 		if err := common.Database.AutoMigrate(&models.CacheComment{}); err != nil {
@@ -341,8 +347,8 @@ var RootCmd = &cobra.Command{
 		//
 		if err := common.Database.Exec(`CREATE TABLE IF NOT EXISTS categories_products_sort (
 		CategoryId BIGINT UNSIGNED NOT NULL,
-			ProductId BIGINT UNSIGNED NOT NULL,
-			Value BIGINT UNSIGNED NOT NULL,
+		ProductId BIGINT UNSIGNED NOT NULL,
+		Value BIGINT UNSIGNED NOT NULL,
 			PRIMARY KEY (CategoryId, ProductId),
 			CONSTRAINT Constr_CategoryId_ProductId_fk
 		FOREIGN KEY (CategoryId) REFERENCES categories (ID)
@@ -356,7 +362,7 @@ var RootCmd = &cobra.Command{
 		//
 		if err := common.Database.Exec(`CREATE TABLE IF NOT EXISTS products_relations (
 		ProductIdL BIGINT UNSIGNED NOT NULL,
-			ProductIdR BIGINT UNSIGNED NOT NULL,
+		ProductIdR BIGINT UNSIGNED NOT NULL,
 			PRIMARY KEY (ProductIdL, ProductIdR),
 			CONSTRAINT Constr_ProductIdL_ProductIdR_fk
 		FOREIGN KEY (ProductIdL) REFERENCES products (ID)

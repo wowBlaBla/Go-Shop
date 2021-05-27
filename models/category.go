@@ -214,7 +214,7 @@ type CategoryView struct {
 	Children []*CategoryView `json:",omitempty"`
 	Parents []*CategoryView `json:",omitempty"`
 	Products int64 `json:",omitempty"`
-	Count int `json:",omitempty"`
+	Count int
 	Sort int `json:",omitempty"`
 }
 
@@ -255,6 +255,9 @@ func getCategoryPath(connector *gorm.DB, pid int, chunks *[]string) error {
 
 func getChildrenCategoriesView(connector *gorm.DB, root *CategoryView, depth int, noProducts bool, count bool) *CategoryView {
 	for _, category := range GetChildrenOfCategoryById(connector, root.ID) {
+		if cache, err := GetCacheCategoryByCategoryId(common.Database, category.ID); err == nil {
+			category.Thumbnail = cache.Thumbnail
+		}
 		if depth > 0 {
 			child := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Path: path.Join(root.Path, root.Name), Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category", Sort: category.Sort}, depth - 1, noProducts, count)
 			root.Children = append(root.Children, child)

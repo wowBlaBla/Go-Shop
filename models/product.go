@@ -18,7 +18,9 @@ type Product struct {
 	CustomParameters 	string
 	Content 	string
 	// ONLY TO USE AS DEFAULT VALUE FOR VIRIATIONS
+	Container bool // if true skip Default variation
 	Variation string
+	Size string // small, medium, large
 	BasePrice float64          `sql:"type:decimal(8,2);"`
 	SalePrice float64          `sql:"type:decimal(8,2);"`
 	Start time.Time
@@ -33,6 +35,7 @@ type Product struct {
 	Depth float64 `sql:"type:decimal(8,2);"`
 	Volume float64 `sql:"type:decimal(8,2);"`
 	Weight float64 `sql:"type:decimal(8,2);"`
+	Packages int
 	Availability string
 	//Sending string
 	Sku string
@@ -120,6 +123,9 @@ func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 		Images struct {
 			Order []uint
 		}
+		Variations struct {
+			Order []uint
+		}
 	}
 	// Parameters
 	parameters := product.Parameters
@@ -135,6 +141,7 @@ func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	product.Parameters = parameters
 	// Customization
 	if err := json.Unmarshal([]byte(product.Customization), &customization); err == nil {
+		// images
 		images := product.Images
 		sort.SliceStable(images, func(i, j int) bool {
 			var x, y = -1, -1
@@ -153,6 +160,25 @@ func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 			}
 		})
 		product.Images = images
+		// variations
+		variations := product.Variations
+		sort.SliceStable(variations, func(i, j int) bool {
+			var x, y = -1, -1
+			for k, id := range customization.Variations.Order {
+				if id == variations[i].ID {
+					x = k
+				}
+				if id == variations[j].ID {
+					y = k
+				}
+			}
+			if x == -1 || y == -1 {
+				return variations[i].ID < variations[j].ID
+			}else{
+				return x < y
+			}
+		})
+		product.Variations = variations
 	}
 	//
 	if len(product.Variations) > 0 {

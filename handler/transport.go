@@ -234,6 +234,7 @@ type TransportsListItem struct {
 	Enabled bool
 	Name string
 	Title string
+	Thumbnail string `json:",omitmepty"`
 	Weight float64
 	Volume float64
 	Order string
@@ -302,7 +303,7 @@ func postTransportsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Transport{}).Select("transports.ID, transports.Enabled, transports.Name, transports.Title, transports.Weight, transports.Volume, transports.`Order`, transports.Item, transports.Kg, transports.M3").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Transport{}).Select("transports.ID, transports.Enabled, transports.Name, transports.Title, transports.Thumbnail, transports.Weight, transports.Volume, transports.`Order`, transports.Item, transports.Kg, transports.M3").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -318,7 +319,7 @@ func postTransportsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Transport{}).Select("transports.ID, transports.Enabled, transports.Name, transports.Title, transports.Weight, transports.Volume, transports.`Order`, transports.Item, transports.Kg, transports.M3").Where(strings.Join(keys1, " and "), values1...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Transport{}).Select("transports.ID, transports.Enabled, transports.Name, transports.Title, transports.Thumbnail, transports.Weight, transports.Volume, transports.`Order`, transports.Item, transports.Kg, transports.M3").Where(strings.Join(keys1, " and "), values1...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++

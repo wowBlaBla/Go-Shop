@@ -135,11 +135,11 @@ func postTagHandler(c *fiber.Ctx) error {
 						c.Status(http.StatusInternalServerError)
 						return c.JSON(HTTPError{err.Error()})
 					}
-					defer out.Close()
 					if _, err := io.Copy(out, in); err != nil {
 						c.Status(http.StatusInternalServerError)
 						return c.JSON(HTTPError{err.Error()})
 					}
+					out.Close()
 					tag.Thumbnail = "/" + path.Join("tags", filename)
 					if err = models.UpdateTag(common.Database, tag); err != nil {
 						c.Status(http.StatusInternalServerError)
@@ -416,11 +416,11 @@ func putTagHandler(c *fiber.Ctx) error {
 					c.Status(http.StatusInternalServerError)
 					return c.JSON(HTTPError{err.Error()})
 				}
-				defer out.Close()
 				if _, err := io.Copy(out, in); err != nil {
 					c.Status(http.StatusInternalServerError)
 					return c.JSON(HTTPError{err.Error()})
 				}
+				out.Close()
 				tag.Thumbnail = "/" + path.Join("tags", filename)
 				if err = models.UpdateTag(common.Database, tag); err != nil {
 					c.Status(http.StatusInternalServerError)

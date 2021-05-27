@@ -33,7 +33,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210517112022"
+	COMPILED = "20210526171347"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -241,6 +241,7 @@ type ProductPF struct {
 	Title      string
 	Description string `json:",omitempty"`
 	Thumbnail  string `json:",omitempty"`
+	Size string `json:",omitempty"`
 	Files     []FilePF
 	Images     []string
 	Parameters []ParameterPF
@@ -305,6 +306,7 @@ type VariationPF struct {
 	Depth float64       `json:",omitempty"`
 	Volume float64 `json:",omitempty"`
 	Weight float64      `json:",omitempty"`
+	Packages int      `json:",omitempty"`
 	Availability string `json:",omitempty"`
 	//Sending string `json:",omitempty"`
 	Time string `json:",omitempty"`
@@ -528,6 +530,81 @@ func ReadTagFile(p string) (*TagFile, error) {
 }
 
 func WriteTagFile(p string, tagFile *TagFile) error {
+	bts, err := tagFile.MarshalJSON()
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(p, bts, 0644)
+}
+
+/* Vendor */
+type VendorFile struct {
+	ID        uint
+	Name      string
+	Title     string
+	Thumbnail string
+	Type         string
+	//
+	Content string
+}
+
+func (o *VendorFile) MarshalJSON() ([]byte, error) {
+	if bts, err := json.MarshalIndent(&struct {
+		ID        uint
+		Name      string
+		Title     string
+		Thumbnail string
+		Type         string
+	}{
+		ID:         o.ID,
+		Name:       o.Name,
+		Title:      o.Title,
+		Thumbnail:  o.Thumbnail,
+		Type: o.Type,
+	}, "", "   "); err == nil {
+		bts = append(bts, "\n\n"...)
+		bts = append(bts, o.Content...)
+		return bts, nil
+	}else{
+		return []byte{}, err
+	}
+}
+
+func (o *VendorFile) UnmarshalJSON(data []byte) error {
+	type Alias VendorFile
+	v := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(o),
+	}
+	n := bytes.Index(data, []byte("\n\n"))
+	if n > -1 {
+		if err := json.Unmarshal(data[:n], &v); err != nil {
+			return err
+		}
+		v.Content = strings.TrimSpace(string(data[n:]))
+	}else{
+		return json.Unmarshal(data, &v)
+	}
+	return nil
+}
+
+func ReadVendorFile(p string) (*VendorFile, error) {
+	if _, err := os.Stat(p); err != nil {
+		return nil, err
+	}
+	bts, err := ioutil.ReadFile(p)
+	if err != nil {
+		return nil, err
+	}
+	tagFile := &VendorFile{}
+	if err = tagFile.UnmarshalJSON(bts); err != nil {
+		return nil, err
+	}
+	return tagFile, nil
+}
+
+func WriteVendorFile(p string, tagFile *VendorFile) error {
 	bts, err := tagFile.MarshalJSON()
 	if err != nil {
 		return err

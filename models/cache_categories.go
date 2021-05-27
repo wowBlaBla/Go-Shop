@@ -40,3 +40,12 @@ func GetCacheCategoryByLink(connector *gorm.DB, link string) (*CacheCategory, er
 	}
 	return &cacheCategory, db.Error
 }
+
+func DeleteCacheCategoryByCategoryId(connector *gorm.DB, categoryId uint) error {
+	db := connector
+	db.Unscoped().Where("category_id = ?", categoryId).Delete(&CacheCategory{})
+	if err := db.Error; err != nil {
+		return err
+	}
+	return nil
+}

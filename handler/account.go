@@ -1118,6 +1118,7 @@ type OrdersView []*OrderView
 type OrderView struct {
 	ID uint
 	CreatedAt time.Time
+	Description string `json:",omitempty"`
 	Items []*ItemView
 	Status string
 	Sum float64

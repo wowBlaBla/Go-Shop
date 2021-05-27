@@ -113,7 +113,7 @@ func postVariationsListHandler(c *fiber.Ctx) error {
 				case "Options":
 					orders = append(orders, fmt.Sprintf("%v %v", key, value))
 				default:
-					orders = append(orders, fmt.Sprintf("properties.%v %v", key, value))
+					orders = append(orders, fmt.Sprintf("variations.%v %v", key, value))
 				}
 			}
 		}
@@ -121,7 +121,7 @@ func postVariationsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Variation{}).Select("variations.ID, variations.Name, variations.Title, cache_variation.Thumbnail as Thumbnail, variations.Description, variations.Base_Price, variations.Product_id, products.Title as ProductTitle, cache_products.Thumbnail as ProductThumbnail, group_concat(properties.ID, ', ') as PropertiesIds, group_concat(properties.Title, ', ') as PropertiesTitles").Joins("left join cache_variation on variations.id = cache_variation.variation_id").Joins("left join products on products.id = variations.product_id").Joins("left join cache_products on variations.product_id = cache_products.product_id").Joins("left join properties on properties.variation_id = variations.id").Group("variations.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Variation{}).Select("variations.ID, variations.Name, variations.Title, cache_variation.Thumbnail as Thumbnail, variations.Description, variations.Base_Price, variations.Sku, variations.Product_id, products.Title as ProductTitle, cache_products.Thumbnail as ProductThumbnail, replace(group_concat(properties.ID), ',', ', ') as PropertiesIds, replace(group_concat(properties.Title), ',', ', ') as PropertiesTitles").Joins("left join cache_variation on variations.id = cache_variation.variation_id").Joins("left join products on products.id = variations.product_id").Joins("left join cache_products on variations.product_id = cache_products.product_id").Joins("left join properties on properties.variation_id = variations.id").Group("variations.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -139,7 +139,7 @@ func postVariationsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Variation{}).Select("variations.ID, variations.Name, variations.Title, variations.Thumbnail, variations.Description, variations.Base_Price, variations.Product_id, group_concat(properties.ID, ', ') as PropertiesIds, group_concat(properties.Title, ', ') as PropertiesTitles").Joins("left join properties on properties.variation_id = variations.id").Group("variations.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Variation{}).Select("variations.ID, variations.Name, variations.Title, variations.Thumbnail, variations.Description, variations.Base_Price, variations.Sku, variations.Product_id, replace(group_concat(properties.ID), ',', ', ') as PropertiesIds, replace(group_concat(properties.Title), ',', ', ') as PropertiesTitles").Joins("left join properties on properties.variation_id = variations.id").Group("variations.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -309,6 +309,12 @@ func postVariationHandler(c *fiber.Ctx) error {
 					weight = vv
 				}
 			}
+			var packages int
+			if v, found := data.Value["Packages"]; found && len(v) > 0 {
+				if vv, _ := strconv.Atoi(v[0]); err == nil {
+					packages = vv
+				}
+			}
 			var availability string
 			if v, found := data.Value["Availability"]; found && len(v) > 0 {
 				availability = strings.TrimSpace(v[0])
@@ -323,7 +329,7 @@ func postVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Sku"]; found && len(v) > 0 {
 				sku = strings.TrimSpace(v[0])
 			}
-			variation := &models.Variation{Name: name, Title: title, Description: description, Notes: notes, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Availability: availability, TimeId: timeId, Sku: sku}
+			variation := &models.Variation{Name: name, Title: title, Description: description, Notes: notes, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Packages: packages, Availability: availability, TimeId: timeId, Sku: sku}
 			if id, err := models.CreateVariation(common.Database, variation); err == nil {
 				if name == "" {
 					variation.Name = fmt.Sprintf("new-variation-%d", variation.ID)
@@ -495,6 +501,12 @@ func putVariationHandler(c *fiber.Ctx) error {
 					weight = vv
 				}
 			}
+			var packages int
+			if v, found := data.Value["Packages"]; found && len(v) > 0 {
+				if vv, _ := strconv.Atoi(v[0]); err == nil {
+					packages = vv
+				}
+			}
 			var availability string
 			if v, found := data.Value["Availability"]; found && len(v) > 0 {
 				availability = strings.TrimSpace(v[0])
@@ -528,6 +540,7 @@ func putVariationHandler(c *fiber.Ctx) error {
 			variation.Depth = depth
 			variation.Volume = volume
 			variation.Weight = weight
+			variation.Packages = packages
 			variation.Availability = availability
 			variation.TimeId = timeId
 			variation.Sku = sku
@@ -642,6 +655,7 @@ type VariationsListItem struct {
 	Thumbnail string
 	Description string
 	BasePrice float64
+	Sku string `json:",omitempty"`
 	ProductId uint
 	ProductTitle string
 	ProductThumbnail string
@@ -669,7 +683,7 @@ func getVariationHandler(c *fiber.Ctx) error {
 		var err error
 		if variation, err = models.GetVariation(common.Database, id); err == nil {
 			var view VariationView
-			if bts, err := json.MarshalIndent(variation, "", "   "); err == nil {
+			if bts, err := json.Marshal(variation); err == nil {
 				if err = json.Unmarshal(bts, &view); err == nil {
 					view.New = variation.UpdatedAt.Sub(variation.CreatedAt).Seconds() < 1.0
 					for i, property := range view.Properties {
@@ -705,6 +719,8 @@ func getVariationHandler(c *fiber.Ctx) error {
 
 type PatchVariationRequest struct {
 	Action string
+	AddFile uint
+	AddImage uint
 }
 
 // @security BasicAuth
@@ -721,114 +737,111 @@ type PatchVariationRequest struct {
 func patchVariationHandler(c *fiber.Ctx) error {
 	var variation *models.Variation
 	var id int
+	var err error
 	if v := c.Params("id"); v != "" {
-		id, _ = strconv.Atoi(v)
-		var err error
-		if variation, err = models.GetVariation(common.Database, id); err == nil {
-
-			var request PatchVariationRequest
-			if err := c.BodyParser(&request); err != nil {
-				return err
-			}
-
-			if request.Action == "clone" {
-				variation.ID = 0
-				name := variation.Name
-				for ; ; {
-					if variations, err := models.GetVariationsByProductAndName(common.Database, variation.ProductId, name); err == nil && len(variations) > 0 {
-						if res := reName.FindAllStringSubmatch(name, 1); len(res) > 0 && len(res[0]) > 2 {
-							if n, err := strconv.Atoi(res[0][2]); err == nil {
-								name = fmt.Sprintf("%s-%d", res[0][1], n + 1)
-							}
-						}else{
-							name = fmt.Sprintf("%s-%d", name, 2)
-						}
-					} else {
-						break
+		if id, err = strconv.Atoi(v); err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}
+	if variation, err = models.GetVariation(common.Database, id); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	var request PatchVariationRequest
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	if request.Action == "clone" {
+		variation.ID = 0
+		name := variation.Name
+		for ; ; {
+			if variations, err := models.GetVariationsByProductAndName(common.Database, variation.ProductId, name); err == nil && len(variations) > 0 {
+				if res := reName.FindAllStringSubmatch(name, 1); len(res) > 0 && len(res[0]) > 2 {
+					if n, err := strconv.Atoi(res[0][2]); err == nil {
+						name = fmt.Sprintf("%s-%d", res[0][1], n + 1)
 					}
+				}else{
+					name = fmt.Sprintf("%s-%d", name, 2)
 				}
-				variation.Name = name
-				variation.Thumbnail = ""
-				properties := variation.Properties
-				variation.Properties = []*models.Property{}
-				prices := variation.Prices
-				variation.Prices = []*models.Price{}
-				variation.Images = []*models.Image{}
-				variation.Files = []*models.File{}
-				variation.Time = nil
-				variation.TimeId = 0
-				var vid uint
-				if vid, err = models.CreateVariation(common.Database, variation); err == nil {
-					// We need to replace old properties ids to new one, because of this first save old ids
-					alpha := []uint{}
-					for i := 0; i < len(properties); i++ {
-						properties[i].ID = 0
-						properties[i].VariationId = vid
-						rates := properties[i].Rates
-						properties[i].Rates = []*models.Rate{}
-						for _, rate := range rates {
-							alpha = append(alpha, rate.ID)
-							rate.ID = 0
-							rate.Property = nil
-							rate.PropertyId = 0
-							properties[i].Rates = append(properties[i].Rates, rate)
-						}
-						variation.Properties = append(variation.Properties, properties[i])
+			} else {
+				break
+			}
+		}
+		variation.Name = name
+		variation.Thumbnail = ""
+		properties := variation.Properties
+		variation.Properties = []*models.Property{}
+		prices := variation.Prices
+		variation.Prices = []*models.Price{}
+		variation.Images = []*models.Image{}
+		variation.Files = []*models.File{}
+		variation.Time = nil
+		variation.TimeId = 0
+		var vid uint
+		if vid, err = models.CreateVariation(common.Database, variation); err == nil {
+			// We need to replace old properties ids to new one, because of this first save old ids
+			alpha := []uint{}
+			for i := 0; i < len(properties); i++ {
+				properties[i].ID = 0
+				properties[i].VariationId = vid
+				rates := properties[i].Rates
+				properties[i].Rates = []*models.Rate{}
+				for _, rate := range rates {
+					alpha = append(alpha, rate.ID)
+					rate.ID = 0
+					rate.Property = nil
+					rate.PropertyId = 0
+					properties[i].Rates = append(properties[i].Rates, rate)
+				}
+				variation.Properties = append(variation.Properties, properties[i])
+			}
+			if err = models.UpdateVariation(common.Database, variation); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			// then create save new ids
+			beta := []uint{}
+			for i := 0; i < len(properties); i++ {
+				for j := 0; j < len(properties[i].Rates); j++ {
+					beta = append(beta, properties[i].Rates[j].ID)
+				}
+			}
+			// this map contains old => new match
+			m := make(map[uint]uint)
+			for i := 0; i < len(alpha); i++ {
+				m[alpha[i]] = beta[i]
+			}
+			//
+			for i := 0; i < len(prices); i++ {
+				prices[i].ID = 0
+				prices[i].Variation = nil
+				prices[i].VariationId = vid
+				rates := prices[i].Rates
+				prices[i].Rates = []*models.Rate{}
+				for _, rate := range rates {
+					// update old ids to new
+					if v, found := m[rate.ID]; found {
+						rate.ID = v
 					}
-					if err = models.UpdateVariation(common.Database, variation); err != nil {
-						c.Status(http.StatusInternalServerError)
-						return c.JSON(HTTPError{err.Error()})
-					}
-					// then create save new ids
-					beta := []uint{}
-					for i := 0; i < len(properties); i++ {
-						for j := 0; j < len(properties[i].Rates); j++ {
-							beta = append(beta, properties[i].Rates[j].ID)
-						}
-					}
-					// this map contains old => new match
-					m := make(map[uint]uint)
-					for i := 0; i < len(alpha); i++ {
-						m[alpha[i]] = beta[i]
-					}
-					//
-					for i := 0; i < len(prices); i++ {
-						prices[i].ID = 0
-						prices[i].Variation = nil
-						prices[i].VariationId = vid
-						rates := prices[i].Rates
-						prices[i].Rates = []*models.Rate{}
-						for _, rate := range rates {
-							// update old ids to new
-							if v, found := m[rate.ID]; found {
-								rate.ID = v
-							}
-							prices[i].Rates = append(prices[i].Rates, rate)
-						}
-						variation.Prices = append(variation.Prices, prices[i])
-					}
-					if err = models.UpdateVariation(common.Database, variation); err == nil {
-						var view VariationView
-						if bts, err := json.MarshalIndent(variation, "", "   "); err == nil {
-							if err = json.Unmarshal(bts, &view); err == nil {
-								view.New = variation.UpdatedAt.Sub(variation.CreatedAt).Seconds() < 1.0
-								for i, property := range view.Properties {
-									for j, rate := range property.Rates{
-										if cache, err := models.GetCacheValueByValueId(common.Database, rate.Value.ID); err == nil {
-											view.Properties[i].Rates[j].Value.Thumbnail = strings.Split(cache.Thumbnail, ",")[0]
-										}
-									}
+					prices[i].Rates = append(prices[i].Rates, rate)
+				}
+				variation.Prices = append(variation.Prices, prices[i])
+			}
+			if err = models.UpdateVariation(common.Database, variation); err == nil {
+				var view VariationView
+				if bts, err := json.MarshalIndent(variation, "", "   "); err == nil {
+					if err = json.Unmarshal(bts, &view); err == nil {
+						view.New = variation.UpdatedAt.Sub(variation.CreatedAt).Seconds() < 1.0
+						for i, property := range view.Properties {
+							for j, rate := range property.Rates{
+								if cache, err := models.GetCacheValueByValueId(common.Database, rate.Value.ID); err == nil {
+									view.Properties[i].Rates[j].Value.Thumbnail = strings.Split(cache.Thumbnail, ",")[0]
 								}
-								return c.JSON(view)
-							}else{
-								c.Status(http.StatusInternalServerError)
-								return c.JSON(HTTPError{err.Error()})
 							}
-						}else{
-							c.Status(http.StatusInternalServerError)
-							return c.JSON(HTTPError{err.Error()})
 						}
-					} else {
+						return c.JSON(view)
+					}else{
 						c.Status(http.StatusInternalServerError)
 						return c.JSON(HTTPError{err.Error()})
 					}
@@ -836,15 +849,48 @@ func patchVariationHandler(c *fiber.Ctx) error {
 					c.Status(http.StatusInternalServerError)
 					return c.JSON(HTTPError{err.Error()})
 				}
+			} else {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
 			}
-		} else {
+		}else{
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
 		}
-	}else{
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(fiber.Map{"ERROR": "Variation ID is not defined"})
 	}
-	c.Status(http.StatusInternalServerError)
-	return c.JSON(fiber.Map{"ERROR": "Somethind wrong"})
+	if request.AddFile > 0 {
+		for _, file := range variation.Files {
+			if file.ID == request.AddFile {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"File already added"})
+			}
+		}
+		if file, err := models.GetFile(common.Database, int(request.AddFile)); err == nil {
+			variation.Files = append(variation.Files, file)
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}
+	//
+	if request.AddImage > 0 {
+		for _, image := range variation.Images {
+			if image.ID == request.AddImage {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Image already added"})
+			}
+		}
+		if image, err := models.GetImage(common.Database, int(request.AddImage)); err == nil {
+			variation.Images = append(variation.Images, image)
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}
+	//
+	if err = models.UpdateVariation(common.Database, variation); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	return c.JSON(HTTPMessage{"OK"})
 }

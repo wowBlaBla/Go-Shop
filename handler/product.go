@@ -150,17 +150,21 @@ func postProductsHandler(c *fiber.Ctx) error {
 			parameters = append(parameters, parameter)
 		}
 	}
-	logger.Infof("Parameters: %+v", len(parameters))
-	for _, parameter := range parameters {
-		logger.Infof("Parameter: %+v", parameter)
-	}
 	var customParameters string
 	if v, found := data.Value["CustomParameters"]; found && len(v) > 0 {
 		customParameters = strings.TrimSpace(v[0])
 	}
+	var container bool
+	if v, found := data.Value["Container"]; found && len(v) > 0 {
+		container, _ = strconv.ParseBool(v[0])
+	}
 	var variation = "Default"
 	if v, found := data.Value["Variation"]; found && len(v) > 0 {
 		variation = strings.TrimSpace(v[0])
+	}
+	var size = "medium"
+	if v, found := data.Value["Size"]; found && len(v) > 0 {
+		size = strings.TrimSpace(v[0])
 	}
 	var basePrice float64
 	if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
@@ -210,6 +214,12 @@ func postProductsHandler(c *fiber.Ctx) error {
 			weight = vv
 		}
 	}
+	var packages int
+	if v, found := data.Value["Packages"]; found && len(v) > 0 {
+		if vv, _ := strconv.Atoi(v[0]); err == nil {
+			packages = vv
+		}
+	}
 	var availability string
 	if v, found := data.Value["Availability"]; found && len(v) > 0 {
 		availability = strings.TrimSpace(v[0])
@@ -232,7 +242,7 @@ func postProductsHandler(c *fiber.Ctx) error {
 	if v, found := data.Value["Customization"]; found && len(v) > 0 {
 		customization = strings.TrimSpace(v[0])
 	}
-	product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes, Parameters: parameters, CustomParameters: customParameters, Variation: variation, BasePrice: basePrice, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Availability: availability, TimeId: timeId, Sku: sku, Content: content, Customization: customization}
+	product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes, Parameters: parameters, CustomParameters: customParameters, Container: container, Variation: variation, Size: size, BasePrice: basePrice, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Packages: packages, Availability: availability, TimeId: timeId, Sku: sku, Content: content, Customization: customization}
 	if _, err := models.CreateProduct(common.Database, product); err == nil {
 		// Create new product automatically
 		if name == "" {
@@ -457,7 +467,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_images.Thumbnail as Thumbnail, products.Description, products.base_price as BasePrice, products.Sku, count(variations.ID) as Variations, categories_products_sort.Value as Sort").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join categories_products_sort on categories_products_sort.productId = products.id").Joins("left join cache_products on products.id = cache_products.product_id").Joins("left join cache_images on products.image_id = cache_images.image_id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_images.Thumbnail as Thumbnail, products.Description, products.base_price as BasePrice, products.Sku, count(distinct variations.ID) as Variations, categories_products_sort.Value as Sort").Joins("left join categories_products_sort on categories_products_sort.productId = products.id").Joins("left join cache_products on products.id = cache_products.product_id").Joins("left join cache_images on products.image_id = cache_images.image_id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -473,7 +483,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_images.Thumbnail as Thumbnail, products.Description, products.base_price as BasePrice, products.Sku, count(variations.ID) as Variations").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join cache_images on products.image_id = cache_images.image_id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_images.Thumbnail as Thumbnail, products.Description, products.base_price as BasePrice, products.Sku, count(distinct variations.ID) as Variations").Joins("left join cache_images on products.image_id = cache_images.image_id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -580,6 +590,8 @@ func getProductHandler(c *fiber.Ctx) error {
 
 type ProductPatchRequest struct {
 	Enabled string
+	AddFile uint
+	AddImage uint
 }
 
 // @security BasicAuth
@@ -608,7 +620,7 @@ func patchProductHandler(c *fiber.Ctx) error {
 	}
 	var product *models.Product
 	var err error
-	if product, err = models.GetProduct(common.Database, int(id)); err != nil {
+	if product, err = models.GetProductFull(common.Database, int(id)); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
@@ -616,6 +628,34 @@ func patchProductHandler(c *fiber.Ctx) error {
 		product.Enabled = true
 	}else if request.Enabled == "false" {
 		product.Enabled = false
+	}
+	if request.AddFile > 0 {
+		for _, file := range product.Files {
+			if file.ID == request.AddFile {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"File already added"})
+			}
+		}
+		if file, err := models.GetFile(common.Database, int(request.AddFile)); err == nil {
+			product.Files = append(product.Files, file)
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}
+	if request.AddImage > 0 {
+		for _, image := range product.Images {
+			if image.ID == request.AddImage {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Image already added"})
+			}
+		}
+		if image, err := models.GetImage(common.Database, int(request.AddImage)); err == nil {
+			product.Images = append(product.Images, image)
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
 	}
 	if err = models.UpdateProduct(common.Database, product); err != nil {
 		c.Status(http.StatusInternalServerError)
@@ -708,9 +748,17 @@ func putProductHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["CustomParameters"]; found && len(v) > 0 {
 				customParameters = strings.TrimSpace(v[0])
 			}
+			var container bool
+			if v, found := data.Value["Container"]; found && len(v) > 0 {
+				container, _ = strconv.ParseBool(v[0])
+			}
 			var variation string
 			if v, found := data.Value["Variation"]; found && len(v) > 0 {
 				variation = strings.TrimSpace(v[0])
+			}
+			var size string
+			if v, found := data.Value["Size"]; found && len(v) > 0 {
+				size = strings.TrimSpace(v[0])
 			}
 			var basePrice float64
 			if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
@@ -768,6 +816,12 @@ func putProductHandler(c *fiber.Ctx) error {
 					weight = vv
 				}
 			}
+			var packages int
+			if v, found := data.Value["Packages"]; found && len(v) > 0 {
+				if vv, _ := strconv.Atoi(v[0]); err == nil {
+					packages = vv
+				}
+			}
 			var availability string
 			if v, found := data.Value["Availability"]; found && len(v) > 0 {
 				availability = strings.TrimSpace(v[0])
@@ -809,7 +863,9 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Notes = notes
 			product.CustomParameters = customParameters
 			oldBasePrice := product.BasePrice
+			product.Container = container
 			product.Variation = variation
+			product.Size = size
 			product.BasePrice = basePrice
 			oldSalePrice := product.SalePrice
 			product.SalePrice = salePrice
@@ -826,6 +882,8 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Volume = volume
 			oldWeight := product.Weight
 			product.Weight = weight
+			oldPackages := product.Packages
+			product.Packages = packages
 			oldAvailability := product.Availability
 			product.Availability = availability
 			oldSku := product.Sku
@@ -855,6 +913,9 @@ func putProductHandler(c *fiber.Ctx) error {
 						}
 						if math.Abs(oldWeight - weight) > 0.01 {
 							variation.Weight = product.Weight
+						}
+						if oldPackages != packages {
+							variation.Packages = product.Packages
 						}
 						if oldAvailability != availability {
 							variation.Availability = product.Availability

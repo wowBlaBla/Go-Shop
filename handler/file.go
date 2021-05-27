@@ -68,11 +68,11 @@ func postFileHandler(c *fiber.Ctx) error {
 									c.Status(http.StatusInternalServerError)
 									return c.JSON(HTTPError{err.Error()})
 								}
-								defer out.Close()
 								if _, err := io.Copy(out, in); err != nil {
 									c.Status(http.StatusInternalServerError)
 									return c.JSON(HTTPError{err.Error()})
 								}
+								out.Close()
 								file.Url = common.Config.Base + "/" + path.Join("files", filename)
 								file.Path = "/" + path.Join("files", filename)
 								if reader, err := os.Open(p); err == nil {
@@ -82,6 +82,25 @@ func postFileHandler(c *fiber.Ctx) error {
 										file.Type = http.DetectContentType(buff)
 									}else{
 										logger.Warningf("%v", err)
+									}
+								}
+								if p1 := path.Join(dir, "storage", file.Path); len(p1) > 0 {
+									if fi, err := os.Stat(p1); err == nil {
+										filename := fmt.Sprintf("%d-%s-%d%v", file.ID, file.Name, fi.ModTime().Unix(), path.Ext(p1))
+										location := path.Join("files", filename)
+										logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
+										if url, err := common.STORAGE.PutFile(p1, path.Join("files", filename)); err == nil {
+											// Cache
+											if _, err = models.CreateCacheFile(common.Database, &models.CacheFile{
+												FileId:   file.ID,
+												Name: file.Name,
+												File: url,
+											}); err != nil {
+												logger.Warningf("%v", err)
+											}
+										} else {
+											logger.Warningf("%v", err)
+										}
 									}
 								}
 								if err = models.UpdateFile(common.Database, file); err != nil {
@@ -149,6 +168,7 @@ type FilesListItem struct {
 	Type string
 	Path string
 	Url string
+	File string `json:",omitempty"`
 	Name string
 	Size int
 	Updated time.Time
@@ -185,6 +205,9 @@ func postFilesListHandler(c *fiber.Ctx) error {
 		for key, value := range request.Filter {
 			if key != "" && len(strings.TrimSpace(value)) > 0 {
 				switch key {
+				case "Created":
+					keys1 = append(keys1, fmt.Sprintf("files.%v = ?", "Created_At"))
+					values1 = append(values1, value)
 				case "Size":
 					v := strings.TrimSpace(value)
 					if strings.Index(v, ">=") == 0 {
@@ -233,6 +256,8 @@ func postFilesListHandler(c *fiber.Ctx) error {
 		for key, value := range request.Sort {
 			if key != "" && value != "" {
 				switch key {
+				case "Created":
+					orders = append(orders, fmt.Sprintf("files.%v %v", "Created_At", value))
 				case "Values":
 					orders = append(orders, fmt.Sprintf("%v %v", key, value))
 				default:
@@ -247,7 +272,7 @@ func postFilesListHandler(c *fiber.Ctx) error {
 		//id, _ = strconv.Atoi(v)
 		keys1 = append(keys1, "products_files.product_id = ?")
 		values1 = append(values1, v)
-		rows, err := common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Path, files.Url, files.Size, files.Updated_At as Updated").Joins("left join products_files on products_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+		rows, err := common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Path, files.Url, cache_files.File as File, files.Size, files.Updated_At as Updated").Joins("left join cache_files on cache_files.file_id = files.id").Joins("left join products_files on products_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 		if err == nil {
 			if err == nil {
 				for rows.Next() {
@@ -263,7 +288,7 @@ func postFilesListHandler(c *fiber.Ctx) error {
 			}
 			rows.Close()
 		}
-		rows, err = common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Path, files.Url, files.Size, files.Updated_At as Updated").Joins("left join products_files on products_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Rows()
+		rows, err = common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Path, files.Url, cache_files.File as File, files.Size, files.Updated_At as Updated").Joins("left join cache_files on cache_files.file_id = files.id").Joins("left join products_files on products_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Rows()
 		if err == nil {
 			for rows.Next() {
 				response.Filtered ++
@@ -276,7 +301,7 @@ func postFilesListHandler(c *fiber.Ctx) error {
 			response.Total = response.Filtered
 		}
 	}else{
-		rows, err := common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Path, files.Url, files.Size, files.Updated_At as Updated").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+		rows, err := common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Path, files.Url, cache_files.File as File, files.Size, files.Updated_At as Updated").Joins("left join cache_files on cache_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 		if err == nil {
 			if err == nil {
 				for rows.Next() {
@@ -292,7 +317,7 @@ func postFilesListHandler(c *fiber.Ctx) error {
 			}
 			rows.Close()
 		}
-		rows, err = common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Path, files.Url, files.Size, files.Updated_At as Updated").Where(strings.Join(keys1, " and "), values1...).Rows()
+		rows, err = common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Path, files.Url, cache_files.File as File, files.Size, files.Updated_At as Updated").Joins("left join cache_files on cache_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Rows()
 		if err == nil {
 			for rows.Next() {
 				response.Filtered ++
@@ -306,7 +331,6 @@ func postFilesListHandler(c *fiber.Ctx) error {
 		}
 	}
 	//
-
 	c.Status(http.StatusOK)
 	return c.JSON(response)
 }
@@ -318,6 +342,7 @@ type File2View struct {
 	Name string `json:",omitempty"`
 	Path string `json:",omitempty"`
 	Url string `json:",omitempty"`
+	File string `json:",omitempty"`
 	Size int `json:",omitempty"`
 	Updated time.Time `json:",omitempty"`
 }
@@ -342,6 +367,9 @@ func getFileHandler(c *fiber.Ctx) error {
 		var view File2View
 		if bts, err := json.MarshalIndent(file, "", "   "); err == nil {
 			if err = json.Unmarshal(bts, &view); err == nil {
+				if cache, err := models.GetCacheFileByFileId(common.Database, file.ID); err == nil {
+					view.File = cache.File
+				}
 				return c.JSON(view)
 			}else{
 				c.Status(http.StatusInternalServerError)
@@ -398,21 +426,18 @@ func putFileHandler(c *fiber.Ctx) error {
 				file.Name = strings.TrimSpace(v[0])
 			}
 			if v, found := data.File["File"]; found && len(v) > 0 {
-				p := path.Dir(path.Join(dir, file.Path))
+				p := path.Dir(path.Join(dir, "storage", file.Path))
 				if _, err := os.Stat(p); err != nil {
 					if err = os.MkdirAll(p, 0755); err != nil {
 						logger.Errorf("%v", err)
 					}
-				}
-				if err = os.Remove(file.Path); err != nil {
-					logger.Errorf("%v", err)
 				}
 				if file.Name == "" {
 					file.Name = strings.TrimSuffix(v[0].Filename, filepath.Ext(v[0].Filename))
 				}
 				file.Size = v[0].Size
 				//
-				filename := fmt.Sprintf("%d-%s-%d%s", id, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(file.Name, "-"), time.Now().Unix(), path.Ext(v[0].Filename))
+				filename := fmt.Sprintf("%d-%s%s", id, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(file.Name, "-"), path.Ext(v[0].Filename))
 				if p := path.Join(p, filename); len(p) > 0 {
 					if in, err := v[0].Open(); err == nil {
 						out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
@@ -420,11 +445,11 @@ func putFileHandler(c *fiber.Ctx) error {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
 						}
-						defer out.Close()
 						if _, err := io.Copy(out, in); err != nil {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
 						}
+						out.Close()
 						file.Path = path.Join(path.Dir(file.Path), filename)
 						file.Url = common.Config.Base + path.Join(path.Dir(strings.Replace(file.Path, "/hugo/", "/", 1)), filename)
 						//
@@ -433,6 +458,30 @@ func putFileHandler(c *fiber.Ctx) error {
 							buff := make([]byte, 512)
 							if _, err := reader.Read(buff); err == nil {
 								file.Type = http.DetectContentType(buff)
+							}
+						}
+						//
+						if p1 := path.Join(dir, "storage", file.Path); len(p1) > 0 {
+							if fi, err := os.Stat(p1); err == nil {
+								filename := fmt.Sprintf("%d-%s-%d%v", file.ID, file.Name, fi.ModTime().Unix(), path.Ext(p1))
+								location := path.Join("files", filename)
+								logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
+								if url, err := common.STORAGE.PutFile(p1, path.Join("files", filename)); err == nil {
+									file.Url = url
+									// Cache
+									if err = models.DeleteCacheFileByFileId(common.Database, file.ID); err != nil {
+										logger.Warningf("%v", err)
+									}
+									if _, err = models.CreateCacheFile(common.Database, &models.CacheFile{
+										FileId:   file.ID,
+										Name: file.Name,
+										File: url,
+									}); err != nil {
+										logger.Warningf("%v", err)
+									}
+								} else {
+									logger.Warningf("%v", err)
+								}
 							}
 						}
 					}

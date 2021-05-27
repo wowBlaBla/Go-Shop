@@ -7,6 +7,7 @@ type Time struct {
 	Enabled bool
 	Name string `gorm:"size:255;index:idx_time_name,unique"`
 	Title string
+	Value int
 }
 
 func GetTimes(connector *gorm.DB) ([]*Time, error) {

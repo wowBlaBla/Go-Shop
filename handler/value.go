@@ -274,7 +274,7 @@ func postValuesListHandler(c *fiber.Ctx) error {
 					keys1 = append(keys1, fmt.Sprintf("%v = ?", key))
 					values1 = append(values1, strings.TrimSpace(value))
 				default:
-					keys1 = append(keys1, fmt.Sprintf("%v like ?", key))
+					keys1 = append(keys1, fmt.Sprintf("`values`.%v like ?", key))
 					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
 				}
 			}

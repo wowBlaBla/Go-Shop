@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/logger"
 	"github.com/yonnic/goshop/common"
 	"github.com/yonnic/goshop/models"
 	"net/http"
@@ -93,8 +94,6 @@ type NewPrices []NewPrice
 // @Summary Create prices
 // @Accept json
 // @Produce json
-// @Param product_id query int true "Product id"
-// @Param variation_id query int true "Variation id"
 // @Param price body NewPrices true "body"
 // @Success 200 {object} HTTPMessage
 // @Failure 404 {object} HTTPError
@@ -108,6 +107,7 @@ func postPriceAllHandler(c *fiber.Ctx) error {
 	}
 	//
 	for _, request := range requests {
+		logger.Infof("request: %+v", request)
 		price := &models.Price{
 			Enabled: request.Enabled,
 			Price: request.Price,
@@ -126,10 +126,15 @@ func postPriceAllHandler(c *fiber.Ctx) error {
 			}
 		}
 		//
-		if _, err := models.CreatePrice(common.Database, price); err != nil {
+		logger.Infof("price: %+v", price)
+		//
+		var id uint
+		var err error
+		if id, err = models.CreatePrice(common.Database, price); err != nil {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
 		}
+		logger.Infof("id: %+v, err: %+v", id, err)
 	}
 	return c.JSON(HTTPMessage{"OK"})
 }

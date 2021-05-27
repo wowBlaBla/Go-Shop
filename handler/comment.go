@@ -22,12 +22,13 @@ import (
 type CommentsView []*CommentView
 
 type CommentView struct {
-	Id int
+	Id uint
 	Enabled bool
 	CreatedAt time.Time
 	Title string
 	Body string
 	Max int
+	Images string
 }
 
 // @security BasicAuth
@@ -66,10 +67,15 @@ func getCommentsHandler(c *fiber.Ctx) error {
 	}
 	//
 	if comments, err := models.GetCommentsByProductWithOffsetLimit(common.Database, product.ID, offset, limit); err == nil {
-		var view CommentsView
+		var views CommentsView
 		if bts, err := json.Marshal(comments); err == nil {
-			if err = json.Unmarshal(bts, &view); err == nil {
-				return c.JSON(view)
+			if err = json.Unmarshal(bts, &views); err == nil {
+				for i, view := range views {
+					if cache, err := models.GetCacheCommentByCommentId(common.Database, view.Id); err == nil {
+						views[i].Images = cache.Images
+					}
+				}
+				return c.JSON(views)
 			}else{
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
@@ -104,6 +110,9 @@ func getCommentHandler(c *fiber.Ctx) error {
 		var view CommentView
 		if bts, err := json.Marshal(comment); err == nil {
 			if err = json.Unmarshal(bts, &view); err == nil {
+				if cache, err := models.GetCacheCommentByCommentId(common.Database, comment.ID); err == nil {
+					view.Images = cache.Images
+				}
 				return c.JSON(view)
 			}else{
 				c.Status(http.StatusInternalServerError)
@@ -299,6 +308,9 @@ func postAccountCommentHandler(c *fiber.Ctx) error {
 						}
 					}
 				}
+				if i >= 5 {
+					break
+				}
 			}
 		}
 		comment.Images = strings.Join(originals, ",")
@@ -345,6 +357,7 @@ type CommentsListItem struct {
 	CreatedAt time.Time
 	Title string
 	Max float64
+	Images string
 	ProductId uint
 	ProductTitle string
 	ProductThumbnail string
@@ -457,7 +470,7 @@ func postCommentsListHandler(c *fiber.Ctx) error {
 	//logger.Infof("order: %+v", order)
 	//
 	response.Data = []CommentsListItem{}
-	rows, err := common.Database.Debug().Model(&models.Comment{}).Select("comments.ID, comments.created_at as CreatedAt, comments.Enabled, comments.Title, comments.Max, comments.product_id as ProductId, products.Title as ProductTitle, cache_products.Thumbnail as ProductThumbnail, users.Name as UserName, users.Lastname as UserLastname, comments.user_id as UserId").Joins("left join products on comments.product_id = products.id").Joins("left join cache_products on comments.product_id = cache_products.product_id").Joins("left join users on comments.user_id = users.id").Where(strings.Join(keys1, " and "), values1...).Group("comments.id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Comment{}).Select("comments.ID, comments.created_at as CreatedAt, comments.Enabled, comments.Title, comments.Max, cache_comments.Images as Images, comments.product_id as ProductId, products.Title as ProductTitle, cache_products.Thumbnail as ProductThumbnail, users.Name as UserName, users.Lastname as UserLastname, comments.user_id as UserId").Joins("left join cache_comments on comments.id = cache_comments.comment_id").Joins("left join products on comments.product_id = products.id").Joins("left join cache_products on comments.product_id = cache_products.product_id").Joins("left join users on comments.user_id = users.id").Where(strings.Join(keys1, " and "), values1...).Group("comments.id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {

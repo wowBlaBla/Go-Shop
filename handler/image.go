@@ -64,6 +64,10 @@ func postImageHandler(c *fiber.Ctx) error {
 						}
 						filename := fmt.Sprintf("%d-%s%s", id, img.Name, path.Ext(vv.Filename))
 						if p := path.Join(p, filename); len(p) > 0 {
+							if vv.Size > 50 * 1024 * 1024 {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{"File too big"})
+							}
 							if in, err := vv.Open(); err == nil {
 								out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
 								if err != nil {
@@ -88,7 +92,6 @@ func postImageHandler(c *fiber.Ctx) error {
 								}
 								if v := c.Query("pid"); len(v) > 0 {
 									if id, err := strconv.Atoi(v); err == nil {
-										img.Type = "products"
 										if product, err := models.GetProductFull(common.Database, id); err == nil {
 											if err = models.AddImageToProduct(common.Database, product, img); err != nil {
 												logger.Errorf("%v", err.Error())
@@ -102,7 +105,7 @@ func postImageHandler(c *fiber.Ctx) error {
 															name = name[:32]
 														}
 														filename := fmt.Sprintf("%d-%s-%d%v", img.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-														location := path.Join("images", "products", filename)
+														location := path.Join("images", filename)
 														logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
 														if thumbnails, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Image.Size); err == nil {
 															img.Location = location
@@ -136,7 +139,6 @@ func postImageHandler(c *fiber.Ctx) error {
 									}
 								}else if v := c.Query("vid"); len(v) > 0 {
 									if id, err := strconv.Atoi(v); err == nil {
-										img.Type = "variations"
 										if variation, err := models.GetVariation(common.Database, id); err == nil {
 											if err = models.AddImageToVariation(common.Database, variation, img); err != nil {
 												logger.Errorf("%v", err.Error())
@@ -159,14 +161,7 @@ func postImageHandler(c *fiber.Ctx) error {
 																	name = name[:32]
 																}
 																filename := fmt.Sprintf("%d-%s-%d%v", image.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-																location := path.Join("images", "variations", filename)
-																/*p2 := path.Join(dir, "hugo", "static", "images", "variations", filename)
-																logger.Infof("Copy %v => %v %v bytes", p1, p2, fi.Size())
-																if _, err := os.Stat(path.Dir(p2)); err != nil {
-																	if err = os.MkdirAll(path.Dir(p2), 0755); err != nil {
-																		logger.Warningf("%v", err)
-																	}
-																}*/
+																location := path.Join("images", filename)
 																//
 																logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
 																if thumbnails, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Image.Size); err == nil {
@@ -235,6 +230,7 @@ type ImagesListItem struct {
 	Path string
 	Thumbnail string
 	Name string
+	Url string
 	Height int
 	Width int
 	Size int
@@ -272,6 +268,9 @@ func postImagesListHandler(c *fiber.Ctx) error {
 		for key, value := range request.Filter {
 			if key != "" && len(strings.TrimSpace(value)) > 0 {
 				switch key {
+				case "Created":
+					keys1 = append(keys1, fmt.Sprintf("images.%v = ?", "Created_At"))
+					values1 = append(values1, value)
 				case "Height":
 				case "Weight":
 				case "Size":
@@ -322,6 +321,8 @@ func postImagesListHandler(c *fiber.Ctx) error {
 		for key, value := range request.Sort {
 			if key != "" && value != "" {
 				switch key {
+				case "Created":
+					orders = append(orders, fmt.Sprintf("images.%v %v", "Created_At", value))
 				case "Values":
 					orders = append(orders, fmt.Sprintf("%v %v", key, value))
 				default:
@@ -336,7 +337,7 @@ func postImagesListHandler(c *fiber.Ctx) error {
 		//id, _ = strconv.Atoi(v)
 		keys1 = append(keys1, "products_images.product_id = ?")
 		values1 = append(values1, v)
-		rows, err := common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Path, cache_images.Thumbnail as Thumbnail, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join cache_images on images.id = cache_images.image_id").Joins("left join cache_products on images.id = cache_products.image_id").Joins("left join products_images on products_images.image_id = images.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+		rows, err := common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Path, images.Url, cache_images.Thumbnail as Thumbnail, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join cache_images on images.id = cache_images.image_id").Joins("left join cache_products on images.id = cache_products.image_id").Joins("left join products_images on products_images.image_id = images.id").Where(strings.Join(keys1, " and "), values1...).Group("images.id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
 		if err == nil {
 			if err == nil {
 				for rows.Next() {
@@ -352,7 +353,7 @@ func postImagesListHandler(c *fiber.Ctx) error {
 			}
 			rows.Close()
 		}
-		rows, err = common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Path, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join products_images on products_images.image_id = images.id").Where(strings.Join(keys1, " and "), values1...).Rows()
+		rows, err = common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Path, images.Url, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join products_images on products_images.image_id = images.id").Where(strings.Join(keys1, " and "), values1...).Rows()
 		if err == nil {
 			for rows.Next() {
 				response.Filtered ++
@@ -365,7 +366,7 @@ func postImagesListHandler(c *fiber.Ctx) error {
 			response.Total = response.Filtered
 		}
 	}else{
-		rows, err := common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Path, cache_images.Thumbnail as Thumbnail, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join cache_images on images.id = cache_images.image_id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+		rows, err := common.Database.Debug().Model(&models.Image{}).Select("images.ID, images.Created_At as Created, images.Name, images.Path, images.Url, cache_images.Thumbnail as Thumbnail, images.Height, images.Width, images.Size, images.Updated_At as Updated").Joins("left join cache_images on images.id = cache_images.image_id").Where(strings.Join(keys1, " and "), values1...).Group("images.id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
 		if err == nil {
 			if err == nil {
 				for rows.Next() {
@@ -429,10 +430,13 @@ func getImageHandler(c *fiber.Ctx) error {
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)
 	}
-	if option, err := models.GetImage(common.Database, id); err == nil {
+	if image, err := models.GetImage(common.Database, id); err == nil {
 		var view ImageView
-		if bts, err := json.MarshalIndent(option, "", "   "); err == nil {
+		if bts, err := json.MarshalIndent(image, "", "   "); err == nil {
 			if err = json.Unmarshal(bts, &view); err == nil {
+				if cache, err := models.GetCacheImageByImageId(common.Database, image.ID); err == nil {
+					view.Thumbnail = cache.Thumbnail
+				}
 				return c.JSON(view)
 			}else{
 				c.Status(http.StatusInternalServerError)
@@ -485,6 +489,9 @@ func putImageHandler(c *fiber.Ctx) error {
 			if err != nil {
 				return err
 			}
+			if v, found := data.Value["Name"]; found && len(v) > 0 {
+				img.Name = strings.TrimSpace(v[0])
+			}
 			if v, found := data.File["Image"]; found && len(v) > 0 {
 				p := path.Dir(path.Join(dir, "storage", img.Path))
 				if _, err := os.Stat(p); err != nil {
@@ -529,15 +536,11 @@ func putImageHandler(c *fiber.Ctx) error {
 						logger.Infof("image: %+v", img)
 						if p1 := path.Join(dir, "storage", img.Path); len(p1) > 0 {
 							if fi, err := os.Stat(p1); err == nil {
-								location := []string{"images"}
-								if img.Type == "products" {
-									location = append(location, "products")
-								}else if img.Type == "variations" {
-									location = append(location, "variations")
-								}
+								location := []string{"images", filename}
 								location = append(location, filename)
 								logger.Infof("Copy %v => %v %v bytes", p1, path.Join(location...), fi.Size())
 								if thumbnails, err := common.STORAGE.PutImage(p1, path.Join(location...), common.Config.Resize.Image.Size); err == nil {
+									img.Url = thumbnails[0]
 									// Cache
 									if err = models.DeleteCacheImageByImageId(common.Database, img.ID); err != nil {
 										logger.Warningf("%v", err)

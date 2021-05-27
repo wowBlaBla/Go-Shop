@@ -12,8 +12,10 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // @security BasicAuth
@@ -75,7 +77,7 @@ type NewCategory struct {
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/categories [post]
 // @Tags category
-func postCategoriesHandler(c *fiber.Ctx) error {
+func postCategoryHandler(c *fiber.Ctx) error {
 	var view models.CategoryView
 	var request NewCategory
 	if err := c.BodyParser(&request); err != nil {
@@ -167,16 +169,38 @@ func postCategoriesHandler(c *fiber.Ctx) error {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
 							}
-							defer out.Close()
 							if _, err := io.Copy(out, in); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
 							}
-							// TODO: Update category with Thumbnail
+							out.Close()
 							category.Thumbnail = "/" + path.Join("categories", filename)
 							if err = models.UpdateCategory(common.Database, category); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
+							}
+							//
+							if p1 := path.Join(dir, "storage", "categories", filename); len(p1) > 0 {
+								if fi, err := os.Stat(p1); err == nil {
+									filename := filepath.Base(p1)
+									filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+									logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "categories", filename), fi.Size())
+									var paths string
+									if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "categories", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+										paths = strings.Join(thumbnails, ",")
+									} else {
+										logger.Warningf("%v", err)
+									}
+									// Cache
+									if _, err = models.CreateCacheCategory(common.Database, &models.CacheCategory{
+										CategoryID:   category.ID,
+										Title:     category.Title,
+										Name:     category.Name,
+										Thumbnail: paths,
+									}); err != nil {
+										logger.Warningf("%v", err)
+									}
+								}
 							}
 						}
 					}
@@ -667,18 +691,54 @@ func putCategoryHandler(c *fiber.Ctx) error {
 				filename := fmt.Sprintf("%d-%s%s", id, category.Name, path.Ext(v[0].Filename))
 				if p := path.Join(p, filename); len(p) > 0 {
 					if in, err := v[0].Open(); err == nil {
+						var mod time.Time
+						if fi, err := os.Stat(p); err == nil {
+							mod = fi.ModTime()
+						}
 						out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
 						if err != nil {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
 						}
-						defer out.Close()
 						if _, err := io.Copy(out, in); err != nil {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
 						}
-						// TODO: Update category with Thumbnail
+						out.Close()
 						category.Thumbnail = "/" + path.Join("categories", filename)
+						if err = models.UpdateCategory(common.Database, category); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+						//
+						if p1 := path.Join(dir, "storage", "categories", filename); len(p1) > 0 {
+							if fi, err := os.Stat(p1); err == nil {
+								filename := filepath.Base(p1)
+								if mod.IsZero() {
+									mod = fi.ModTime()
+								}
+								filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], mod.Unix(), filepath.Ext(filename))
+								logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "categories", filename), fi.Size())
+								var paths string
+								if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "categories", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+									paths = strings.Join(thumbnails, ",")
+								} else {
+									logger.Warningf("%v", err)
+								}
+								// Cache
+								if err = models.DeleteCacheCategoryByCategoryId(common.Database, category.ID); err != nil {
+									logger.Warningf("%v", err)
+								}
+								if _, err = models.CreateCacheCategory(common.Database, &models.CacheCategory{
+									CategoryID:   category.ID,
+									Title:     category.Title,
+									Name:     category.Name,
+									Thumbnail: paths,
+								}); err != nil {
+									logger.Warningf("%v", err)
+								}
+							}
+						}
 					}
 				}
 			}
@@ -721,6 +781,13 @@ func delCategoryHandler(c *fiber.Ctx) error {
 		categories := models.GetChildrenCategories(common.Database, category)
 		for _, category := range categories {
 			if category.Thumbnail != "" {
+				if err = models.DeleteCacheCategoryByCategoryId(common.Database, category.ID); err != nil {
+					logger.Warningf("%v", err)
+				}
+				if err = common.STORAGE.DeleteImage(path.Join("images", category.Thumbnail), common.Config.Resize.Thumbnail.Size); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
 				p := path.Join(dir, "hugo", category.Thumbnail)
 				if _, err := os.Stat(p); err == nil {
 					if err = os.Remove(p); err != nil {

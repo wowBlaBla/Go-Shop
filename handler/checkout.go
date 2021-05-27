@@ -365,15 +365,10 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 			} else {
 				logger.Warningf("%v", err.Error())
 			}
-			logger.Infof("Prices: %+v", len(prices))
-			for i, price := range prices {
-				logger.Infof("%d: %+v", i, price)
-			}
 			var propertiesShortView []PropertyShortView
 			var pricesShortView []PriceShortView
 			var couponsOrderView []*CouponOrderView
 			if len(arr) > 2 {
-				logger.Infof("arr: %+v", arr)
 				//
 				for _, id := range arr[2:] {
 					if price, err := models.GetRate(common.Database, id); err == nil {
@@ -420,11 +415,6 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 				sort.SliceStable(prices2, func(i, j int) bool {
 					return len(prices2[i].Rates) > len(prices2[j].Rates)
 				})
-				//
-				logger.Infof("Top")
-				for i, price := range prices2 {
-					logger.Infof("%d: %+v", i, price)
-				}
 				//
 				if len(prices2) > 0 && prices2[0].Price > 0 {
 					item.Price += prices2[0].Price * tax

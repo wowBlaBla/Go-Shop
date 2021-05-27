@@ -138,7 +138,7 @@ func GetFiber() *fiber.App {
 	v1.Put("/settings/wrangler", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("wrangler settings updated"), putWranglerSettingsHandler)
 	//
 	v1.Get("/categories", authRequired, getCategoriesHandler)
-	v1.Post("/categories", authRequired, changed("category created"), postCategoriesHandler)
+	v1.Post("/categories", authRequired, changed("category created"), postCategoryHandler)
 	v1.Post("/categories/autocomplete", authRequired, postCategoriesAutocompleteHandler)
 	v1.Post("/categories/list", authRequired, postCategoriesListHandler)
 	v1.Get("/categories/:id", authRequired, getCategoryHandler)
@@ -3854,12 +3854,39 @@ func postVendorHandler(c *fiber.Ctx) error {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
 							}
-							defer out.Close()
 							if _, err := io.Copy(out, in); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
 							}
+							out.Close()
 							vendor.Thumbnail = "/" + path.Join("vendors", filename)
+							if err = models.UpdateVendor(common.Database, vendor); err != nil {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+							//
+							if p1 := path.Join(dir, "storage", "vendors", filename); len(p1) > 0 {
+								if fi, err := os.Stat(p1); err == nil {
+									filename := filepath.Base(p1)
+									filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+									logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "vendors", filename), fi.Size())
+									var paths string
+									if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "vendors", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+										paths = strings.Join(thumbnails, ",")
+									} else {
+										logger.Warningf("%v", err)
+									}
+									// Cache
+									if _, err = models.CreateCacheVendor(common.Database, &models.CacheVendor{
+										VendorID:   vendor.ID,
+										Title:     vendor.Title,
+										Name:     vendor.Name,
+										Thumbnail: paths,
+									}); err != nil {
+										logger.Warningf("%v", err)
+									}
+								}
+							}
 							if err = models.UpdateVendor(common.Database, vendor); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
@@ -3897,6 +3924,7 @@ type VendorsListItem struct {
 	Enabled bool
 	Name string
 	Title string
+	Thumbnail string
 	Description string
 	Content string
 }
@@ -3956,7 +3984,7 @@ func postVendorsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Vendor{}).Select("vendors.ID, vendors.Enabled, vendors.Name, vendors.Title, vendors.Description, vendors.Content").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Vendor{}).Select("vendors.ID, vendors.Enabled, vendors.Name, vendors.Title, cache_vendors.Thumbnail as Thumbnail, vendors.Description, vendors.Content").Joins("left join cache_vendors on cache_vendors.vendor_id = vendors.ID").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -3972,7 +4000,7 @@ func postVendorsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Vendor{}).Select("vendors.ID, vendors.Enabled, vendors.Name, vendors.Title, vendors.Description, vendors.Content").Where(strings.Join(keys1, " and "), values1...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Vendor{}).Select("vendors.ID, vendors.Enabled, vendors.Name, vendors.Title, cache_vendors.Thumbnail as Thumbnail, vendors.Description, vendors.Content").Joins("left join cache_vendors on cache_vendors.vendor_id = vendors.ID").Where(strings.Join(keys1, " and "), values1...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -4097,20 +4125,53 @@ func putVendorHandler(c *fiber.Ctx) error {
 				filename := fmt.Sprintf("%d-%s-thumbnail%s", id, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(vendor.Name, "-"), path.Ext(v[0].Filename))
 				if p := path.Join(p, filename); len(p) > 0 {
 					if in, err := v[0].Open(); err == nil {
+						var mod time.Time
+						if fi, err := os.Stat(p); err == nil {
+							mod = fi.ModTime()
+						}
 						out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
 						if err != nil {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
 						}
-						defer out.Close()
 						if _, err := io.Copy(out, in); err != nil {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
 						}
+						out.Close()
 						vendor.Thumbnail = "/" + path.Join("vendors", filename)
 						if err = models.UpdateVendor(common.Database, vendor); err != nil {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
+						}
+						//
+						if p1 := path.Join(dir, "storage", "vendors", filename); len(p1) > 0 {
+							if fi, err := os.Stat(p1); err == nil {
+								filename := filepath.Base(p1)
+								if mod.IsZero() {
+									mod = fi.ModTime()
+								}
+								filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], mod.Unix(), filepath.Ext(filename))
+								logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "vendors", filename), fi.Size())
+								var paths string
+								if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "vendors", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+									paths = strings.Join(thumbnails, ",")
+								} else {
+									logger.Warningf("%v", err)
+								}
+								// Cache
+								if err = models.DeleteCacheVendorByVendorId(common.Database, vendor.ID); err != nil {
+									logger.Warningf("%v", err)
+								}
+								if _, err = models.CreateCacheVendor(common.Database, &models.CacheVendor{
+									VendorID:   vendor.ID,
+									Title:     vendor.Title,
+									Name:     vendor.Name,
+									Thumbnail: paths,
+								}); err != nil {
+									logger.Warningf("%v", err)
+								}
+							}
 						}
 					}
 				}
@@ -4183,9 +4244,13 @@ func delVendorHandler(c *fiber.Ctx) error {
 		id, _ = strconv.Atoi(v)
 	}
 	if vendor, err := models.GetVendor(common.Database, id); err == nil {
-		if thumbnail := vendor.Thumbnail; thumbnail != "" {
-			if err = os.Remove(path.Join(dir, "storage", thumbnail)); err != nil {
-				logger.Warningf("%v", err.Error())
+		if vendor.Thumbnail != "" {
+			if err = models.DeleteCacheTagByTagId(common.Database, vendor.ID); err != nil {
+				logger.Warningf("%v", err)
+			}
+			if err = common.STORAGE.DeleteImage(path.Join("images", vendor.Thumbnail), common.Config.Resize.Thumbnail.Size); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
 			}
 		}
 		if err = models.DeleteVendor(common.Database, vendor); err == nil {
@@ -4339,7 +4404,7 @@ type TimeListItem struct {
 	Enabled bool
 	Name string
 	Title string
-	Value int
+	Value int `json:",omitempty"`
 }
 
 // @security BasicAuth
@@ -5302,8 +5367,8 @@ func postFilterHandler(c *fiber.Ctx) error {
 					}else{
 						logger.Warningf("%+v", err)
 					}
-					keys1 = append(keys1, "(cache_products.Title like ? or cache_products.Description like ?)")
-					values1 = append(values1, "%" + value + "%", "%" + value + "%")
+					keys1 = append(keys1, "(cache_products.Title like ? or cache_products.Description like ? or cache_products.Sku like ?)")
+					values1 = append(values1, "%" + value + "%", "%" + value + "%", "%" + value + "%")
 				default:
 					if strings.Index(key, "Option-") >= -1 {
 						if res := regexp.MustCompile(`Option-(\d+)`).FindAllStringSubmatch(key, 1); len(res) > 0 && len(res[0]) > 1 {
@@ -5647,7 +5712,9 @@ type ProductView struct {
 	Notes string `json:",omitempty"`
 	Parameters []ParameterView `json:",omitempty"`
 	CustomParameters string `json:",omitempty"`
+	Container bool `json:",omitempty"`
 	Variation string `json:",omitempty"`
+	Size string `json:",omitempty"`
 	BasePrice float64
 	SalePrice float64 `json:",omitempty"`
 	Start *time.Time `json:",omitempty"`
@@ -5660,6 +5727,7 @@ type ProductView struct {
 	Depth float64 `json:",omitempty"`
 	Volume float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
+	Packages int `json:",omitempty"`
 	Availability string `json:",omitempty"`
 	Sending string `json:",omitempty"`
 	Sku string
@@ -5757,6 +5825,7 @@ type VariationView struct {
 	Depth float64 `json:",omitempty"`
 	Volume float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
+	Packages int `json:",omitempty"`
 	Availability string `json:",omitempty"`
 	//Sending string `json:",omitempty"`
 	TimeId uint `json:",omitempty"`

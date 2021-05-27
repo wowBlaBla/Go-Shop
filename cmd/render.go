@@ -8,6 +8,7 @@ import (
 	cmap "github.com/streamrail/concurrent-map"
 	"github.com/yonnic/goshop/common"
 	"github.com/yonnic/goshop/config"
+	"github.com/yonnic/goshop/handler"
 	"github.com/yonnic/goshop/models"
 	"github.com/yonnic/goshop/storage"
 	"gorm.io/driver/mysql"
@@ -16,11 +17,13 @@ import (
 	"gorm.io/gorm"
 	"io/ioutil"
 	"math"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -132,11 +135,13 @@ var renderCmd = &cobra.Command{
 		// Cache
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheCategory{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheProduct{})
+		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheFile{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheImage{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheVariation{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheValue{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheTag{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheTransport{})
+		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheVendor{})
 		//
 		common.STORAGE, err = storage.NewLocalStorage(path.Join(dir, "hugo"), common.Config.Resize.Quality)
 		if err != nil {
@@ -216,6 +221,100 @@ var renderCmd = &cobra.Command{
 							if err = common.WriteTagFile(p2, tagFile); err != nil {
 								logger.Warningf("%v", err)
 							}
+						}
+					}
+				}
+			}
+		}
+		// Vendors
+		if vendors, err := models.GetVendors(common.Database); err == nil {
+			if remove {
+				if err := os.RemoveAll(path.Join(output, "vendors")); err != nil {
+					logger.Infof("%v", err)
+				}
+			}
+			// Payload
+			for _, vendor := range vendors {
+				if p1 := path.Join(output, "vendors", vendor.Name); len(p1) > 0 {
+					if _, err := os.Stat(p1); err != nil {
+						if err = os.MkdirAll(p1, 0755); err != nil {
+							logger.Errorf("%v", err)
+						}
+					}
+					for _, language := range languages {
+						if p2 := path.Join(p1, fmt.Sprintf("_index%s.html", language.Suffix)); len(p2) > 0 {
+							content := vendor.Content
+							vendorFile := &common.VendorFile{
+								ID:      vendor.ID,
+								Name:   vendor.Name,
+								Title:   vendor.Title,
+								Type:    "vendors",
+								Content: content,
+							}
+							//
+							// Thumbnail
+							if vendor.Thumbnail != "" {
+								if p1 := path.Join(dir, "storage", vendor.Thumbnail); len(p1) > 0 {
+									if fi, err := os.Stat(p1); err == nil {
+										filename := filepath.Base(p1)
+										filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+										logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "vendors", filename), fi.Size())
+										if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "vendors", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+											vendorFile.Thumbnail = strings.Join(thumbnails, ",")
+										} else {
+											logger.Warningf("%v", err)
+										}
+										//
+										if _, err = models.CreateCacheVendor(common.Database, &models.CacheVendor{
+											VendorID:   vendor.ID,
+											Title:     vendor.Title,
+											Name:     vendor.Name,
+											Thumbnail: vendorFile.Thumbnail,
+										}); err != nil {
+											logger.Warningf("%v", err)
+										}
+									}
+								}
+							}
+							if err = common.WriteVendorFile(p2, vendorFile); err != nil {
+								logger.Warningf("%v", err)
+							}
+						}
+					}
+				}
+			}
+		}
+		// Values
+		if values, err := models.GetValues(common.Database); err == nil {
+			for _, value := range values {
+				var thumbnail string
+				if value.Thumbnail != "" {
+					if p1 := path.Join(dir, "storage", value.Thumbnail); len(p1) > 0 {
+						if fi, err := os.Stat(p1); err == nil {
+							filename := filepath.Base(p1)
+							filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+							logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
+							if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+								thumbnail = strings.Join(thumbnails, ",")
+							} else {
+								logger.Warningf("%v", err)
+							}
+						}
+					}
+				}
+				if !models.HasCacheValueByValueId(common.Database, value.ID) {
+					// Cache
+					if _, err = models.CreateCacheValue(common.Database, &models.CacheValue{
+						ValueID:   value.ID,
+						Title:     value.Title,
+						Thumbnail: thumbnail,
+						Value:     value.Value,
+					}); err != nil {
+						logger.Warningf("%v", err)
+					}
+					if key := fmt.Sprintf("%v", value.ID); key != "" {
+						if !VALUES.Has(key) {
+							VALUES.Set(key, thumbnail)
 						}
 					}
 				}
@@ -432,6 +531,75 @@ var renderCmd = &cobra.Command{
 			if widgets, err := models.GetWidgetsByApplyTo(common.Database, "all-products"); err == nil {
 				for _, widget := range widgets {
 					if widget.Enabled {
+						//
+						if wildcards := regexp.MustCompile(`<img(.*?data-type="(.*?)".*)?>`).FindAllStringSubmatch(widget.Content, -1); len(wildcards) > 0 && len(wildcards[0]) > 1 {
+							for _, wildcard := range wildcards {
+								var content string
+								switch wildcard[2] {
+								case "colors":
+									var title string
+									if res := regexp.MustCompile(`data-title="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
+										if v, err := url.QueryUnescape(res[0][1]); err == nil {
+											var vv string
+											if err = json.Unmarshal([]byte(v), &vv); err == nil {
+												title = vv
+											}
+										}
+									}
+									var option int
+									if res := regexp.MustCompile(`data-option="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
+										if v, err := url.QueryUnescape(res[0][1]); err == nil {
+											var vv string
+											if err = json.Unmarshal([]byte(v), &vv); err == nil {
+												if vvv, err := strconv.Atoi(vv); err == nil {
+													option = vvv
+												}
+											}
+										}
+									}
+									fmt.Printf("option: %+v\n", option)
+									var limit int
+									if res := regexp.MustCompile(`data-limit="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
+										if v, err := url.QueryUnescape(res[0][1]); err == nil {
+											var vv string
+											if err = json.Unmarshal([]byte(v), &vv); err == nil {
+												if vvv, err := strconv.Atoi(vv); err == nil {
+													limit = vvv
+												}
+											}
+										}
+									}
+									fmt.Printf("limit: %+v\n", limit)
+									if option, err := models.GetOption(common.Database, option); err == nil {
+										var data struct {
+											Option *handler.OptionView
+											Limit int
+										}
+										if bts, err := json.Marshal(option); err == nil {
+											if err = json.Unmarshal(bts, &data.Option); err != nil {
+												logger.Warningf("%+v", err)
+											}
+										}
+										for i, value := range data.Option.Values {
+											if cache, err := models.GetCacheValueByValueId(common.Database, value.ID); err == nil {
+												data.Option.Values[i].Thumbnail = cache.Thumbnail
+											}else{
+												logger.Warningf("%+v", err)
+											}
+										}
+										data.Limit = limit
+										if bts, err := json.Marshal(data); err == nil {
+											content = fmt.Sprintf(`<script type="application/json" data-goshop="samples">%v</script><button id="btnSamples" class="v-button">%v</button>`, string(bts), title)
+										}
+									}else{
+										content = fmt.Sprintf(`[ERROR: %+v]`, err)
+									}
+									break
+								}
+								widget.Content = strings.Replace(widget.Content, wildcard[0], content, 1)
+							}
+						}
+						//
 						allProductsWidgets = append(allProductsWidgets, common.WidgetCF{
 							Name:     widget.Name,
 							Title:    widget.Title,
@@ -916,6 +1084,11 @@ var renderCmd = &cobra.Command{
 									Name:       product.Name,
 									Title:      product.Title,
 								}
+								if product.Size != "" {
+									productView.Size = product.Size
+								}else {
+									productView.Size = "medium"
+								}
 								productView.Description = reTags.ReplaceAllString(product.Description, "")
 								productView.Description = reSpace.ReplaceAllString(product.Description, " ")
 								if len(productView.Description) > 160 {
@@ -926,14 +1099,15 @@ var renderCmd = &cobra.Command{
 								if product.Image != nil {
 									if p1 := path.Join(dir, "storage", product.Image.Path); len(p1) > 0 {
 										if fi, err := os.Stat(p1); err == nil {
-											name := product.Name + "-thumbnail"
+											name := product.Name
 											if len(name) > 32 {
 												name = name[:32]
 											}
 											filename := fmt.Sprintf("%d-%s-%d%v", product.ID, name, fi.ModTime().Unix(), path.Ext(p1))
 											//p2 := path.Join(p0, filename)
-											logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "products", filename), fi.Size())
-											if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "products", filename), common.Config.Resize.Image.Size); err == nil {
+											location := path.Join("images", filename)
+											logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
+											if thumbnails, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Image.Size); err == nil {
 												productFile.Thumbnail = strings.Join(thumbnails, ",")
 												productView.Thumbnail = strings.Join(thumbnails, ",")
 											} else {
@@ -949,13 +1123,14 @@ var renderCmd = &cobra.Command{
 										if image.Path != "" {
 											if p1 := path.Join(dir, "storage", image.Path); len(p1) > 0 {
 												if fi, err := os.Stat(p1); err == nil {
-													name := product.Name + "-" + image.Name
+													name := product.Name
 													if len(name) > 32 {
 														name = name[:32]
 													}
 													filename := fmt.Sprintf("%d-%s-%d%v", image.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-													logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "products", filename), fi.Size())
-													if images2, err := common.STORAGE.PutImage(p1, path.Join("images", "products", filename), common.Config.Resize.Image.Size); err == nil {
+													location := path.Join("images", filename)
+													logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
+													if images2, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Image.Size); err == nil {
 														// Generate thumbnail
 														if i == 0 || product.ImageId == image.ID {
 															productFile.Thumbnail = strings.Join(images2, ",")
@@ -994,8 +1169,9 @@ var renderCmd = &cobra.Command{
 														name = name[:32]
 													}
 													filename := fmt.Sprintf("%d-%s-%d%v", file.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-													logger.Infof("Copy %v => %v %v bytes", p1, path.Join("files", "products", filename), fi.Size())
-													if url, err := common.STORAGE.PutFile(p1, path.Join("files", "products", filename)); err == nil {
+													location := path.Join("files", filename)
+													logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
+													if url, err := common.STORAGE.PutFile(p1, location); err == nil {
 														files = append(files, common.FilePF{
 															Id:   file.ID,
 															Type: file.Type,
@@ -1003,6 +1179,14 @@ var renderCmd = &cobra.Command{
 															Path: url,
 															Size: file.Size,
 														})
+														// Cache
+														if _, err = models.CreateCacheFile(common.Database, &models.CacheFile{
+															FileId:   file.ID,
+															Name: file.Name,
+															File: url,
+														}); err != nil {
+															logger.Warningf("%v", err)
+														}
 													} else {
 														logger.Warningf("%v", err)
 													}
@@ -1089,6 +1273,7 @@ var renderCmd = &cobra.Command{
 									Depth:        product.Depth,
 									Volume:       product.Volume,
 									Weight:       product.Weight,
+									Packages:     product.Packages,
 									Availability: product.Availability,
 									Time:         product.Time,
 									Sku:          product.Sku,
@@ -1097,7 +1282,10 @@ var renderCmd = &cobra.Command{
 								if product.Variation != "" {
 									variation.Title = product.Variation
 								}
-								variations2 := []*models.Variation{variation}
+								var variations2 []*models.Variation
+								if !product.Container {
+									variations2 = append(variations2, variation)
+								}
 								for _, variation2 := range product.Variations {
 									if variation2.Name != "default" {
 										variations2 = append(variations2, variation2)
@@ -1128,6 +1316,7 @@ var renderCmd = &cobra.Command{
 											Depth: variation.Depth,
 											Volume: variation.Volume,
 											Weight: variation.Weight,
+											Packages: variation.Packages,
 											Availability: variation.Availability,
 											Sku: variation.Sku,
 											Selected:    len(productView.Variations) == 0,
@@ -1163,8 +1352,8 @@ var renderCmd = &cobra.Command{
 																name = name[:32]
 															}
 															filename := fmt.Sprintf("%d-%s-%d%v", image.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-															logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "variations", filename), fi.Size())
-															if images2, err := common.STORAGE.PutImage(p1, path.Join("images", "variations", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+															logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", filename), fi.Size())
+															if images2, err := common.STORAGE.PutImage(p1, path.Join("images", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 																images = append(images, strings.Join(images2, ","))
 															} else{
 																logger.Warningf("%v", err)
@@ -1192,8 +1381,9 @@ var renderCmd = &cobra.Command{
 																	name = name[:32]
 																}
 																filename := fmt.Sprintf("%d-%s-%d%v", file.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-																logger.Infof("Copy %v => %v %v bytes", p1, path.Join("files", "variations", filename), fi.Size())
-																if url, err := common.STORAGE.PutFile(p1, path.Join("files", "variations", filename)); err == nil {
+																location := path.Join("files", filename)
+																logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
+																if url, err := common.STORAGE.PutFile(p1, location); err == nil {
 																	files = append(files, common.FilePF{
 																		Id:   file.ID,
 																		Type: file.Type,
@@ -1201,6 +1391,14 @@ var renderCmd = &cobra.Command{
 																		Path: url,
 																		Size: file.Size,
 																	})
+																	// Cache
+																	if _, err = models.CreateCacheFile(common.Database, &models.CacheFile{
+																		FileId:   file.ID,
+																		Name: file.Name,
+																		File: url,
+																	}); err != nil {
+																		logger.Warningf("%v", err)
+																	}
 																} else {
 																	logger.Warningf("%v", err)
 																}
@@ -1434,6 +1632,7 @@ var renderCmd = &cobra.Command{
 									Depth:       product.Depth,
 									Volume:      product.Volume,
 									Weight:      product.Weight,
+									Sku: product.Sku,
 								}); err != nil {
 									logger.Warningf("%v", err)
 								}

@@ -19,6 +19,7 @@ type CacheProduct struct {
 	Height float64
 	Depth float64
 	Weight float64
+	Sku string
 }
 
 func (CacheProduct) TableName() string {
