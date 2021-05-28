@@ -325,13 +325,7 @@ var renderCmd = &cobra.Command{
 		if widgets, err := models.GetWidgetsByApplyTo(common.Database, "all"); err == nil {
 			for _, widget := range widgets {
 				if widget.Enabled {
-					allWidgets = append(allWidgets, common.WidgetCF{
-						Name:     widget.Name,
-						Title:    widget.Title,
-						Content:  widget.Content,
-						Location: widget.Location,
-						ApplyTo:  widget.ApplyTo,
-					})
+					allWidgets = append(allWidgets, createWidgetCF(widget))
 				}
 			}
 		} else {
@@ -389,13 +383,7 @@ var renderCmd = &cobra.Command{
 			if widgets, err := models.GetWidgetsByApplyTo(common.Database, "all-categories"); err == nil {
 				for _, widget := range widgets {
 					if widget.Enabled {
-						allCategoriesWidgets = append(allCategoriesWidgets, common.WidgetCF{
-							Name:     widget.Name,
-							Title:    widget.Title,
-							Content:  widget.Content,
-							Location: widget.Location,
-							ApplyTo:  widget.ApplyTo,
-						})
+						allCategoriesWidgets = append(allCategoriesWidgets, createWidgetCF(widget))
 					}
 				}
 			} else {
@@ -486,13 +474,7 @@ var renderCmd = &cobra.Command{
 									if widgets, err := models.GetWidgetsByCategory(common.Database, category.ID); err == nil {
 										for _, widget := range widgets {
 											if widget.Enabled {
-												categoryFile.Widgets = append(categoryFile.Widgets, common.WidgetCF{
-													Name:     widget.Name,
-													Title:    widget.Title,
-													Content:  widget.Content,
-													Location: widget.Location,
-													ApplyTo:  widget.ApplyTo,
-												})
+												categoryFile.Widgets = append(categoryFile.Widgets, createWidgetCF(widget))
 											}
 										}
 									}
@@ -531,82 +513,7 @@ var renderCmd = &cobra.Command{
 			if widgets, err := models.GetWidgetsByApplyTo(common.Database, "all-products"); err == nil {
 				for _, widget := range widgets {
 					if widget.Enabled {
-						//
-						if wildcards := regexp.MustCompile(`<img(.*?data-type="(.*?)".*)?>`).FindAllStringSubmatch(widget.Content, -1); len(wildcards) > 0 && len(wildcards[0]) > 1 {
-							for _, wildcard := range wildcards {
-								var content string
-								switch wildcard[2] {
-								case "colors":
-									var title string
-									if res := regexp.MustCompile(`data-title="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
-										if v, err := url.QueryUnescape(res[0][1]); err == nil {
-											var vv string
-											if err = json.Unmarshal([]byte(v), &vv); err == nil {
-												title = vv
-											}
-										}
-									}
-									var option int
-									if res := regexp.MustCompile(`data-option="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
-										if v, err := url.QueryUnescape(res[0][1]); err == nil {
-											var vv string
-											if err = json.Unmarshal([]byte(v), &vv); err == nil {
-												if vvv, err := strconv.Atoi(vv); err == nil {
-													option = vvv
-												}
-											}
-										}
-									}
-									fmt.Printf("option: %+v\n", option)
-									var limit int
-									if res := regexp.MustCompile(`data-limit="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
-										if v, err := url.QueryUnescape(res[0][1]); err == nil {
-											var vv string
-											if err = json.Unmarshal([]byte(v), &vv); err == nil {
-												if vvv, err := strconv.Atoi(vv); err == nil {
-													limit = vvv
-												}
-											}
-										}
-									}
-									fmt.Printf("limit: %+v\n", limit)
-									if option, err := models.GetOption(common.Database, option); err == nil {
-										var data struct {
-											Option *handler.OptionView
-											Limit int
-										}
-										if bts, err := json.Marshal(option); err == nil {
-											if err = json.Unmarshal(bts, &data.Option); err != nil {
-												logger.Warningf("%+v", err)
-											}
-										}
-										for i, value := range data.Option.Values {
-											if cache, err := models.GetCacheValueByValueId(common.Database, value.ID); err == nil {
-												data.Option.Values[i].Thumbnail = cache.Thumbnail
-											}else{
-												logger.Warningf("%+v", err)
-											}
-										}
-										data.Limit = limit
-										if bts, err := json.Marshal(data); err == nil {
-											content = fmt.Sprintf(`<script type="application/json" data-goshop="samples">%v</script><button id="btnSamples" class="v-button">%v</button>`, string(bts), title)
-										}
-									}else{
-										content = fmt.Sprintf(`[ERROR: %+v]`, err)
-									}
-									break
-								}
-								widget.Content = strings.Replace(widget.Content, wildcard[0], content, 1)
-							}
-						}
-						//
-						allProductsWidgets = append(allProductsWidgets, common.WidgetCF{
-							Name:     widget.Name,
-							Title:    widget.Title,
-							Content:  widget.Content,
-							Location: widget.Location,
-							ApplyTo:  widget.ApplyTo,
-						})
+						allProductsWidgets = append(allProductsWidgets, createWidgetCF(widget))
 					}
 				}
 			} else {
@@ -1588,13 +1495,7 @@ var renderCmd = &cobra.Command{
 									if widgets, err := models.GetWidgetsByProduct(common.Database, product.ID); err == nil {
 										for _, widget := range widgets {
 											if widget.Enabled {
-												productFile.Widgets = append(productFile.Widgets, common.WidgetCF{
-													Name:     widget.Name,
-													Title:    widget.Title,
-													Content:  widget.Content,
-													Location: widget.Location,
-													ApplyTo:  widget.ApplyTo,
-												})
+												productFile.Widgets = append(productFile.Widgets, createWidgetCF(widget))
 											}
 										}
 									}
@@ -1836,6 +1737,107 @@ func createMenu(root *common.MenuItemView, bts []byte) {
 			}
 			root.Children = append(root.Children, item)
 		}
+	}
+}
+
+func createWidgetCF(widget *models.Widget) common.WidgetCF {
+	if wildcards := regexp.MustCompile(`<img(.*?data-type="(.*?)".*)?>`).FindAllStringSubmatch(widget.Content, -1); len(wildcards) > 0 && len(wildcards[0]) > 1 {
+		for _, wildcard := range wildcards {
+			var content string
+			switch wildcard[2] {
+			case "colors":
+				var title string
+				if res := regexp.MustCompile(`data-title="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
+					if v, err := url.QueryUnescape(res[0][1]); err == nil {
+						var vv string
+						if err = json.Unmarshal([]byte(v), &vv); err == nil {
+							title = vv
+						}
+					}
+				}
+				var description string
+				if res := regexp.MustCompile(`data-description="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
+					if v, err := url.QueryUnescape(res[0][1]); err == nil {
+						var vv string
+						if err = json.Unmarshal([]byte(v), &vv); err == nil {
+							description = vv
+						}
+					}
+				}
+				var option int
+				if res := regexp.MustCompile(`data-option="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
+					if v, err := url.QueryUnescape(res[0][1]); err == nil {
+						var vv string
+						if err = json.Unmarshal([]byte(v), &vv); err == nil {
+							if vvv, err := strconv.Atoi(vv); err == nil {
+								option = vvv
+							}
+						}
+					}
+				}
+				var form int
+				if res := regexp.MustCompile(`data-form="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
+					if v, err := url.QueryUnescape(res[0][1]); err == nil {
+						var vv string
+						if err = json.Unmarshal([]byte(v), &vv); err == nil {
+							if vvv, err := strconv.Atoi(vv); err == nil {
+								form = vvv
+							}
+						}
+					}
+				}
+				var limit int
+				if res := regexp.MustCompile(`data-limit="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
+					if v, err := url.QueryUnescape(res[0][1]); err == nil {
+						var vv string
+						if err = json.Unmarshal([]byte(v), &vv); err == nil {
+							if vvv, err := strconv.Atoi(vv); err == nil {
+								limit = vvv
+							}
+						}
+					}
+				}
+				if option, err := models.GetOption(common.Database, option); err == nil {
+					var data struct {
+						Description string
+						Option *handler.OptionView
+						Form int
+						Limit int
+					}
+					data.Description = description
+					data.Form = form
+					data.Limit = limit
+					if bts, err := json.Marshal(option); err == nil {
+						if err = json.Unmarshal(bts, &data.Option); err != nil {
+							logger.Warningf("%+v", err)
+						}
+					}
+					for i, value := range data.Option.Values {
+						if cache, err := models.GetCacheValueByValueId(common.Database, value.ID); err == nil {
+							data.Option.Values[i].Thumbnail = cache.Thumbnail
+						}else{
+							logger.Warningf("%+v", err)
+						}
+					}
+					data.Limit = limit
+					if bts, err := json.Marshal(data); err == nil {
+						content = fmt.Sprintf(`<script type="application/json" data-goshop="samples">%v</script><button id="btnSamples" class="v-button">%v</button>`, string(bts), title)
+					}
+				}else{
+					content = fmt.Sprintf(`[ERROR: %+v]`, err)
+				}
+				break
+			}
+			widget.Content = strings.Replace(widget.Content, wildcard[0], content, 1)
+		}
+	}
+
+	return common.WidgetCF{
+		Name:     widget.Name,
+		Title:    widget.Title,
+		Content:  widget.Content,
+		Location: widget.Location,
+		ApplyTo:  widget.ApplyTo,
 	}
 }
 

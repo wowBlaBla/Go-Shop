@@ -414,6 +414,8 @@ definitions:
         type: boolean
       id:
         type: integer
+      images:
+        type: string
       max:
         type: integer
       title:
@@ -429,6 +431,8 @@ definitions:
         type: boolean
       id:
         type: integer
+      images:
+        type: string
       max:
         type: number
       productId:
@@ -707,6 +711,8 @@ definitions:
     properties:
       createdAt:
         type: string
+      file:
+        type: string
       id:
         type: integer
       name:
@@ -745,6 +751,8 @@ definitions:
     properties:
       created:
         type: string
+      file:
+        type: string
       id:
         type: integer
       name:
@@ -773,6 +781,41 @@ definitions:
     type: object
   handler.FilterRequest:
     $ref: '#/definitions/handler.ListRequest'
+  handler.FormListItem:
+    properties:
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.FormView:
+    properties:
+      description:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.FormsListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.FormListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
   handler.HTTPCsrf:
     properties:
       csfr:
@@ -900,6 +943,8 @@ definitions:
       thumbnail:
         type: string
       updated:
+        type: string
+      url:
         type: string
       width:
         type: integer
@@ -1145,6 +1190,35 @@ definitions:
       total:
         type: integer
     type: object
+  handler.MessageListItem:
+    properties:
+      body:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+    type: object
+  handler.MessageView:
+    properties:
+      body:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+    type: object
+  handler.MessagesListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/handler.MessageListItem'
+        type: array
+      filtered:
+        type: integer
+      total:
+        type: integer
+    type: object
   handler.MollieOrderView:
     properties:
       checkout:
@@ -1241,6 +1315,17 @@ definitions:
       name:
         type: string
     type: object
+  handler.NewForm:
+    properties:
+      description:
+        type: string
+      enabled:
+        type: boolean
+      name:
+        type: string
+      title:
+        type: string
+    type: object
   handler.NewImage:
     properties:
       image:
@@ -1266,6 +1351,13 @@ definitions:
       location:
         type: string
       name:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.NewMessage:
+    properties:
+      body:
         type: string
       title:
         type: string
@@ -1690,6 +1782,8 @@ definitions:
         type: string
       delivery:
         type: number
+      description:
+        type: string
       id:
         type: integer
       items:
@@ -1781,6 +1875,10 @@ definitions:
     properties:
       action:
         type: string
+      addFile:
+        type: integer
+      addImage:
+        type: integer
     type: object
   handler.PaymentView:
     properties:
@@ -1830,6 +1928,10 @@ definitions:
     type: object
   handler.ProductPatchRequest:
     properties:
+      addFile:
+        type: integer
+      addImage:
+        type: integer
       enabled:
         type: string
     type: object
@@ -1856,6 +1958,8 @@ definitions:
         items:
           $ref: '#/definitions/models.CategoryView'
         type: array
+      container:
+        type: boolean
       content:
         type: string
       customParameters:
@@ -1892,6 +1996,8 @@ definitions:
         type: boolean
       notes:
         type: string
+      packages:
+        type: integer
       parameters:
         items:
           $ref: '#/definitions/handler.ParameterView'
@@ -1961,6 +2067,8 @@ definitions:
       salePrice:
         type: number
       sending:
+        type: string
+      size:
         type: string
       sku:
         type: string
@@ -2303,6 +2411,8 @@ definitions:
         type: integer
       name:
         type: string
+      thumbnail:
+        type: string
       title:
         type: string
     type: object
@@ -2317,6 +2427,8 @@ definitions:
       id:
         type: integer
       name:
+        type: string
+      thumbnail:
         type: string
       title:
         type: string
@@ -2533,6 +2645,8 @@ definitions:
         type: string
       order:
         type: string
+      thumbnail:
+        type: string
       title:
         type: string
       volume:
@@ -2725,6 +2839,8 @@ definitions:
         type: boolean
       notes:
         type: string
+      packages:
+        type: integer
       pattern:
         type: string
       prices:
@@ -2825,6 +2941,8 @@ definitions:
         type: string
       propertiesTitles:
         type: string
+      sku:
+        type: string
       thumbnail:
         type: string
       title:
@@ -2877,6 +2995,8 @@ definitions:
       id:
         type: integer
       name:
+        type: string
+      thumbnail:
         type: string
       title:
         type: string
@@ -5055,6 +5175,162 @@ paths:
       summary: Search and Filter products. Use fixed word 'Search' to make search, another options according to doc
       tags:
       - frontend
+  /api/v1/forms:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewForm'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.FormView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create form
+      tags:
+      - form
+  /api/v1/forms/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Form ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete form
+      tags:
+      - form
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Form ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.FormView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get form
+      tags:
+      - form
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: form
+        required: true
+        schema:
+          $ref: '#/definitions/handler.FormView'
+      - description: Coupon ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.FormView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Update form
+      tags:
+      - form
+  /api/v1/forms/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.FormsListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search forms
+      tags:
+      - form
   /api/v1/images:
     post:
       consumes:
@@ -5494,6 +5770,167 @@ paths:
       summary: Search menus
       tags:
       - menu
+  /api/v1/messages:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewMessage'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.MessageView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create message
+      tags:
+      - message
+  /api/v1/messages/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Message ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete message
+      tags:
+      - message
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Message ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.MessageView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get message
+      tags:
+      - message
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: message
+        required: true
+        schema:
+          $ref: '#/definitions/handler.MessageView'
+      - description: Coupon ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.MessageView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Update message
+      tags:
+      - message
+  /api/v1/messages/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Form ID
+        in: query
+        name: form_id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.MessagesListResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Search messages
+      tags:
+      - message
   /api/v1/notification/email:
     post:
       consumes:
@@ -6311,16 +6748,6 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Product id
-        in: query
-        name: product_id
-        required: true
-        type: integer
-      - description: Variation id
-        in: query
-        name: variation_id
-        required: true
-        type: integer
       - description: body
         in: body
         name: price

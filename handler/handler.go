@@ -235,13 +235,6 @@ func GetFiber() *fiber.App {
 	v1.Get("/coupons/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getCouponHandler)
 	v1.Put("/coupons/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("coupon updated"), putCouponHandler)
 	v1.Delete("/options/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("option deleted"), delCouponHandler)
-	// Discounts
-	//v1.Get("/values", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getValuesHandler)
-	//v1.Post("/values", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("value created"), postValueHandler)
-	//v1.Post("/values/list", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), postValuesListHandler)
-	//v1.Get("/values/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getValueHandler)
-	//v1.Put("/values/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("value updated"), putValueHandler)
-	//v1.Delete("/values/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("value deleted"), delValueHandler)
 	// Orders
 	v1.Post("/orders/list", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), postOrdersListHandler)
 	v1.Get("/orders/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getOrderHandler)
@@ -264,6 +257,22 @@ func GetFiber() *fiber.App {
 	v1.Get("/menus/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getMenuHandler)
 	v1.Put("/menus/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("menu updated"), putMenuHandler)
 	v1.Delete("/menus/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("menu deleted"), delMenuHandler)
+	// Form
+	v1.Post("/forms", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("form created"), postFormHandler)
+	v1.Post("/forms/list", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), postFormsListHandler)
+	v1.Get("/forms/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getFormHandler)
+	v1.Get("/forms/:id/messages", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getFormMessagesHandler)
+	v1.Post("/forms/:id/messages", changed("message created"), postFormMessageHandler)
+	v1.Put("/forms/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("form updated"), putFormHandler)
+	v1.Delete("/forms/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("form deleted"), delFormHandler)
+	//
+	// Message
+	v1.Get("/messages", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getMessagesHandler)
+	v1.Post("/messages", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("message created"), postMessageHandler)
+	v1.Post("/messages/list", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), postMessagesListHandler)
+	v1.Get("/messages/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getMessageHandler)
+	v1.Put("/messages/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("message updated"), putMessageHandler)
+	v1.Delete("/messages/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("message deleted"), delMessageHandler)
 	//
 	v1.Get("/comments", getCommentsHandler)
 	//
@@ -359,6 +368,8 @@ func GetFiber() *fiber.App {
 	v1.Delete("/account/wishes/:id", authRequired, deleteAccountWishHandler)
 	// Account Comments
 	v1.Post("/account/comments", authRequired, postAccountCommentHandler)
+	//
+	//v1.Post("/forms/:id", /*csrf,*/ postMessageHandler)
 	//
 	v1.Post("/email", postEmailHandler)
 	v1.Get("/test", getTestHandler)
@@ -2553,7 +2564,7 @@ func postWidgetsListHandler(c *fiber.Ctx) error {
 		rows.Close()
 	}
 	if len(keys1) > 0 {
-		common.Database.Debug().Model(&models.Coupon{}).Count(&response.Total)
+		common.Database.Debug().Model(&models.Widget{}).Count(&response.Total)
 	}else{
 		response.Total = response.Filtered
 	}

@@ -345,6 +345,13 @@ var RootCmd = &cobra.Command{
 			logger.Warningf("%+v", err)
 		}
 		//
+		if err := common.Database.AutoMigrate(&models.Form{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
+		if err := common.Database.AutoMigrate(&models.Message{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
+		//
 		if err := common.Database.Exec(`CREATE TABLE IF NOT EXISTS categories_products_sort (
 		CategoryId BIGINT UNSIGNED NOT NULL,
 		ProductId BIGINT UNSIGNED NOT NULL,
