@@ -716,6 +716,8 @@ func getPreviewHandler (c *fiber.Ctx) error {
 
 type InfoView struct {
 	Application string
+	Version string `json:",omitempty"`
+	Compiled string `json:",omitempty"`
 	Started string
 	AbsolutePrice bool `json:",omitempty"`
 	Debug bool `json:",omitempty"`
@@ -745,6 +747,8 @@ type InfoView struct {
 func getInfoHandler(c *fiber.Ctx) error {
 	var view InfoView
 	view.Application = fmt.Sprintf("%v v%v, build: %v", common.APPLICATION, common.VERSION, common.COMPILED)
+	view.Version = common.VERSION
+	view.Compiled = common.COMPILED
 	view.Started = common.Started.Format(time.RFC3339)
 	view.Debug = common.Config.Debug
 	view.Decimal = common.Config.Decimal
@@ -1174,6 +1178,7 @@ func putBasicSettingsHandler(c *fiber.Ctx) error {
 type HugoSettingsView struct {
 	Title string `toml:"title"`
 	Theme string `toml:"theme"`
+	LanguageCode string `toml:"languageCode"`
 	Paginate int `toml:"paginate"`
 	Params struct {
 		Description string `toml:"description"`
@@ -1293,6 +1298,9 @@ func putHugoSettingsHandler(c *fiber.Ctx) error {
 						}
 					}
 				}
+			}
+			if v, found := data.Value["LanguageCode"]; found && len(v) > 0 {
+				conf.LanguageCode = v[0]
 			}
 			if v, found := data.Value["Paginate"]; found && len(v) > 0 {
 				if vv, err := strconv.Atoi(v[0]); err == nil {
