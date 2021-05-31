@@ -88,10 +88,13 @@ func initConfig() {
 		}else{
 			common.Config.Hugo.Bin = config.DEFAULT_HUGO
 		}
-		common.Config.Hugo.Theme = "multikart"
+		common.Config.Hugo.Theme = "default"
 		common.Config.Hugo.Minify = true
+		common.Config.Publisher.Enabled = true
 		if os.Getenv("DOCKER") == "true" {
-			common.Config.Wrangler.Bin = "/usr/bin/docker run --rm -v %DIR%/hugo/public:/hugo/public -v %DIR%/worker/workers-site:/worker/workers-site -v %DIR%/worker/wrangler.toml:/worker/wrangler.toml goshop_wrangler"
+			common.Config.Publisher.Bin = "/usr/bin/docker run --rm -v %DIR%/hugo/public:/hugo/public -v %DIR%/worker/workers-site:/worker/workers-site -v %DIR%/worker/wrangler.toml:/worker/wrangler.toml goshop_wrangler"
+		}else{
+			common.Config.Publisher.Bin = "/bin/true"
 		}
 		common.Config.Products = "Products"
 		common.Config.FlatUrl = true

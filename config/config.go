@@ -82,7 +82,7 @@ type Config struct {
 		Theme  string
 		Minify bool
 	}
-	Wrangler WranglerConfig
+	Publisher PublisherConfig
 	//
 	Currency string // usd, eur
 	Symbol string // $, €
@@ -99,10 +99,10 @@ type Config struct {
 	Modified time.Time
 }
 
-type WranglerConfig struct {
+type PublisherConfig struct {
 	Enabled bool
 	Bin string
-	ApiToken string
+	ApiToken string `json:",omitempty" toml:",omitempty"`
 }
 
 type PaymentConfig struct {
