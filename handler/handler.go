@@ -134,8 +134,8 @@ func GetFiber() *fiber.App {
 	v1.Put("/settings/basic", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("basic settings updated"), putBasicSettingsHandler)
 	v1.Get("/settings/hugo", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getHugoSettingsHandler)
 	v1.Put("/settings/hugo", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("hugo settings updated"), putHugoSettingsHandler)
-	v1.Get("/settings/wrangler", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getWranglerSettingsHandler)
-	v1.Put("/settings/wrangler", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("wrangler settings updated"), putWranglerSettingsHandler)
+	v1.Get("/settings/publisher", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getPublisherSettingsHandler)
+	v1.Put("/settings/publisher", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("publisher settings updated"), putPublisherSettingsHandler)
 	//
 	v1.Get("/categories", authRequired, getCategoriesHandler)
 	v1.Post("/categories", authRequired, changed("category created"), postCategoryHandler)
@@ -1245,90 +1245,81 @@ type HugoSettingsRequest struct {
 // @Router /api/v1/settings/hugo [put]
 // @Tags settings
 func putHugoSettingsHandler(c *fiber.Ctx) error {
-	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
-			data, err := c.Request().MultipartForm()
-			if err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
+	data, err := c.Request().MultipartForm()
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	//
+	var conf HugoSettingsView
+	if _, err := toml.DecodeFile(path.Join(dir, "hugo", "config.toml"), &conf); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	if v, found := data.Value["Title"]; found && len(v) > 0 {
+		conf.Title = v[0]
+	}
+	if v, found := data.Value["Description"]; found && len(v) > 0 {
+		conf.Params.Description = v[0]
+	}
+	if v, found := data.Value["Keywords"]; found && len(v) > 0 {
+		conf.Params.Keywords = v[0]
+	}
+	if v, found := data.Value["Currency"]; found && len(v) > 0 {
+		conf.Params.Currency = v[0]
+	}
+	if v, found := data.Value["Products"]; found && len(v) > 0 {
+		conf.Params.Products = v[0]
+	}
+	if v, found := data.Value["Theme"]; found && len(v) > 0 {
+		conf.Theme = v[0]
+	}
+	if v, found := data.File["Logo"]; found && len(v) > 0 {
+		p := path.Join(dir, "hugo", "themes", conf.Theme, "static", "img")
+		if _, err := os.Stat(p); err != nil {
+			if err = os.MkdirAll(p, 0755); err != nil {
+				logger.Errorf("%v", err)
 			}
-			//
-			var conf HugoSettingsView
-			if _, err := toml.DecodeFile(path.Join(dir, "hugo", "config.toml"), &conf); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			if v, found := data.Value["Title"]; found && len(v) > 0 {
-				conf.Title = v[0]
-			}
-			if v, found := data.Value["Description"]; found && len(v) > 0 {
-				conf.Params.Description = v[0]
-			}
-			if v, found := data.Value["Keywords"]; found && len(v) > 0 {
-				conf.Params.Keywords = v[0]
-			}
-			if v, found := data.Value["Currency"]; found && len(v) > 0 {
-				conf.Params.Currency = v[0]
-			}
-			if v, found := data.Value["Products"]; found && len(v) > 0 {
-				conf.Params.Products = v[0]
-			}
-			if v, found := data.Value["Theme"]; found && len(v) > 0 {
-				conf.Theme = v[0]
-			}
-			if v, found := data.File["Logo"]; found && len(v) > 0 {
-				p := path.Join(dir, "hugo", "themes", conf.Theme, "static", "img")
-				if _, err := os.Stat(p); err != nil {
-					if err = os.MkdirAll(p, 0755); err != nil {
-						logger.Errorf("%v", err)
-					}
+		}
+		filename := "logo.png"
+		if p := path.Join(p, filename); len(p) > 0 {
+			if in, err := v[0].Open(); err == nil {
+				out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
+				if err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
 				}
-				filename := "logo.png"
-				if p := path.Join(p, filename); len(p) > 0 {
-					if in, err := v[0].Open(); err == nil {
-						out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
-						if err != nil {
-							c.Status(http.StatusInternalServerError)
-							return c.JSON(HTTPError{err.Error()})
-						}
-						defer out.Close()
-						if _, err := io.Copy(out, in); err != nil {
-							c.Status(http.StatusInternalServerError)
-							return c.JSON(HTTPError{err.Error()})
-						}
-					}
+				defer out.Close()
+				if _, err := io.Copy(out, in); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
 				}
 			}
-			if v, found := data.Value["LanguageCode"]; found && len(v) > 0 {
-				conf.LanguageCode = v[0]
-			}
-			if v, found := data.Value["Paginate"]; found && len(v) > 0 {
-				if vv, err := strconv.Atoi(v[0]); err == nil {
-					conf.Paginate = vv
-				}
-			}
-			f, err := os.Create(path.Join(dir, "hugo", "config.toml"))
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer f.Close()
-			if err = toml.NewEncoder(f).Encode(conf); err != nil {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			return c.JSON(HTTPMessage{"OK"})
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Unsupported Content-Type"})
 		}
 	}
-	c.Status(http.StatusInternalServerError)
-	return c.JSON(HTTPError{"Something went wrong"})
+	if v, found := data.Value["LanguageCode"]; found && len(v) > 0 {
+		conf.LanguageCode = v[0]
+	}
+	if v, found := data.Value["Paginate"]; found && len(v) > 0 {
+		if vv, err := strconv.Atoi(v[0]); err == nil {
+			conf.Paginate = vv
+		}
+	}
+	f, err := os.Create(path.Join(dir, "hugo", "config.toml"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	if err = toml.NewEncoder(f).Encode(conf); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	return c.JSON(HTTPMessage{"OK"})
 }
 
 
 
-type WranglerSettingsView struct {
+type PublisherSettingsView struct {
 	Name string `toml:"name"`
 	Type string `toml:"type"`
 	AccountId string `toml:"account_id"`
@@ -1340,43 +1331,43 @@ type WranglerSettingsView struct {
 	} `toml:"site"`
 }
 
-type BasicWranglerView config.WranglerConfig
+type BasicPublisherView config.PublisherConfig
 
 // GetWranglerSettings godoc
-// @Summary Get wrangler settings
+// @Summary Get publisher settings
 // @Accept json
 // @Produce json
-// @Success 200 {object} BasicWranglerView
+// @Success 200 {object} BasicPublisherView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
-// @Router /api/v1/settings/wrangler [get]
+// @Router /api/v1/settings/publisher [get]
 // @Tags settings
-func getWranglerSettingsHandler(c *fiber.Ctx) error {
+func getPublisherSettingsHandler(c *fiber.Ctx) error {
 	var conf struct {
-		WranglerSettingsView
-		config.WranglerConfig
+		PublisherSettingsView
+		config.PublisherConfig
 	}
 	if _, err := toml.DecodeFile(path.Join(dir, "worker", "wrangler.toml"), &conf); err != nil {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
+		logger.Warningf("%+v", err)
 	}
-	conf.Enabled = common.Config.Wrangler.Enabled
-	conf.ApiToken = common.Config.Wrangler.ApiToken
+	conf.Enabled = common.Config.Publisher.Enabled
+	conf.Bin = common.Config.Publisher.Bin
+	conf.ApiToken = common.Config.Publisher.ApiToken
 	return c.JSON(conf)
 }
 
 // @security BasicAuth
-// PutWranglerSettings godoc
-// @Summary Set wrangler settings
+// PutPublisherSettings godoc
+// @Summary Set publisher settings
 // @Accept json
 // @Produce json
-// @Param category body WranglerSettingsView true "body"
+// @Param category body PublisherSettingsView true "body"
 // @Success 200 {object} HTTPMessage
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
-// @Router /api/v1/settings/wrangler [put]
+// @Router /api/v1/settings/publisher [put]
 // @Tags settings
-func putWranglerSettingsHandler(c *fiber.Ctx) error {
+func putPublisherSettingsHandler(c *fiber.Ctx) error {
 	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
 		if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
 			data, err := c.Request().MultipartForm()
@@ -1386,18 +1377,26 @@ func putWranglerSettingsHandler(c *fiber.Ctx) error {
 			}
 			if v, found := data.Value["Enabled"]; found && len(v) > 0 {
 				if value, err := strconv.ParseBool(v[0]); err == nil {
-					common.Config.Wrangler.Enabled = value
+					common.Config.Publisher.Enabled = value
+				}
+			}
+			if v, found := data.Value["Bin"]; found && len(v) > 0 {
+				if _, err := os.Stat(v[0]); err == nil {
+					common.Config.Publisher.Bin = v[0]
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
 				}
 			}
 			if v, found := data.Value["ApiToken"]; found && len(v) > 0 {
-				common.Config.Wrangler.ApiToken = v[0]
+				common.Config.Publisher.ApiToken = v[0]
 			}
 			if err = common.Config.Save(); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
 			//
-			var conf WranglerSettingsView
+			/*var conf PublisherSettingsView
 			if _, err := toml.DecodeFile(path.Join(dir, "worker", "wrangler.toml"), &conf); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
@@ -1427,7 +1426,7 @@ func putWranglerSettingsHandler(c *fiber.Ctx) error {
 			if err = toml.NewEncoder(f).Encode(conf); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
-			}
+			}*/
 			return c.JSON(HTTPMessage{"OK"})
 		}else{
 			c.Status(http.StatusInternalServerError)
@@ -5122,14 +5121,14 @@ func postPublishHandler(c *fiber.Ctx) error {
 				return err
 			}
 			//
-			if !common.Config.Wrangler.Enabled{
+			if !common.Config.Publisher.Enabled{
 				err := fmt.Errorf("wrangler disabled")
 				logger.Errorf("%v", err.Error())
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
 			//
-			bin := strings.Split(common.Config.Wrangler.Bin, " ")
+			bin := strings.Split(common.Config.Publisher.Bin, " ")
 			//
 			var arguments []string
 			if len(bin) > 1 {
@@ -5137,13 +5136,13 @@ func postPublishHandler(c *fiber.Ctx) error {
 					x = strings.Replace(x, "%DIR%", dir, -1)
 					arguments = append(arguments, x)
 				}
-				if common.Config.Wrangler.ApiToken == "" {
+				if common.Config.Publisher.ApiToken == "" {
 					err := fmt.Errorf("api_token is not specified")
 					logger.Errorf("%v", err.Error())
 					c.Status(http.StatusInternalServerError)
 					return c.JSON(HTTPError{err.Error()})
 				}
-				arguments = append(arguments, common.Config.Wrangler.ApiToken)
+				arguments = append(arguments, common.Config.Publisher.ApiToken)
 			}
 			//
 			logger.Infof("Run: %v %+v", bin[0], strings.Join(arguments, " "))

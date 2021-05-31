@@ -6691,7 +6691,7 @@ var doc = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.WranglerSettingsView"
+                            "$ref": "#/definitions/handler.PublisherSettingsView"
                         }
                     }
                 ],
@@ -9798,7 +9798,7 @@ var doc = `{
                 }
             }
         },
-        "config.WranglerConfig": {
+        "config.PublisherConfig": {
             "type": "object",
             "properties": {
                 "apiToken": {
@@ -10008,7 +10008,7 @@ var doc = `{
             }
         },
         "handler.BasicWranglerView": {
-            "$ref": "#/definitions/config.WranglerConfig"
+            "$ref": "#/definitions/config.PublisherConfig"
         },
         "handler.BillingOrderView": {
             "type": "object",
@@ -14443,7 +14443,7 @@ var doc = `{
                 }
             }
         },
-        "handler.WranglerSettingsView": {
+        "handler.PublisherSettingsView": {
             "type": "object",
             "properties": {
                 "accountId": {
