@@ -33,7 +33,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210531102823"
+	COMPILED = "20210601105845"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -204,6 +204,7 @@ type ProductFile struct {
 	Url        string `json:",omitempty"`
 	Aliases    []string `json:",omitempty"`
 	Date       time.Time
+	Description string `json:",omitempty"`
 	//Tags       []string
 	Tags []TagPF `json:",omitempty"`
 	Canonical  string `json:",omitempty"`
@@ -251,6 +252,7 @@ type ProductPF struct {
 	Volume float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
 	Availability string `json:",omitempty"`
+	Vendor VendorPF `json:",omitempty"`
 	Time string `json:",omitempty"`
 	Properties []PropertyPF
 	Variations []VariationPF
@@ -322,6 +324,14 @@ type PricePF struct {
 	Sku string `json:",omitempty"`
 }
 
+type VendorPF struct {
+	Id uint
+	Name  string
+	Title string
+	Thumbnail string `json:",omitempty"`
+	Description string `json:",omitempty"`
+}
+
 type PropertyPF struct {
 	Id uint
 	Type string
@@ -370,6 +380,7 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Url        string `json:",omitempty"`
 		Aliases    []string `json:",omitempty"`
 		Date       time.Time
+		Description string `json:",omitempty"`
 		Tags       []TagPF
 		Canonical  string
 		Categories []string
@@ -394,6 +405,7 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Url: p.Url,
 		Aliases: p.Aliases,
 		Date: p.Date,
+		Description: p.Description,
 		Tags: p.Tags,
 		Canonical: p.Canonical,
 		Categories: p.Categories,

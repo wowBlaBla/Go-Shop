@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // @security BasicAuth
@@ -97,6 +98,7 @@ type MessagesListResponse struct {
 
 type MessageListItem struct {
 	ID uint
+	Created time.Time
 	FormTitle string
 	Title string
 	Body string
@@ -164,7 +166,7 @@ func postMessagesListHandler(c *fiber.Ctx) error {
 		order = strings.Join(orders, ", ")
 	}
 	//
-	rows, err := common.Database.Debug().Model(&models.Message{}).Select("messages.ID, forms.Title as FormTitle, messages.Title, messages.Body, length(messages.Body) as length").Joins("left join forms on messages.form_id = forms.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Message{}).Select("messages.ID, messages.Created_At as Created, forms.Title as FormTitle, messages.Title, messages.Body, length(messages.Body) as length").Joins("left join forms on messages.form_id = forms.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -180,7 +182,7 @@ func postMessagesListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Message{}).Select("messages.ID, forms.Title as FormTitle, messages.Title, messages.Body, length(messages.Body) as length").Joins("left join forms on messages.form_id = forms.id").Where(strings.Join(keys1, " and "), values1...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Message{}).Select("messages.ID, messages.Created_At as Created, forms.Title as FormTitle, messages.Title, messages.Body, length(messages.Body) as length").Joins("left join forms on messages.form_id = forms.id").Where(strings.Join(keys1, " and "), values1...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
