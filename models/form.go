@@ -8,6 +8,7 @@ type Form struct {
 	Name string
 	Title string
 	Description string `json:",omitempty"`
+	Type string `json:",omitempty"` // empty = default
 	//
 	Messages []*Message `gorm:"foreignKey:FormId"`
 }

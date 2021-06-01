@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/logger"
+	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"github.com/yonnic/goshop/common"
 	"github.com/yonnic/goshop/models"
 	"net/http"
@@ -17,6 +18,7 @@ type NewForm struct {
 	Name string
 	Title string
 	Description string
+	Type string
 }
 
 // @security BasicAuth
@@ -49,11 +51,15 @@ func postFormHandler(c *fiber.Ctx) error {
 	if len(request.Description) > 256 {
 		request.Description = request.Description[0:255]
 	}
+	if len(request.Type) > 256 {
+		request.Type = request.Type[0:255]
+	}
 	form := &models.Form {
 		Enabled: request.Enabled,
 		Name: request.Name,
 		Title: request.Title,
 		Description: request.Description,
+		Type: request.Type,
 	}
 	if _, err := models.CreateForm(common.Database, form); err != nil {
 		c.Status(http.StatusInternalServerError)
@@ -79,6 +85,7 @@ type FormListItem struct {
 	Enabled bool
 	Name string
 	Title string
+	Type string
 }
 
 // @security BasicAuth
@@ -133,23 +140,21 @@ func postFormsListHandler(c *fiber.Ctx) error {
 		order = strings.Join(orders, ", ")
 	}
 	//
-	rows, err := common.Database.Debug().Model(&models.Form{}).Select("forms.ID, forms.Enabled, forms.Name, forms.Title, forms.Description").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Form{}).Select("forms.ID, forms.Enabled, forms.Name, forms.Title, forms.Description, forms.Type").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
-		if err == nil {
-			for rows.Next() {
-				var item FormListItem
-				if err = common.Database.ScanRows(rows, &item); err == nil {
-					response.Data = append(response.Data, item)
-				} else {
-					logger.Errorf("%v", err)
-				}
+		for rows.Next() {
+			var item FormListItem
+			if err = common.Database.ScanRows(rows, &item); err == nil {
+				response.Data = append(response.Data, item)
+			} else {
+				logger.Errorf("%v", err)
 			}
-		}else{
-			logger.Errorf("%v", err)
 		}
 		rows.Close()
+	}else{
+		logger.Warningf("%+v", err)
 	}
-	rows, err = common.Database.Debug().Model(&models.Form{}).Select("forms.ID, forms.Enabled, forms.Name, forms.Title, forms.Description").Where(strings.Join(keys1, " and "), values1...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Form{}).Select("forms.ID, forms.Enabled, forms.Name, forms.Title, forms.Description, forms.Type").Where(strings.Join(keys1, " and "), values1...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -157,7 +162,7 @@ func postFormsListHandler(c *fiber.Ctx) error {
 		rows.Close()
 	}
 	if len(keys1) > 0 {
-		common.Database.Debug().Model(&models.Coupon{}).Count(&response.Total)
+		common.Database.Debug().Model(&models.Form{}).Count(&response.Total)
 	}else{
 		response.Total = response.Filtered
 	}
@@ -171,6 +176,7 @@ type FormView struct {
 	Name string `json:",omitempty"`
 	Title string `json:",omitempty"`
 	Description string `json:",omitempty"`
+	Type string `json:",omitempty"`
 }
 
 // @security BasicAuth
@@ -252,8 +258,12 @@ func putFormHandler(c *fiber.Ctx) error {
 	if len(request.Description) > 256 {
 		request.Description = request.Description[0:255]
 	}
+	if len(request.Type) > 256 {
+		request.Type = request.Type[0:255]
+	}
 	form.Title = request.Title
 	form.Description = request.Description
+	form.Type = request.Type
 	if err := models.UpdateForm(common.Database, form); err == nil {
 		var view FormView
 		if bts, err := json.MarshalIndent(form, "", "   "); err == nil {
@@ -362,9 +372,9 @@ func postFormMessageHandler(c *fiber.Ctx) error {
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)
 	}
-	//var form *models.Form
+	var form *models.Form
 	var err error
-	if _, err = models.GetForm(common.Database, id); err != nil {
+	if form, err = models.GetForm(common.Database, id); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
@@ -395,6 +405,67 @@ func postFormMessageHandler(c *fiber.Ctx) error {
 	if _, err := models.CreateMessage(common.Database, message); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
+	}
+	//
+	if form.Type == "samples" {
+		if common.Config.Notification.Enabled {
+			if common.Config.Notification.Email.Enabled {
+				// to admin
+				if users, err := models.GetUsersByRoleLessOrEqualsAndNotification(common.Database, models.ROLE_ADMIN, true); err == nil {
+					template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_ADMIN_FREE_SAMPLES_ORDERED)
+					if err == nil {
+						//logger.Infof("Template: %+v", template)
+						for _, user := range users {
+							logger.Infof("Send email admin user: %+v", user.Email)
+							vars := &common.NotificationTemplateVariables{
+								Url: common.Config.Url,
+							}
+							var payload struct {
+								Address struct {
+									Name string
+									Lastname string
+									Email string
+									Phone string
+									Address string
+									City string
+									Country string
+									Zip string
+								}
+								Samples []struct {
+									ID uint
+									Title string
+									Thumbnail string
+									Value string
+								}
+							}
+							logger.Infof("body: %+v", body)
+							if err = json.Unmarshal([]byte(body), &payload); err == nil {
+								logger.Infof("payload1: %+v", payload)
+								for i := 0; i < len(payload.Samples); i++ {
+									if cache, err := models.GetCacheValueByValueId(common.Database, payload.Samples[i].ID); err == nil {
+										payload.Samples[i].Title = cache.Title
+										payload.Samples[i].Thumbnail = cache.Thumbnail
+										payload.Samples[i].Value = cache.Value
+									}
+								}
+								logger.Infof("payload2: %+v", payload)
+								vars.Address = payload.Address
+								vars.Samples = payload.Samples
+								if err := common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), mail.NewEmail(user.Login, user.Email), template.Topic, template.Message, vars); err != nil {
+									logger.Warningf("%+v", err)
+								}
+							}else{
+								logger.Warningf("%+v", err)
+							}
+						}
+					} else {
+						logger.Warningf("%+v", err)
+					}
+				} else {
+					logger.Warningf("%+v", err)
+				}
+			}
+		}
 	}
 	if bts, err := json.Marshal(message); err == nil {
 		if err = json.Unmarshal(bts, &view); err != nil {

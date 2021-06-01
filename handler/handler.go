@@ -1689,6 +1689,7 @@ func patchContentHandler(c *fiber.Ctx) error {
 				return c.JSON(HTTPError{err.Error()})
 			}
 			page := NewPage()
+			page.Type = "page"
 			page.Title = request.Title
 			if bts, err := page.MarshalJSON(); err == nil {
 				if err = ioutil.WriteFile(path.Join(p, "index.html"), bts, 0644); err != nil {
@@ -1704,6 +1705,7 @@ func patchContentHandler(c *fiber.Ctx) error {
 				return c.JSON(HTTPError{err.Error()})
 			}
 			page := NewPage()
+			page.Type = "page"
 			page.Title = request.Title
 			if bts, err := page.MarshalJSON(); err == nil {
 				if err = ioutil.WriteFile(p, bts, 0644); err != nil {

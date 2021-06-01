@@ -1427,6 +1427,20 @@ var renderCmd = &cobra.Command{
 								productView.Volume = product.Volume
 								productView.Weight = product.Weight
 								productView.Availability = product.Availability
+								if product.Vendor != nil {
+									productView.Vendor = common.VendorPF{
+										Id:          product.Vendor.ID,
+										Name:        product.Vendor.Name,
+										Title:       product.Vendor.Title,
+										Thumbnail:   product.Vendor.Thumbnail,
+										Description: product.Vendor.Description,
+									}
+									if product.Vendor.Thumbnail != "" {
+										if cache, err := models.GetCacheVendorByVendorId(common.Database, product.VendorId); err == nil {
+											productView.Vendor.Thumbnail = cache.Thumbnail
+										}
+									}
+								}
 								if product.Time != nil {
 									productView.Time = product.Time.Title
 								}
@@ -1477,6 +1491,7 @@ var renderCmd = &cobra.Command{
 									productFile.Max = math.Round((float64(max) / float64(votes)) * 100) / 100
 								}
 								productFile.Votes = votes
+								productFile.Description = product.Content
 								productFile.Content = product.Content
 								//
 								for _, language := range languages {
@@ -1527,7 +1542,7 @@ var renderCmd = &cobra.Command{
 									Images:      strings.Join(images, ";"),
 									Variations:  strings.Join(variations, ";"),
 									CategoryID:  category.ID,
-									Price:       basePriceMin,
+									Price:       variations2[0].BasePrice,
 									Width:       product.Width,
 									Height:      product.Height,
 									Depth:       product.Depth,
