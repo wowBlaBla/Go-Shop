@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+var (
+	CATEGORIES = make(map[uint]string)
+)
+
 type Category struct {
 	gorm.Model
 	Name          string
@@ -255,8 +259,15 @@ func getCategoryPath(connector *gorm.DB, pid int, chunks *[]string) error {
 
 func getChildrenCategoriesView(connector *gorm.DB, root *CategoryView, depth int, noProducts bool, count bool) *CategoryView {
 	for _, category := range GetChildrenOfCategoryById(connector, root.ID) {
-		if cache, err := GetCacheCategoryByCategoryId(common.Database, category.ID); err == nil {
-			category.Thumbnail = cache.Thumbnail
+		if v, found := CATEGORIES[category.ID]; !found {
+			if cache, err := GetCacheCategoryByCategoryId(common.Database, category.ID); err == nil {
+				category.Thumbnail = cache.Thumbnail
+				CATEGORIES[category.ID] = cache.Thumbnail
+			}else{
+				CATEGORIES[category.ID] = ""
+			}
+		}else if v != "" {
+			category.Thumbnail = v
 		}
 		if depth > 0 {
 			child := getChildrenCategoriesView(connector, &CategoryView{ID: category.ID, Path: path.Join(root.Path, root.Name), Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category", Sort: category.Sort}, depth - 1, noProducts, count)

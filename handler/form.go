@@ -13,6 +13,36 @@ import (
 	"strings"
 )
 
+// @security BasicAuth
+// GetForms godoc
+// @Summary Get forms
+// @Accept json
+// @Produce json
+// @Success 200 {object} FormsView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/forms [get]
+// @Tags form
+func getFormsHandler(c *fiber.Ctx) error {
+	if forms, err := models.GetForms(common.Database); err == nil {
+		var view FormsView
+		if bts, err := json.Marshal(forms); err == nil {
+			if err = json.Unmarshal(bts, &view); err == nil {
+				return c.JSON(view)
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+}
+
 type NewForm struct {
 	Enabled bool
 	Name string
@@ -169,6 +199,8 @@ func postFormsListHandler(c *fiber.Ctx) error {
 	c.Status(http.StatusOK)
 	return c.JSON(response)
 }
+
+type FormsView []FormView
 
 type FormView struct {
 	ID uint

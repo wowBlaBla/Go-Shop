@@ -27,7 +27,7 @@ func GetValues(connector *gorm.DB) ([]*Value, error) {
 func GetValuesByOptionId(connector *gorm.DB, id int) ([]*Value, error) {
 	db := connector
 	var value []*Value
-	if err := db.Debug().Where("option_id = ?", id).Order("Sort asc, ID asc").Find(&value).Error; err != nil {
+	if err := db.Where("option_id = ?", id).Order("Sort asc, ID asc").Find(&value).Error; err != nil {
 		return nil, err
 	}
 	return value, nil

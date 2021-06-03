@@ -373,7 +373,7 @@ type CommentPF struct {
 }
 
 func (p *ProductFile) MarshalJSON() ([]byte, error) {
-	if bts, err := json.MarshalIndent(&struct {
+	if bts, err := json.Marshal(&struct {
 		ID uint
 		Type       string
 		Title      string
@@ -423,7 +423,7 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Votes: p.Votes,
 		Comments: p.Comments,
 		Sort: p.Sort,
-	}, "", "   "); err == nil {
+	}); err == nil {
 		bts = append(bts, "\n\n"...)
 		bts = append(bts, p.Content...)
 		return bts, nil

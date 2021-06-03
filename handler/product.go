@@ -162,7 +162,7 @@ func postProductsHandler(c *fiber.Ctx) error {
 	if v, found := data.Value["Variation"]; found && len(v) > 0 {
 		variation = strings.TrimSpace(v[0])
 	}
-	var size = "medium"
+	var size = common.Config.Size
 	if v, found := data.Value["Size"]; found && len(v) > 0 {
 		size = strings.TrimSpace(v[0])
 	}
