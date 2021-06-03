@@ -31,7 +31,7 @@ func GetWidgets(connector *gorm.DB) ([]*Widget, error) {
 func GetWidgetsByApplyTo(connector *gorm.DB, applyTo string) ([]*Widget, error) {
 	db := connector
 	var widgets []*Widget
-	if err := db.Debug().Where("apply_to = ?", applyTo).Find(&widgets).Error; err != nil {
+	if err := db.Where("apply_to = ?", applyTo).Find(&widgets).Error; err != nil {
 		return nil, err
 	}
 	return widgets, nil
@@ -40,7 +40,7 @@ func GetWidgetsByApplyTo(connector *gorm.DB, applyTo string) ([]*Widget, error) 
 func GetWidgetsByCategory(connector *gorm.DB, categoryId uint) ([]*Widget, error) {
 	db := connector
 	var widgets []*Widget
-	if err := db.Debug().Where("apply_to = ? and categories_widgets.category_id = ?", "categories", categoryId).Joins("left join categories_widgets on categories_widgets.widget_id = widgets.id").Find(&widgets).Error; err != nil {
+	if err := db.Where("apply_to = ? and categories_widgets.category_id = ?", "categories", categoryId).Joins("left join categories_widgets on categories_widgets.widget_id = widgets.id").Find(&widgets).Error; err != nil {
 		return nil, err
 	}
 	return widgets, nil
@@ -49,7 +49,7 @@ func GetWidgetsByCategory(connector *gorm.DB, categoryId uint) ([]*Widget, error
 func GetWidgetsByProduct(connector *gorm.DB, productId uint) ([]*Widget, error) {
 	db := connector
 	var widgets []*Widget
-	if err := db.Debug().Where("apply_to = ? and products_widgets.product_id = ?", "products", productId).Joins("left join products_widgets on products_widgets.widget_id = widgets.id").Find(&widgets).Error; err != nil {
+	if err := db.Where("apply_to = ? and products_widgets.product_id = ?", "products", productId).Joins("left join products_widgets on products_widgets.widget_id = widgets.id").Find(&widgets).Error; err != nil {
 		return nil, err
 	}
 	return widgets, nil
@@ -67,7 +67,7 @@ func CreateWidget(connector *gorm.DB, widget *Widget) (uint, error) {
 func GetWidget(connector *gorm.DB, id int) (*Widget, error) {
 	db := connector
 	var widget Widget
-	if err := db.Debug().Preload("Categories").Preload("Products").Where("id = ?", id).First(&widget).Error; err != nil {
+	if err := db.Preload("Categories").Preload("Products").Where("id = ?", id).First(&widget).Error; err != nil {
 		return nil, err
 	}
 	return &widget, nil

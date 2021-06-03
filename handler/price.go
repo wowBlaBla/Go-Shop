@@ -107,7 +107,6 @@ func postPriceAllHandler(c *fiber.Ctx) error {
 	}
 	//
 	for _, request := range requests {
-		logger.Infof("request: %+v", request)
 		price := &models.Price{
 			Enabled: request.Enabled,
 			Price: request.Price,

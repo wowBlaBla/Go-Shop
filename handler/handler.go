@@ -258,11 +258,12 @@ func GetFiber() *fiber.App {
 	v1.Put("/menus/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("menu updated"), putMenuHandler)
 	v1.Delete("/menus/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("menu deleted"), delMenuHandler)
 	// Form
+	v1.Get("/forms", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getFormsHandler)
 	v1.Post("/forms", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("form created"), postFormHandler)
 	v1.Post("/forms/list", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), postFormsListHandler)
 	v1.Get("/forms/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getFormHandler)
 	v1.Get("/forms/:id/messages", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getFormMessagesHandler)
-	v1.Post("/forms/:id/messages", changed("message created"), postFormMessageHandler)
+	v1.Post("/forms/:id/messages", csrf, changed("message created"), postFormMessageHandler)
 	v1.Put("/forms/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("form updated"), putFormHandler)
 	v1.Delete("/forms/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("form deleted"), delFormHandler)
 	//
@@ -610,23 +611,29 @@ func getPreviewHandler (c *fiber.Ctx) error {
 			if vv, ok := v.(bool); ok && vv {
 				if u, err := url.Parse(c.Request().URI().String()); err == nil {
 					u.Scheme = "https"
-					u.Host = common.Config.Preview
+					if common.Config.Preview != "" {
+						u.Host = common.Config.Preview
+					}
 					query := u.Query()
-					if referer := string(c.Request().Header.Referer()); referer != "" {
+					var referer string
+					if v := c.Query("path"); v != "" {
+						if vv, err := url.QueryUnescape(v); err == nil {
+							referer =  vv
+						}
+					}else if v := string(c.Request().Header.Referer()); v != "" {
+						referer = v
+					}
+					if referer != "" {
 						if res := regexp.MustCompile(`/products/(\d+)`).FindAllStringSubmatch(referer, 1); len(res) > 0 && len(res[0]) > 1 {
 							if v, err := strconv.Atoi(res[0][1]); err == nil {
 								if c, err := models.GetCacheProductByProductId(common.Database, uint(v)); err == nil {
 									query.Set("referer", path.Join(c.Path, c.Name))
-
 								}
 							}
 						}else if res := regexp.MustCompile(`/categories/(\d+)`).FindAllStringSubmatch(referer, 1); len(res) > 0 && len(res[0]) > 1 {
-							logger.Infof("res: %+v", res)
 							if v, err := strconv.Atoi(res[0][1]); err == nil {
 								if c, err := models.GetCacheCategoryByCategoryId(common.Database, uint(v)); err == nil {
-									logger.Infof("c: %+v", c)
 									query.Set("referer", path.Join(c.Path, c.Name))
-
 								}
 							}
 						}
@@ -724,6 +731,7 @@ type InfoView struct {
 	Decimal string `json:",omitempty"`
 	Thousands string `json:",omitempty"`
 	Pattern string `json:",omitempty"`
+	Size string `json:",omitempty"`
 	Preview string `json:",omitempty"`
 	Authorization string `json:",omitempty"`
 	ExpirationAt string `json:",omitempty"`
@@ -754,6 +762,11 @@ func getInfoHandler(c *fiber.Ctx) error {
 	view.Decimal = common.Config.Decimal
 	view.Thousands = common.Config.Thousands
 	view.AbsolutePrice = common.Config.AbsolutePrice
+	if common.Config.Size != "" {
+		view.Size = common.Config.Size
+	}else{
+		view.Size = "medium"
+	}
 	view.Pattern = common.Config.Pattern
 	view.Preview = common.Config.Preview
 	if v := c.Locals("authorization"); v != nil {
@@ -947,6 +960,7 @@ type BasicSettingsView struct {
 	Products string
 	FlatUrl bool
 	AbsolutePrice bool
+	Size string
 	Pattern string
 	Preview      string
 	Payment      config.PaymentConfig
@@ -975,6 +989,7 @@ func getBasicSettingsHandler(c *fiber.Ctx) error {
 	conf.Products = common.Config.Products
 	conf.FlatUrl = common.Config.FlatUrl
 	conf.AbsolutePrice = common.Config.AbsolutePrice
+	conf.Size = common.Config.Size
 	conf.Pattern = common.Config.Pattern
 	conf.Preview = common.Config.Preview
 	conf.Payment = common.Config.Payment
@@ -1066,6 +1081,7 @@ func putBasicSettingsHandler(c *fiber.Ctx) error {
 	common.Config.Decimal = request.Decimal
 	common.Config.Thousands = request.Thousands
 	common.Config.AbsolutePrice = request.AbsolutePrice
+	common.Config.Size = request.Size
 	common.Config.Pattern = request.Pattern
 	common.Config.Preview = request.Preview
 	// Payment
@@ -5027,6 +5043,12 @@ func postPrepareHandler(c *fiber.Ctx) error {
 			view.Output = buff.String()
 			view.Status = "OK"
 			//
+			if _, err := os.Stat(path.Join(dir, HAS_CHANGES)); err == nil {
+				if err := os.Remove(path.Join(dir, HAS_CHANGES)); err != nil {
+					logger.Errorf("%v", err)
+				}
+			}
+			//
 			return c.JSON(view)
 		} else {
 			c.Status(http.StatusInternalServerError)
@@ -5161,13 +5183,6 @@ func postPublishHandler(c *fiber.Ctx) error {
 			}
 			view.Output = buff.String()
 			view.Status = "OK"
-			//
-			if _, err := os.Stat(path.Join(dir, HAS_CHANGES)); err == nil {
-				if err := os.Remove(path.Join(dir, HAS_CHANGES)); err != nil {
-					logger.Errorf("%v", err)
-				}
-			}
-			//
 			return c.JSON(view)
 		} else {
 			c.Status(http.StatusInternalServerError)

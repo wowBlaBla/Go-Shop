@@ -132,7 +132,60 @@ func (storage *AWSS3Storage) rw(link string) string {
 }
 
 func (storage *AWSS3Storage) PutFile(src, location string) (string, error) {
-	return storage.upload(src, location)
+	dst := path.Join(storage.temp, location)
+	if _, err := os.Stat(path.Dir(dst)); err != nil {
+		if err = os.MkdirAll(path.Dir(dst), 0755); err != nil {
+			return location, err
+		}
+	}
+	urls := make(map[string]*AWSS3StorageItem)
+	fi1, err := os.Stat(src)
+	if err != nil {
+		return location, err
+	}
+	if fi2, err := os.Stat(dst + ".json"); err != nil || !fi1.ModTime().Equal(fi2.ModTime()) {
+		//logger.Infof("case1: %+v", dst + ".json")
+		// Upload original
+		if url, err := storage.upload(src, location); err == nil {
+			urls[location] = &AWSS3StorageItem{
+				Created:  time.Now(),
+				Url:      url,
+				Size:     fi1.Size(),
+				Modified: fi1.ModTime(),
+			}
+			location = storage.rw(fmt.Sprintf("%s?%s", url, strconv.FormatInt(time.Now().Unix(), 36)))
+		} else {
+			return location, err
+		}
+	} else {
+		//logger.Infof("case2: %+v", dst + ".json")
+		if bts, err := ioutil.ReadFile(dst + ".json"); err == nil {
+			var item *AWSS3StorageItem
+			if err = json.Unmarshal(bts, &item); err == nil {
+				location = storage.rw(item.Url)
+			} else {
+				logger.Warningf("%v", err)
+			}
+		}else{
+			logger.Warningf("%v", err)
+		}
+	}
+
+	for key, value := range urls {
+		//logger.Infof("%v: %+v", key, value)
+		if bts, err := json.Marshal(value); err == nil {
+			file := path.Join(storage.temp, key + ".json")
+			if err = ioutil.WriteFile(file, bts, 0755); err == nil {
+				if err = os.Chtimes(file, value.Modified, value.Modified); err != nil {
+					logger.Warningf("%v", err)
+				}
+			}else{
+				logger.Warningf("%v", err)
+			}
+		}
+	}
+
+	return location, err
 }
 
 func (storage *AWSS3Storage) DeleteFile(location string) (error) {
@@ -319,124 +372,3 @@ func (storage *AWSS3Storage) DeleteImage(location, sizes string) error {
 	}
 	return storage.delete(location)
 }
-
-/*func (s3 *AWSS3Storage) Copy(src, dst string) error {
-	suffix := strings.Replace(dst, path.Join(s3.dir, "hugo", "static"), "", 1)
-	dst = strings.Replace(dst, path.Join(s3.dir, "hugo", "static"), path.Join(s3.dir, "temp", "s3"), 1)
-	if _, err := os.Stat(path.Dir(dst)); err != nil {
-		os.MkdirAll(path.Dir(dst), 0755)
-	}
-	logger.Infof("Copy: %+v, %+v", src, dst)
-	fi1, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-	if fi2, err := os.Stat(dst); err == nil {
-		if fi1.ModTime().Equal(fi2.ModTime()) && fi1.Size() == fi2.Size() {
-			//logger.Infof("ModTime and Size are the same, skip")
-			return nil
-		}
-	}
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return err
-	}
-	err = out.Close()
-	if err != nil {
-		return err
-	}
-	err = os.Chtimes(dst, fi1.ModTime(), fi1.ModTime())
-	if err != nil {
-		return err
-	}
-
-	uploader := s3manager.NewUploader(s3.session)
-
-	file, err := os.Open(dst)
-	if err != nil {
-		return err
-	}
-
-	up, err := uploader.Upload(&s3manager.UploadInput{
-		Bucket: aws.String(s3.Bucket),
-		ACL:    aws.String("public-read"),
-		Key:    aws.String(suffix),
-		Body:   file,
-	})
-	if err != nil {
-		return err
-	}
-
-	logger.Infof("s3 up: %+v", up)
-
-	return nil
-}
-
-func (s3 *AWSS3Storage) ImageResize(src, sizes string) ([]Image, error) {
-	src = strings.Replace(src, path.Join(s3.dir, "hugo", "static"), path.Join(s3.dir, "temp", "s3"), 1)
-	logger.Infof("ImageResize: %+v, %+v", src, sizes)
-	var images []Image
-	fi1, err := os.Stat(src)
-	if err != nil {
-		return images, err
-	}
-	var img image.Image
-	if p := path.Join(path.Dir(src), "resize"); len(p) > 0 {
-		if _, err := os.Stat(p); err != nil {
-			if err = os.MkdirAll(p, 0755); err != nil {
-				logger.Warningf("%v", err)
-			}
-		}
-	}
-	for _, size := range strings.Split(sizes, ",") {
-		pair := strings.Split(size, "x")
-		var width int
-		if width, err = strconv.Atoi(pair[0]); err != nil {
-			return images, err
-		}
-		var height int
-		if height, err = strconv.Atoi(pair[1]); err != nil {
-			return images, err
-		}
-		filename := path.Base(src)
-		filename = filename[:len(filename) - len(filepath.Ext(filename))]
-		filename = fmt.Sprintf("%s_%dx%d%s", filename, width, height, filepath.Ext(src))
-		if fi2, err := os.Stat(path.Join(path.Dir(src), "resize", filename)); err != nil || !fi1.ModTime().Equal(fi2.ModTime()) {
-			if img == nil {
-				file, err := os.Open(src)
-				if err != nil {
-					return images, err
-				}
-				img, err = jpeg.Decode(file)
-				if err != nil {
-					return images, err
-				}
-				file.Close()
-			}
-			m := resize.Resize(uint(width), uint(height), img, resize.Lanczos3)
-			out, err := os.Create(path.Join(path.Dir(src), "resize", filename))
-			if err != nil {
-				return images, err
-			}
-			if err = jpeg.Encode(out, m, &jpeg.Options{Quality: s3.quality}); err != nil {
-				return images, err
-			}
-			out.Close()
-			os.Chtimes(path.Join(path.Dir(src), "resize", filename), fi1.ModTime(), fi1.ModTime())
-		}
-		images = append(images, Image{Filename: filename, Size: fmt.Sprintf("%dw", width)})
-	}
-	return images, nil
-}*/

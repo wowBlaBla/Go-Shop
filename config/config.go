@@ -74,6 +74,7 @@ type Config struct {
 	Products string
 	FlatUrl bool
 	AbsolutePrice bool
+	Size string // 'small', 'medium', 'large'
 	//
 	Resize ResizeConfig
 	//

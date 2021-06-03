@@ -20,7 +20,7 @@ type Comment struct {
 func GetCommentsByProduct(connector *gorm.DB, id uint) ([]*Comment, error) {
 	db := connector
 	var comments []*Comment
-	if err := db.Debug().Where("product_id = ?", id).Order("id desc").Find(&comments).Error; err != nil {
+	if err := db.Where("product_id = ?", id).Order("id desc").Find(&comments).Error; err != nil {
 		return nil, err
 	}
 	return comments, nil
