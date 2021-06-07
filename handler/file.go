@@ -301,7 +301,7 @@ func postFilesListHandler(c *fiber.Ctx) error {
 			response.Total = response.Filtered
 		}
 	}else{
-		rows, err := common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Path, files.Url, cache_files.File as File, files.Size, files.Updated_At as Updated").Joins("left join cache_files on cache_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+		rows, err := common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Path, files.Url, cache_files.File as File, files.Size, files.Updated_At as Updated").Joins("left join cache_files on cache_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Group("files.id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
 		if err == nil {
 			if err == nil {
 				for rows.Next() {
@@ -317,7 +317,7 @@ func postFilesListHandler(c *fiber.Ctx) error {
 			}
 			rows.Close()
 		}
-		rows, err = common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Path, files.Url, cache_files.File as File, files.Size, files.Updated_At as Updated").Joins("left join cache_files on cache_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Rows()
+		rows, err = common.Database.Debug().Model(&models.File{}).Select("files.ID, files.Created_At as Created, files.Type, files.Name, files.Path, files.Url, cache_files.File as File, files.Size, files.Updated_At as Updated").Joins("left join cache_files on cache_files.file_id = files.id").Where(strings.Join(keys1, " and "), values1...).Group("files.id").Rows()
 		if err == nil {
 			for rows.Next() {
 				response.Filtered ++
