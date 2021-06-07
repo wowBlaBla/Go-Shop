@@ -963,6 +963,7 @@ type BasicSettingsView struct {
 	Size string
 	Pattern string
 	Preview      string
+	CDN      string
 	Payment      config.PaymentConfig
 	Resize       config.ResizeConfig
 	Storage       config.StorageConfig
@@ -1161,7 +1162,7 @@ func putBasicSettingsHandler(c *fiber.Ctx) error {
 			(common.Config.Storage.S3.Enabled && request.Storage.S3.SecretAccessKey != common.Config.Storage.S3.SecretAccessKey) ||
 			(common.Config.Storage.S3.Enabled && request.Storage.S3.Region != common.Config.Storage.S3.Region) ||
 			(common.Config.Storage.S3.Enabled && request.Storage.S3.Bucket != common.Config.Storage.S3.Bucket){
-			if storage, err := storage.NewAWSS3Storage(request.Storage.S3.AccessKeyID,request.Storage.S3.SecretAccessKey, request.Storage.S3.Region, request.Storage.S3.Bucket, request.Storage.S3.Prefix, path.Join(dir, "temp", "s3"), common.Config.Resize.Quality, common.Config.Storage.S3.Rewrite); err == nil {
+			if storage, err := storage.NewAWSS3Storage(request.Storage.S3.AccessKeyID,request.Storage.S3.SecretAccessKey, request.Storage.S3.Region, request.Storage.S3.Bucket, request.Storage.S3.Prefix, path.Join(dir, "temp", "s3"), common.Config.Resize.Quality, common.Config.Storage.S3.CDN, common.Config.Storage.S3.Rewrite); err == nil {
 				filename := fmt.Sprintf("file-%d.txt", rand.Intn(899999) + 100000)
 				if err = ioutil.WriteFile(path.Join(dir, "temp", filename), []byte(time.Now().Format(time.RFC3339)), 0755); err != nil {
 					c.Status(http.StatusInternalServerError)

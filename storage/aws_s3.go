@@ -15,6 +15,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -28,11 +29,12 @@ var (
 	reUrl = regexp.MustCompile(`https?://([^\/]+)(/.+)`)
 )
 
-func NewAWSS3Storage(accessKeyID, secretAccessKey, region, bucket, prefix string, temp string, quality int, rewrite string) (*AWSS3Storage, error){
+func NewAWSS3Storage(accessKeyID, secretAccessKey, region, bucket, prefix string, temp string, quality int, cdn string, rewrite string) (*AWSS3Storage, error){
 	storage := &AWSS3Storage{
 		prefix: prefix,
 		quality: quality,
 		rewrite: rewrite,
+		cdn: cdn,
 	}
 	var err error
 	storage.session, err = session.NewSession(
@@ -67,6 +69,7 @@ type AWSS3Storage struct {
 	prefix string
 	temp string // full/path
 	quality int
+	cdn string
 	rewrite string
 }
 
@@ -123,10 +126,14 @@ func (storage *AWSS3Storage) delete(location string) error {
 }
 
 func (storage *AWSS3Storage) rw(link string) string {
-	if storage.rewrite != "" {
-		if res := reUrl.FindAllStringSubmatch(link, 1); len(res) > 0 && len(res[0]) > 3 {
-			return storage.rewrite + res[0][2]
+	if u, err := url.Parse(link); err == nil {
+		if storage.cdn != "" {
+			u.Host = storage.cdn
 		}
+		if storage.rewrite != "" {
+			u.Path = storage.rewrite + u.Path
+		}
+		return u.String()
 	}
 	return link
 }

@@ -157,6 +157,7 @@ type StorageConfig struct {
 		Region string
 		Bucket string
 		Prefix string
+		CDN string
 		Rewrite string // /bla/bla:path
 	}
 }
