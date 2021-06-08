@@ -293,6 +293,7 @@ func putFormHandler(c *fiber.Ctx) error {
 	if len(request.Type) > 256 {
 		request.Type = request.Type[0:255]
 	}
+	form.Name = request.Name
 	form.Title = request.Title
 	form.Description = request.Description
 	form.Type = request.Type

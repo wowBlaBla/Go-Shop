@@ -53,6 +53,7 @@ type CategoryFile struct {
 	ID           uint
 	Date         time.Time
 	Title        string
+	Description  string `json:",omitempty"`
 	Url        string `json:",omitempty"`
 	Aliases    []string `json:",omitempty"`
 	Thumbnail    string
@@ -134,6 +135,7 @@ func (p *CategoryFile) MarshalJSON() ([]byte, error) {
 		Title: p.Title,
 		Url: p.Url,
 		Aliases: p.Aliases,
+		Description: p.Description,
 		Thumbnail: p.Thumbnail,
 		Path: p.Path,
 		Options: p.Options,
