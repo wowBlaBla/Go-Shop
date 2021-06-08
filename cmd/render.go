@@ -35,6 +35,7 @@ var (
 	CACHE_VALUES = cmap.New()
 	reKV = regexp.MustCompile(`^([^\:]+):\s*(.*)$`)
 	reTags = regexp.MustCompile(`<.*?>`)
+	reSanitizeFilename = regexp.MustCompile(`[+]`)
 	reSpace = regexp.MustCompile(`\s{2,}`)
 	reTrimEmail = regexp.MustCompile(`^(.+)@.*$`)
 )
@@ -1004,8 +1005,8 @@ var renderCmd = &cobra.Command{
 											if len(name) > 32 {
 												name = name[:32]
 											}
+											name = reSanitizeFilename.ReplaceAllString(name, "_")
 											filename := fmt.Sprintf("%d-%s-%d%v", product.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-											//p2 := path.Join(p0, filename)
 											location := path.Join("images", filename)
 											logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
 											if thumbnails, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Image.Size); err == nil {
@@ -1029,6 +1030,7 @@ var renderCmd = &cobra.Command{
 														if len(name) > 32 {
 															name = name[:32]
 														}
+														name = reSanitizeFilename.ReplaceAllString(name, "_")
 														filename := fmt.Sprintf("%d-%s-%d%v", image.ID, name, fi.ModTime().Unix(), path.Ext(p1))
 														location := path.Join("images", filename)
 														logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
@@ -1054,7 +1056,6 @@ var renderCmd = &cobra.Command{
 														} else {
 															logger.Warningf("%v", err)
 														}
-
 													}
 												}
 											}else{
@@ -1264,6 +1265,7 @@ var renderCmd = &cobra.Command{
 															if len(name) > 32 {
 																name = name[:32]
 															}
+															name = reSanitizeFilename.ReplaceAllString(name, "_")
 															filename := fmt.Sprintf("%d-%s-%d%v", image.ID, name, fi.ModTime().Unix(), path.Ext(p1))
 															logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", filename), fi.Size())
 															if images2, err := common.STORAGE.PutImage(p1, path.Join("images", filename), common.Config.Resize.Thumbnail.Size); err == nil {
