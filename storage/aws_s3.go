@@ -264,7 +264,7 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 			}
 			filename := path.Base(location)
 			filename = filename[:len(filename) - len(filepath.Ext(filename))]
-			filename = fmt.Sprintf("%s_%dx%d%s", filename, width, height, filepath.Ext(src))
+			filename = fmt.Sprintf("%s_%d_%dx%d%s", filename, storage.quality, width, height, filepath.Ext(src))
 			dst2 := path.Join(path.Dir(dst), "resize", filename)
 			if fi2, err := os.Stat(dst2 + ".json"); err != nil || !fi1.ModTime().Equal(fi2.ModTime()) {
 				if img == nil {

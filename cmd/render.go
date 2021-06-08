@@ -450,6 +450,7 @@ var renderCmd = &cobra.Command{
 									ID:    category.ID,
 									Date:  category.UpdatedAt,
 									Title: category.Title,
+									Description: category.Description,
 									//Thumbnail: category.Thumbnail,
 									Path:    "/" + path.Join(names...),
 									Type:    "categories",
