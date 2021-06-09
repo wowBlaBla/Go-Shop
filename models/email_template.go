@@ -17,7 +17,7 @@ func (EmailTemplate) TableName() string {
 func GetEmailTemplates(connector *gorm.DB) ([]*EmailTemplate, error) {
 	db := connector
 	var template []*EmailTemplate
-	if err := db.Debug().Find(&template).Error; err != nil {
+	if err := db.Find(&template).Error; err != nil {
 		return nil, err
 	}
 	return template, nil

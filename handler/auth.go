@@ -288,7 +288,9 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 									logger.Infof("Auth Basic #%v %v %v OK", user.ID, user.Login, user.Email)
 								}
 								c.Locals("authorization", "basic")
+								c.Request().Header.Set("X-Authorization-Method", "basic")
 								c.Locals("user", user)
+								c.Request().Header.Set("X-Authorization-User", user.Login)
 								auth = true
 							}else{
 								logger.Errorf("User %v is not enabled", user.Login)
@@ -311,8 +313,10 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 									logger.Infof("Auth Bearer #%v %v %v up to %v OK", user.ID, user.Login, user.Email, time.Unix(claims.ExpiresAt, 0).Format(time.RFC3339))
 								}
 								c.Locals("authorization", "jwt")
+								c.Request().Header.Set("X-Authorization-Method", "jwt")
 								c.Locals("expiration", claims.ExpiresAt)
 								c.Locals("user", user)
+								c.Request().Header.Set("X-Authorization-User", user.Login)
 								auth = true
 							} else {
 								logger.Errorf("%v", err)
@@ -354,7 +358,9 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 							logger.Infof("Auth Cookie #%v %v %v OK", user.ID, user.Login, user.Email)
 						}
 						c.Locals("authorization", "cookie")
+						c.Request().Header.Set("X-Authorization-Method", "cookie")
 						c.Locals("user", user)
+						c.Request().Header.Set("X-Authorization-User", user.Login)
 						auth = true
 					} else {
 						logger.Errorf("%v", err)

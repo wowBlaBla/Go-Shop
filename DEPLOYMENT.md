@@ -42,6 +42,8 @@ create file **/etc/nginx/conf.d/myshop.com.conf** contains config of **preview.m
 
 ```
 server {
+    listen 80;
+    
     server_name  preview.myshop.com;
     root         /opt/goshop/hugo/public;
     error_page 404 /404.html;
@@ -56,6 +58,8 @@ server {
     }
 
     location /api {
+        proxy_set_header   X-Real-IP          $remote_addr;
+        proxy_set_header   X-Forwarded-For    $proxy_add_x_forwarded_for;
         proxy_pass      http://localhost:18092;
     }
 
@@ -66,10 +70,39 @@ server {
     location /storage/ {
         root /opt/goshop/;
     }
+}
 
+server {
     listen 443 ssl;
     ssl_certificate /opt/goshop/ssl/server.crt;
     ssl_certificate_key /opt/goshop/ssl/server.key;
+    
+    server_name  preview.myshop.com;
+    root         /opt/goshop/hugo/public;
+    error_page 404 /404.html;
+    include /etc/nginx/default.d/*.conf;
+
+    location / {
+        root /opt/goshop/hugo/public/;
+    }
+
+    location /admin {
+        proxy_pass      http://localhost:18092;
+    }
+
+    location /api {
+        proxy_set_header   X-Real-IP          $remote_addr;
+        proxy_set_header   X-Forwarded-For    $proxy_add_x_forwarded_for;
+        proxy_pass      http://localhost:18092;
+    }
+
+    location /assets/ {
+        root /opt/goshop/admin/;
+    }
+
+    location /storage/ {
+        root /opt/goshop/;
+    }
 }
 ```
 

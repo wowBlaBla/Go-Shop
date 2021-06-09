@@ -18,6 +18,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	fiber_logger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/google/logger"
 	"github.com/jinzhu/now"
 	"github.com/nfnt/resize"
@@ -66,7 +67,7 @@ var (
 func GetFiber() *fiber.App {
 	app, authRequired, authOptional, csrf := CreateFiberAppWithAuthMultiple(AuthMultipleConfig{
 			CookieDuration: time.Duration(365 * 24) * time.Hour,
-			Log: true,
+			Log: false,
 			//UseForm: true,
 		},
 		compress.New(compress.Config{
@@ -118,6 +119,10 @@ func GetFiber() *fiber.App {
 			return c.JSON(HTTPError{"AccessViolation"})
 		}
 	}
+	//
+	app.Use(fiber_logger.New(fiber_logger.Config{
+		Format: "${header:X-Forwarded-For} [${time}] \"${method} ${path}\" ${header:X-Authorization-Method} ${header:X-Authorization-User} ${status} \"${referer}\" \"${ua}\" ~ ${latency}\n",
+	}))
 	//
 	api := app.Group("/api")
 	v1 := api.Group("/v1")
@@ -606,7 +611,7 @@ func getPreviewHandler (c *fiber.Ctx) error {
 	//logger.Infof("getPreviewHandler")
 	if v := c.Query("step", "1"); v == "1" {
 		//logger.Infof("Step1")
-		if v := c.Locals("auth"); v != nil {
+		if v := c.Locals("auth"); v != nil && v != false {
 			//logger.Infof("v: %+v", v)
 			if vv, ok := v.(bool); ok && vv {
 				if u, err := url.Parse(c.Request().URI().String()); err == nil {
@@ -654,8 +659,8 @@ func getPreviewHandler (c *fiber.Ctx) error {
 				}
 			}
 		}else{
-			err := fmt.Errorf("auth: %+v", v)
-			c.Status(http.StatusInternalServerError)
+			err := fmt.Errorf("Authentication required")
+			c.Status(http.StatusForbidden)
 			return c.SendString(err.Error())
 		}
 	}else if v == "2" {
@@ -837,11 +842,11 @@ func getDashboardHandler(c *fiber.Ctx) error {
 	var view DashboardView
 	from := now.BeginningOfMonth()
 	till := time.Now()
-	common.Database.Model(&models.Transaction{}).Select("sum(Amount) as sum").Where("created_at > ? and created_at < ? and (status = ? or status = ?)", from.Format("2006-01-02 15:04:05"), till.Format("2006-01-02 15:04:05"), models.TRANSACTION_STATUS_NEW, models.TRANSACTION_STATUS_PENDING).Scan(&view.Pending)
+	common.Database.Model(&models.Transaction{}).Select("COALESCE(sum(Amount), 0) as sum").Where("created_at > ? and created_at < ? and (status = ? or status = ?)", from.Format("2006-01-02 15:04:05"), till.Format("2006-01-02 15:04:05"), models.TRANSACTION_STATUS_NEW, models.TRANSACTION_STATUS_PENDING).Scan(&view.Pending)
 	if err := common.Database.Error; err != nil {
 		logger.Errorf("%v", err.Error())
 	}
-	common.Database.Model(&models.Transaction{}).Select("sum(Amount) as sum").Where("created_at > ? and created_at < ? and status = ?", from.Format("2006-01-02 15:04:05"), till.Format("2006-01-02 15:04:05"), models.TRANSACTION_STATUS_COMPLETE).Scan(&view.Earnings)
+	common.Database.Model(&models.Transaction{}).Select("COALESCE(sum(Amount), 0) as sum").Where("created_at > ? and created_at < ? and status = ?", from.Format("2006-01-02 15:04:05"), till.Format("2006-01-02 15:04:05"), models.TRANSACTION_STATUS_COMPLETE).Scan(&view.Earnings)
 	if err := common.Database.Error; err != nil {
 		logger.Errorf("%v", err.Error())
 	}
@@ -849,7 +854,7 @@ func getDashboardHandler(c *fiber.Ctx) error {
 	if err := common.Database.Error; err != nil {
 		logger.Errorf("%v", err.Error())
 	}
-	common.Database.Model(&models.Item{}).Select("sum(Quantity) as c").Where("created_at > ? and created_at < ?", from.Format("2006-01-02 15:04:05"), till.Format("2006-01-02 15:04:05")).Scan(&view.Items)
+	common.Database.Model(&models.Item{}).Select("COALESCE(sum(Quantity), 0) as c").Where("created_at > ? and created_at < ?", from.Format("2006-01-02 15:04:05"), till.Format("2006-01-02 15:04:05")).Scan(&view.Items)
 	if err := common.Database.Error; err != nil {
 		logger.Errorf("%v", err.Error())
 	}
@@ -859,7 +864,7 @@ func getDashboardHandler(c *fiber.Ctx) error {
 	for ; month.Before(till); {
 		view.Transfers.Labels = append(view.Transfers.Labels, month.Format("Jan`06"))
 		var sum float64
-		common.Database.Model(&models.Transaction{}).Select("sum(Amount) as sum").Where("created_at > ? and created_at < ? and status = ?", month.Format("2006-01-02 15:04:05"), month.AddDate(0, 1, 0).Format("2006-01-02 15:04:05"), models.TRANSACTION_STATUS_COMPLETE).Scan(&sum)
+		common.Database.Model(&models.Transaction{}).Select("COALESCE(sum(Amount), 0) as sum").Where("created_at > ? and created_at < ? and status = ?", month.Format("2006-01-02 15:04:05"), month.AddDate(0, 1, 0).Format("2006-01-02 15:04:05"), models.TRANSACTION_STATUS_COMPLETE).Scan(&sum)
 		if err := common.Database.Error; err != nil {
 			logger.Errorf("%v", err.Error())
 		}
@@ -869,7 +874,7 @@ func getDashboardHandler(c *fiber.Ctx) error {
 	view.Transfers.Series = append(view.Transfers.Series, row)
 	// Last Orders
 	func() {
-		rows, err := common.Database.Debug().Model(&models.Order{}).Select("orders.ID, orders.Created_At as Created, orders.Total, orders.Status").Where("created_at > ? and created_at < ?", from.Format("2006-01-02 15:04:05"), till.Format("2006-01-02 15:04:05")).Order("ID desc").Limit(10).Rows()
+		rows, err := common.Database.Model(&models.Order{}).Select("orders.ID, orders.Created_At as Created, orders.Total, orders.Status").Where("created_at > ? and created_at < ?", from.Format("2006-01-02 15:04:05"), till.Format("2006-01-02 15:04:05")).Order("ID desc").Limit(10).Rows()
 		if err == nil {
 			if err == nil {
 				for rows.Next() {
