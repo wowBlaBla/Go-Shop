@@ -171,14 +171,15 @@ func postRatesListHandler(c *fiber.Ctx) error {
 }
 
 type NewRate struct {
-	Enabled bool
-	ID uint
-	PropertyId uint
-	ValueId uint
-	Price float64
+	Enabled      bool
+	ID           uint
+	PropertyId   uint
+	ValueId      uint
+	Price        float64
 	Availability string
-	Sending string
-	Sku string
+	Sending      string
+	Sku          string
+	Stock        uint
 }
 
 type RateView struct {
@@ -192,6 +193,7 @@ type RateView struct {
 	Availability string
 	Sending string
 	Sku string
+	Stock uint
 }
 
 // @security BasicAuth
