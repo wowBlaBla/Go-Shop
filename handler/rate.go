@@ -244,6 +244,7 @@ func postRateHandler(c *fiber.Ctx) error {
 				Availability: request.Availability,
 				Sending: request.Sending,
 				Sku: request.Sku,
+				Stock: request.Stock,
 			}
 			logger.Infof("price: %+v", price)
 			//
@@ -373,6 +374,7 @@ func putRateHandler(c *fiber.Ctx) error {
 			price.Availability = request.Availability
 			price.Sending = request.Sending
 			price.Sku = request.Sku
+			price.Stock = request.Stock
 			if err = models.UpdateRate(common.Database, price); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
