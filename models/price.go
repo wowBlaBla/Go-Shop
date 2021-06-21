@@ -18,6 +18,7 @@ type Price struct {
 	Availability string
 	Sending string
 	Sku string
+	Stock uint
 }
 
 func GetPricesByProductId(connector *gorm.DB, productId uint) ([]*Price, error) {

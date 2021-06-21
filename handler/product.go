@@ -224,6 +224,12 @@ func postProductsHandler(c *fiber.Ctx) error {
 	if v, found := data.Value["Sku"]; found && len(v) > 0 {
 		sku = strings.TrimSpace(v[0])
 	}
+	var stock uint
+	if v, found := data.Value["TimeId"]; found && len(v) > 0 {
+		if vv, _ := strconv.Atoi(v[0]); err == nil {
+			stock = uint(vv)
+		}
+	}
 	var content string
 	if v, found := data.Value["Content"]; found && len(v) > 0 {
 		content = strings.TrimSpace(v[0])
@@ -232,7 +238,7 @@ func postProductsHandler(c *fiber.Ctx) error {
 	if v, found := data.Value["Customization"]; found && len(v) > 0 {
 		customization = strings.TrimSpace(v[0])
 	}
-	product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes, Parameters: parameters, CustomParameters: customParameters, Variation: variation, BasePrice: basePrice, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Availability: availability, TimeId: timeId, Sku: sku, Content: content, Customization: customization}
+	product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes, Parameters: parameters, CustomParameters: customParameters, Variation: variation, BasePrice: basePrice, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Availability: availability, TimeId: timeId, Sku: sku, Content: content, Customization: customization, Stock: stock}
 	if _, err := models.CreateProduct(common.Database, product); err == nil {
 		// Create new product automatically
 		if name == "" {
@@ -798,6 +804,12 @@ func putProductHandler(c *fiber.Ctx) error {
 					timeId = uint(vv)
 				}
 			}
+			var stock uint
+			if v, found := data.Value["Stock"]; found && len(v) > 0 {
+				if vv, _ := strconv.Atoi(v[0]); err == nil {
+					stock = uint(vv)
+				}
+			}
 			var customization string
 			if v, found := data.Value["Customization"]; found && len(v) > 0 {
 				customization = strings.TrimSpace(v[0])
@@ -830,6 +842,8 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Availability = availability
 			oldSku := product.Sku
 			product.Sku = sku
+			oldStock := product.Stock
+			product.Stock = stock
 			product.ImageId = imageId
 			product.VendorId = vendorId
 			product.TimeId = timeId
@@ -861,6 +875,9 @@ func putProductHandler(c *fiber.Ctx) error {
 						}
 						if oldSku != sku {
 							variation.Sku = product.Sku
+						}
+						if (oldStock != stock) {
+							variation.Stock = product.Stock
 						}
 						if err := models.UpdateVariation(common.Database, variation); err != nil {
 							logger.Warningf("%+v", err)

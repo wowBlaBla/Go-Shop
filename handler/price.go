@@ -20,6 +20,7 @@ type NewPrice struct {
 	Availability string
 	Sending string
 	Sku string
+	Stock uint
 }
 
 type PriceView struct {
@@ -33,6 +34,7 @@ type PriceView struct {
 	Availability string
 	Sending string
 	Sku string
+	Stock uint
 }
 
 // @security BasicAuth
@@ -61,6 +63,7 @@ func postPriceHandler(c *fiber.Ctx) error {
 		Availability: request.Availability,
 		Sending: request.Sending,
 		Sku: request.Sku,
+		Stock: request.Stock,
 	}
 	if request.VariationId > 0 {
 		price.VariationId = request.VariationId
@@ -114,6 +117,7 @@ func postPriceAllHandler(c *fiber.Ctx) error {
 			Availability: request.Availability,
 			Sending: request.Sending,
 			Sku: request.Sku,
+			Stock: request.Stock,
 		}
 		if request.VariationId > 0 {
 			price.VariationId = request.VariationId
@@ -255,6 +259,7 @@ func putPriceHandler(c *fiber.Ctx) error {
 	price.Availability = request.Availability
 	price.Sending = request.Sending
 	price.Sku = request.Sku
+	price.Stock = request.Stock
 	if err = models.UpdatePrice(common.Database, price); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})

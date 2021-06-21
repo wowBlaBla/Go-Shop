@@ -40,6 +40,7 @@ type Variation struct {
 	Time       *Time `gorm:"foreignKey:time_id;"`
 	//
 	ProductId uint
+	Stock uint
 }
 
 func GetVariations(connector *gorm.DB) ([]*Variation, error) {
