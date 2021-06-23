@@ -14,6 +14,7 @@ type Rate struct {
 	Availability string
 	Sending string
 	Sku string
+	Stock uint
 }
 
 func GetRatesByProperty(connector *gorm.DB, propertyId uint) ([]*Rate, error) {

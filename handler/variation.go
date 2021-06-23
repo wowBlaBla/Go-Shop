@@ -329,7 +329,15 @@ func postVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Sku"]; found && len(v) > 0 {
 				sku = strings.TrimSpace(v[0])
 			}
-			variation := &models.Variation{Name: name, Title: title, Description: description, Notes: notes, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Packages: packages, Availability: availability, TimeId: timeId, Sku: sku}
+
+			var stock uint
+			if v, found := data.Value["Stock"]; found && len(v) > 0 {
+				if vv, _ := strconv.Atoi(v[0]); err == nil {
+					stock = uint(vv)
+				}
+			}
+			variation := &models.Variation{Name: name, Title: title, Description: description, Notes: notes, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Packages: packages, Availability: availability, TimeId: timeId, Sku: sku, Stock: stock}
+
 			if id, err := models.CreateVariation(common.Database, variation); err == nil {
 				if name == "" {
 					variation.Name = fmt.Sprintf("new-variation-%d", variation.ID)
@@ -525,6 +533,12 @@ func putVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Customization"]; found && len(v) > 0 {
 				customization = strings.TrimSpace(v[0])
 			}
+			var stock uint
+			if v, found := data.Value["Stock"]; found && len(v) > 0 {
+				if vv, _ := strconv.Atoi(v[0]); err == nil {
+					stock = uint(vv)
+				}
+			}
 			variation.Name = name
 			variation.Title = title
 			variation.Description = description
@@ -544,6 +558,7 @@ func putVariationHandler(c *fiber.Ctx) error {
 			variation.Availability = availability
 			variation.TimeId = timeId
 			variation.Sku = sku
+			variation.Stock = stock
 			variation.Customization = customization
 			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
 				// To delete existing
