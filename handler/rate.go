@@ -171,14 +171,15 @@ func postRatesListHandler(c *fiber.Ctx) error {
 }
 
 type NewRate struct {
-	Enabled bool
-	ID uint
-	PropertyId uint
-	ValueId uint
-	Price float64
+	Enabled      bool
+	ID           uint
+	PropertyId   uint
+	ValueId      uint
+	Price        float64
 	Availability string
-	Sending string
-	Sku string
+	Sending      string
+	Sku          string
+	Stock        uint
 }
 
 type RateView struct {
@@ -192,6 +193,7 @@ type RateView struct {
 	Availability string
 	Sending string
 	Sku string
+	Stock uint
 }
 
 // @security BasicAuth
@@ -242,6 +244,7 @@ func postRateHandler(c *fiber.Ctx) error {
 				Availability: request.Availability,
 				Sending: request.Sending,
 				Sku: request.Sku,
+				Stock: request.Stock,
 			}
 			logger.Infof("price: %+v", price)
 			//
@@ -371,6 +374,7 @@ func putRateHandler(c *fiber.Ctx) error {
 			price.Availability = request.Availability
 			price.Sending = request.Sending
 			price.Sku = request.Sku
+			price.Stock = request.Stock
 			if err = models.UpdateRate(common.Database, price); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})

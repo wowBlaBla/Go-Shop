@@ -21,6 +21,7 @@ type NewProperty struct {
 	Sku       string
 	Filtering bool
 	Rates     []NewRate
+	Stock 	  uint
 }
 
 // @security BasicAuth
@@ -51,6 +52,7 @@ func postPropertyHandler(c *fiber.Ctx) error {
 		Title:       request.Title,
 		OptionId:    request.OptionId,
 		Sku: request.Sku,
+		Stock: request.Stock,
 		Filtering: request.Filtering,
 	}
 	if v := c.Query("product_id"); v != "" {
@@ -91,6 +93,7 @@ func postPropertyHandler(c *fiber.Ctx) error {
 				Enabled: true,
 				Availability: p.Availability,
 				Sku: p.Sku,
+				Stock: p.Stock,
 				Price:   p.Price,
 				Value:   value,
 			})
@@ -292,6 +295,7 @@ type PropertyView struct {
 	OptionId uint
 	Sku string
 	Filtering bool
+	Stock uint
 }
 
 // @security BasicAuth
@@ -365,12 +369,14 @@ func putPropertyHandler(c *fiber.Ctx) error {
 			property.Title = request.Title
 			property.Sku = request.Sku
 			property.Filtering = request.Filtering
+			property.Stock = request.Stock
 			// Update prices
 			for _, p := range request.Rates {
 				if price, err := models.GetRate(common.Database, int(p.ID)); err == nil {
 					price.Availability = p.Availability
 					price.Sku = p.Sku
 					price.Price = p.Price
+					price.Stock = p.Stock
 					if err = models.UpdateRate(common.Database, price); err != nil {
 						c.Status(http.StatusInternalServerError)
 						return c.JSON(HTTPError{err.Error()})
