@@ -121,7 +121,7 @@ func postVariationsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Variation{}).Select("variations.ID, variations.Name, variations.Title, cache_variation.Thumbnail as Thumbnail, variations.Description, variations.Base_Price, variations.Sku, variations.Product_id, products.Title as ProductTitle, cache_products.Thumbnail as ProductThumbnail, replace(group_concat(properties.ID), ',', ', ') as PropertiesIds, replace(group_concat(properties.Title), ',', ', ') as PropertiesTitles").Joins("left join cache_variation on variations.id = cache_variation.variation_id").Joins("left join products on products.id = variations.product_id").Joins("left join cache_products on variations.product_id = cache_products.product_id").Joins("left join properties on properties.variation_id = variations.id").Group("variations.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Variation{}).Select("variations.ID, variations.Name, variations.Title, cache_variation.Thumbnail as Thumbnail, variations.Description, variations.Base_Price, variations.Stock, variations.Product_id, products.Title as ProductTitle, cache_products.Thumbnail as ProductThumbnail, group_concat(properties.ID, ', ') as PropertiesIds, group_concat(properties.Title, ', ') as PropertiesTitles").Joins("left join cache_variation on variations.id = cache_variation.variation_id").Joins("left join products on products.id = variations.product_id").Joins("left join cache_products on variations.product_id = cache_products.product_id").Joins("left join properties on properties.variation_id = variations.id").Group("variations.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -139,7 +139,7 @@ func postVariationsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Variation{}).Select("variations.ID, variations.Name, variations.Title, variations.Thumbnail, variations.Description, variations.Base_Price, variations.Sku, variations.Product_id, replace(group_concat(properties.ID), ',', ', ') as PropertiesIds, replace(group_concat(properties.Title), ',', ', ') as PropertiesTitles").Joins("left join properties on properties.variation_id = variations.id").Group("variations.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Variation{}).Select("variations.ID, variations.Name, variations.Title, variations.Thumbnail, variations.Description, variations.Base_Price, variations.Stock, variations.Product_id, group_concat(properties.ID, ', ') as PropertiesIds, group_concat(properties.Title, ', ') as PropertiesTitles").Joins("left join properties on properties.variation_id = variations.id").Group("variations.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -670,7 +670,11 @@ type VariationsListItem struct {
 	Thumbnail string
 	Description string
 	BasePrice float64
+<<<<<<< HEAD
 	Sku string `json:",omitempty"`
+=======
+	Stock uint
+>>>>>>> feature/HO912
 	ProductId uint
 	ProductTitle string
 	ProductThumbnail string
