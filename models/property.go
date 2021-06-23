@@ -16,6 +16,7 @@ type Property struct {
 	OptionId    uint
 	Sku string
 	Filtering   bool
+	Stock uint
 	//
 	Rates []*Rate `gorm:"foreignKey:PropertyId"`
 }

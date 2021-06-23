@@ -5773,6 +5773,7 @@ type ProductView struct {
 	Availability string `json:",omitempty"`
 	Sending string `json:",omitempty"`
 	Sku string
+	Stock uint
 	Content string
 	Properties []struct {
 		ID uint
@@ -5872,6 +5873,7 @@ type VariationView struct {
 	//Sending string `json:",omitempty"`
 	TimeId uint `json:",omitempty"`
 	Sku string
+	Stock uint
 	Files []File2View `json:",omitempty"`
 	Images []ImageView `json:",omitempty"`
 	ProductId uint

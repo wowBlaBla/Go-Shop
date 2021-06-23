@@ -39,6 +39,7 @@ type Product struct {
 	Availability string
 	//Sending string
 	Sku string
+	Stock uint
 	//
 	Properties []*Property `gorm:"foreignKey:ProductId"`
 	//
