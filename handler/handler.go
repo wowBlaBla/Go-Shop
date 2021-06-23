@@ -2706,6 +2706,7 @@ func putWidgetHandler(c *fiber.Ctx) error {
 	widget.Content = request.Content
 	widget.Location = request.Location
 	widget.ApplyTo = request.ApplyTo
+	widget.Name = request.Name
 	for _, v := range strings.Split(request.Categories, ",") {
 		if id, err := strconv.Atoi(v); err == nil {
 			if category, err := models.GetCategory(common.Database, id); err == nil {
