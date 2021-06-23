@@ -84,7 +84,7 @@ func GetCoupon(connector *gorm.DB, id int) (*Coupon, error) {
 func GetCouponByCode(connector *gorm.DB, code string) (*Coupon, error){
 	db := connector
 	var coupon Coupon
-	db.Debug().Preload("Categories").Preload("Products").Where("code = ?", code).First(&coupon)
+	db.Preload("Categories").Preload("Products").Where("code = ?", code).First(&coupon)
 	return &coupon, db.Error
 }
 

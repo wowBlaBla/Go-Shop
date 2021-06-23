@@ -26,7 +26,7 @@ func CreateCacheTransport(connector *gorm.DB, value *CacheTransport) (uint, erro
 func GetCacheTransportByTransportId(connector *gorm.DB, transportId uint) (*CacheTransport, error){
 	db := connector
 	var cacheTransport CacheTransport
-	db.Debug().Where("transport_id = ?", transportId).First(&cacheTransport)
+	db.Where("transport_id = ?", transportId).First(&cacheTransport)
 	return &cacheTransport, db.Error
 }
 

@@ -38,7 +38,7 @@ func CreateCacheProduct(connector *gorm.DB, product *CacheProduct) (uint, error)
 func GetCacheProductByProductId(connector *gorm.DB, productId uint) (*CacheProduct, error){
 	db := connector
 	var cacheProduct CacheProduct
-	if err := db.Debug().Where("product_id = ?", productId).First(&cacheProduct).Error; err != nil {
+	if err := db.Where("product_id = ?", productId).First(&cacheProduct).Error; err != nil {
 		return nil, err
 	}
 	return &cacheProduct, db.Error
