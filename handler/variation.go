@@ -670,11 +670,7 @@ type VariationsListItem struct {
 	Thumbnail string
 	Description string
 	BasePrice float64
-<<<<<<< HEAD
 	Sku string `json:",omitempty"`
-=======
-	Stock uint
->>>>>>> feature/HO912
 	ProductId uint
 	ProductTitle string
 	ProductThumbnail string
