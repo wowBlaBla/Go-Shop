@@ -2538,6 +2538,54 @@ var doc = `{
                 }
             }
         },
+        "/api/v1/dump": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "util"
+                ],
+                "summary": "Get dump",
+                "responses": {
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "util"
+                ],
+                "summary": "Post dump",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.DumpResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/email": {
             "post": {
                 "consumes": [
@@ -2891,6 +2939,43 @@ var doc = `{
             }
         },
         "/api/v1/forms": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "form"
+                ],
+                "summary": "Get forms",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.FormsView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -3122,6 +3207,109 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handler.HTTPMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/forms/{id}/messages": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "message"
+                ],
+                "summary": "Get messages",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Form ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.MessagesView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "message"
+                ],
+                "summary": "Create message",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Form ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "option",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.NewMessage"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.MessageView"
                         }
                     },
                     "404": {
@@ -3837,6 +4025,43 @@ var doc = `{
             }
         },
         "/api/v1/messages": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "message"
+                ],
+                "summary": "Get transports",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.MessagesView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -6635,7 +6860,7 @@ var doc = `{
                 }
             }
         },
-        "/api/v1/settings/wrangler": {
+        "/api/v1/settings/publisher": {
             "get": {
                 "consumes": [
                     "application/json"
@@ -6646,12 +6871,12 @@ var doc = `{
                 "tags": [
                     "settings"
                 ],
-                "summary": "Get wrangler settings",
+                "summary": "Get publisher settings",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.BasicWranglerView"
+                            "$ref": "#/definitions/handler.BasicPublisherView"
                         }
                     },
                     "404": {
@@ -6683,7 +6908,7 @@ var doc = `{
                 "tags": [
                     "settings"
                 ],
-                "summary": "Set wrangler settings",
+                "summary": "Set publisher settings",
                 "parameters": [
                     {
                         "description": "body",
@@ -9728,6 +9953,20 @@ var doc = `{
                 }
             }
         },
+        "config.PublisherConfig": {
+            "type": "object",
+            "properties": {
+                "apiToken": {
+                    "type": "string"
+                },
+                "bin": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
         "config.ResizeConfig": {
             "type": "object",
             "properties": {
@@ -9778,6 +10017,9 @@ var doc = `{
                         "bucket": {
                             "type": "string"
                         },
+                        "cdn": {
+                            "type": "string"
+                        },
                         "enabled": {
                             "type": "boolean"
                         },
@@ -9795,20 +10037,6 @@ var doc = `{
                             "type": "string"
                         }
                     }
-                }
-            }
-        },
-        "config.PublisherConfig": {
-            "type": "object",
-            "properties": {
-                "apiToken": {
-                    "type": "string"
-                },
-                "bin": {
-                    "type": "string"
-                },
-                "enabled": {
-                    "type": "boolean"
                 }
             }
         },
@@ -9953,11 +10181,17 @@ var doc = `{
                 }
             }
         },
+        "handler.BasicPublisherView": {
+            "$ref": "#/definitions/config.PublisherConfig"
+        },
         "handler.BasicSettingsView": {
             "type": "object",
             "properties": {
                 "absolutePrice": {
                     "type": "boolean"
+                },
+                "cdn": {
+                    "type": "string"
                 },
                 "currency": {
                     "type": "string"
@@ -9992,6 +10226,9 @@ var doc = `{
                     "type": "object",
                     "$ref": "#/definitions/config.ResizeConfig"
                 },
+                "size": {
+                    "type": "string"
+                },
                 "storage": {
                     "type": "object",
                     "$ref": "#/definitions/config.StorageConfig"
@@ -10006,9 +10243,6 @@ var doc = `{
                     "type": "string"
                 }
             }
-        },
-        "handler.BasicWranglerView": {
-            "$ref": "#/definitions/config.PublisherConfig"
         },
         "handler.BillingOrderView": {
             "type": "object",
@@ -10601,6 +10835,14 @@ var doc = `{
                 }
             }
         },
+        "handler.DumpResponse": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.EmailRequest": {
             "type": "object",
             "properties": {
@@ -10835,6 +11077,9 @@ var doc = `{
                 },
                 "title": {
                     "type": "string"
+                },
+                "type": {
+                    "type": "string"
                 }
             }
         },
@@ -10855,6 +11100,9 @@ var doc = `{
                 },
                 "title": {
                     "type": "string"
+                },
+                "type": {
+                    "type": "string"
                 }
             }
         },
@@ -10873,6 +11121,12 @@ var doc = `{
                 "total": {
                     "type": "integer"
                 }
+            }
+        },
+        "handler.FormsView": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/handler.FormView"
             }
         },
         "handler.HTTPCsrf": {
@@ -10925,6 +11179,9 @@ var doc = `{
         "handler.HugoSettingsView": {
             "type": "object",
             "properties": {
+                "languageCode": {
+                    "type": "string"
+                },
                 "languages": {
                     "type": "object",
                     "additionalProperties": {
@@ -11109,6 +11366,9 @@ var doc = `{
                 "authorization": {
                     "type": "string"
                 },
+                "compiled": {
+                    "type": "string"
+                },
                 "debug": {
                     "type": "boolean"
                 },
@@ -11138,6 +11398,9 @@ var doc = `{
                 "preview": {
                     "type": "string"
                 },
+                "size": {
+                    "type": "string"
+                },
                 "started": {
                     "type": "string"
                 },
@@ -11147,6 +11410,9 @@ var doc = `{
                 "user": {
                     "type": "object",
                     "$ref": "#/definitions/handler.UserView"
+                },
+                "version": {
+                    "type": "string"
                 }
             }
         },
@@ -11452,7 +11718,16 @@ var doc = `{
                 "body": {
                     "type": "string"
                 },
+                "created": {
+                    "type": "string"
+                },
+                "formTitle": {
+                    "type": "string"
+                },
                 "id": {
+                    "type": "integer"
+                },
+                "length": {
                     "type": "integer"
                 },
                 "title": {
@@ -11489,6 +11764,12 @@ var doc = `{
                 "total": {
                     "type": "integer"
                 }
+            }
+        },
+        "handler.MessagesView": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/handler.MessageView"
             }
         },
         "handler.MollieOrderView": {
@@ -11652,6 +11933,9 @@ var doc = `{
                 },
                 "title": {
                     "type": "string"
+                },
+                "type": {
+                    "type": "string"
                 }
             }
         },
@@ -11788,6 +12072,9 @@ var doc = `{
                 "sku": {
                     "type": "string"
                 },
+                "stock": {
+                    "type": "integer"
+                },
                 "variationId": {
                     "type": "integer"
                 }
@@ -11878,6 +12165,9 @@ var doc = `{
                 "sku": {
                     "type": "string"
                 },
+                "stock": {
+                    "type": "integer"
+                },
                 "title": {
                     "type": "string"
                 },
@@ -11909,6 +12199,9 @@ var doc = `{
                 },
                 "sku": {
                     "type": "string"
+                },
+                "stock": {
+                    "type": "integer"
                 },
                 "valueId": {
                     "type": "integer"
@@ -12566,6 +12859,9 @@ var doc = `{
                 "sku": {
                     "type": "string"
                 },
+                "stock": {
+                    "type": "integer"
+                },
                 "variationId": {
                     "type": "integer"
                 }
@@ -12796,6 +13092,9 @@ var doc = `{
                 "start": {
                     "type": "string"
                 },
+                "stock": {
+                    "type": "integer"
+                },
                 "tags": {
                     "type": "array",
                     "items": {
@@ -12935,6 +13234,9 @@ var doc = `{
                 "sort": {
                     "type": "integer"
                 },
+                "stock": {
+                    "type": "integer"
+                },
                 "thumbnail": {
                     "type": "string"
                 },
@@ -13054,10 +13356,44 @@ var doc = `{
                 "sku": {
                     "type": "string"
                 },
+                "stock": {
+                    "type": "integer"
+                },
                 "title": {
                     "type": "string"
                 },
                 "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.PublisherSettingsView": {
+            "type": "object",
+            "properties": {
+                "accountId": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "route": {
+                    "type": "string"
+                },
+                "site": {
+                    "type": "object",
+                    "properties": {
+                        "bucket": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "type": {
+                    "type": "string"
+                },
+                "workersDev": {
+                    "type": "boolean"
+                },
+                "zoneId": {
                     "type": "string"
                 }
             }
@@ -13089,6 +13425,9 @@ var doc = `{
                 },
                 "sku": {
                     "type": "string"
+                },
+                "stock": {
+                    "type": "integer"
                 },
                 "value": {
                     "type": "object",
@@ -14067,6 +14406,9 @@ var doc = `{
                 "start": {
                     "type": "string"
                 },
+                "stock": {
+                    "type": "integer"
+                },
                 "thumbnail": {
                     "type": "string"
                 },
@@ -14120,6 +14462,9 @@ var doc = `{
                 },
                 "sku": {
                     "type": "string"
+                },
+                "stock": {
+                    "type": "integer"
                 },
                 "thumbnail": {
                     "type": "string"
@@ -14443,37 +14788,6 @@ var doc = `{
                 }
             }
         },
-        "handler.PublisherSettingsView": {
-            "type": "object",
-            "properties": {
-                "accountId": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "route": {
-                    "type": "string"
-                },
-                "site": {
-                    "type": "object",
-                    "properties": {
-                        "bucket": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "type": {
-                    "type": "string"
-                },
-                "workersDev": {
-                    "type": "boolean"
-                },
-                "zoneId": {
-                    "type": "string"
-                }
-            }
-        },
         "handler.ZoneView": {
             "type": "object",
             "properties": {
@@ -14659,6 +14973,9 @@ var doc = `{
                 "sku": {
                     "type": "string"
                 },
+                "stock": {
+                    "type": "integer"
+                },
                 "title": {
                     "type": "string"
                 },
@@ -14695,6 +15012,9 @@ var doc = `{
                 },
                 "sku": {
                     "type": "string"
+                },
+                "stock": {
+                    "type": "integer"
                 },
                 "value": {
                     "type": "object",

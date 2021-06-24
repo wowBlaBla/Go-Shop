@@ -63,6 +63,15 @@ definitions:
       vat:
         type: number
     type: object
+  config.PublisherConfig:
+    properties:
+      apiToken:
+        type: string
+      bin:
+        type: string
+      enabled:
+        type: boolean
+    type: object
   config.ResizeConfig:
     properties:
       enabled:
@@ -96,6 +105,8 @@ definitions:
             type: string
           bucket:
             type: string
+          cdn:
+            type: string
           enabled:
             type: boolean
           prefix:
@@ -108,15 +119,6 @@ definitions:
           secretAccessKey:
             type: string
         type: object
-    type: object
-  config.WranglerConfig:
-    properties:
-      apiToken:
-        type: string
-      bin:
-        type: string
-      enabled:
-        type: boolean
     type: object
   handler.Account2View:
     properties:
@@ -211,10 +213,14 @@ definitions:
       search:
         type: string
     type: object
+  handler.BasicPublisherView:
+    $ref: '#/definitions/config.PublisherConfig'
   handler.BasicSettingsView:
     properties:
       absolutePrice:
         type: boolean
+      cdn:
+        type: string
       currency:
         type: string
       debug:
@@ -238,6 +244,8 @@ definitions:
       resize:
         $ref: '#/definitions/config.ResizeConfig'
         type: object
+      size:
+        type: string
       storage:
         $ref: '#/definitions/config.StorageConfig'
         type: object
@@ -248,8 +256,6 @@ definitions:
       url:
         type: string
     type: object
-  handler.BasicWranglerView:
-    $ref: '#/definitions/config.WranglerConfig'
   handler.BillingOrderView:
     properties:
       id:
@@ -638,6 +644,11 @@ definitions:
       id:
         type: integer
     type: object
+  handler.DumpResponse:
+    properties:
+      url:
+        type: string
+    type: object
   handler.EmailRequest:
     properties:
       email:
@@ -791,6 +802,8 @@ definitions:
         type: string
       title:
         type: string
+      type:
+        type: string
     type: object
   handler.FormView:
     properties:
@@ -804,6 +817,8 @@ definitions:
         type: string
       title:
         type: string
+      type:
+        type: string
     type: object
   handler.FormsListResponse:
     properties:
@@ -816,6 +831,10 @@ definitions:
       total:
         type: integer
     type: object
+  handler.FormsView:
+    items:
+      $ref: '#/definitions/handler.FormView'
+    type: array
   handler.HTTPCsrf:
     properties:
       csfr:
@@ -848,6 +867,8 @@ definitions:
     type: object
   handler.HugoSettingsView:
     properties:
+      languageCode:
+        type: string
       languages:
         additionalProperties:
           properties:
@@ -968,6 +989,8 @@ definitions:
         type: string
       authorization:
         type: string
+      compiled:
+        type: string
       debug:
         type: boolean
       decimal:
@@ -987,6 +1010,8 @@ definitions:
         type: string
       preview:
         type: string
+      size:
+        type: string
       started:
         type: string
       thousands:
@@ -994,6 +1019,8 @@ definitions:
       user:
         $ref: '#/definitions/handler.UserView'
         type: object
+      version:
+        type: string
     type: object
   handler.ItemShortView:
     properties:
@@ -1194,7 +1221,13 @@ definitions:
     properties:
       body:
         type: string
+      created:
+        type: string
+      formTitle:
+        type: string
       id:
+        type: integer
+      length:
         type: integer
       title:
         type: string
@@ -1219,6 +1252,10 @@ definitions:
       total:
         type: integer
     type: object
+  handler.MessagesView:
+    items:
+      $ref: '#/definitions/handler.MessageView'
+    type: array
   handler.MollieOrderView:
     properties:
       checkout:
@@ -1325,6 +1362,8 @@ definitions:
         type: string
       title:
         type: string
+      type:
+        type: string
     type: object
   handler.NewImage:
     properties:
@@ -1413,6 +1452,8 @@ definitions:
         type: string
       sku:
         type: string
+      stock:
+        type: integer
       variationId:
         type: integer
     type: object
@@ -1472,6 +1513,8 @@ definitions:
         type: string
       sku:
         type: string
+      stock:
+        type: integer
       title:
         type: string
       type:
@@ -1493,6 +1536,8 @@ definitions:
         type: string
       sku:
         type: string
+      stock:
+        type: integer
       valueId:
         type: integer
     type: object
@@ -1923,6 +1968,8 @@ definitions:
         type: string
       sku:
         type: string
+      stock:
+        type: integer
       variationId:
         type: integer
     type: object
@@ -2074,6 +2121,8 @@ definitions:
         type: string
       start:
         type: string
+      stock:
+        type: integer
       tags:
         items:
           $ref: '#/definitions/handler.TagView'
@@ -2166,6 +2215,8 @@ definitions:
         type: string
       sort:
         type: integer
+      stock:
+        type: integer
       thumbnail:
         type: string
       title:
@@ -2244,9 +2295,31 @@ definitions:
         type: string
       sku:
         type: string
+      stock:
+        type: integer
       title:
         type: string
       type:
+        type: string
+    type: object
+  handler.PublisherSettingsView:
+    properties:
+      accountId:
+        type: string
+      name:
+        type: string
+      route:
+        type: string
+      site:
+        properties:
+          bucket:
+            type: string
+        type: object
+      type:
+        type: string
+      workersDev:
+        type: boolean
+      zoneId:
         type: string
     type: object
   handler.RateView:
@@ -2268,6 +2341,8 @@ definitions:
         type: string
       sku:
         type: string
+      stock:
+        type: integer
       value:
         $ref: '#/definitions/handler.ValueView'
         type: object
@@ -2907,6 +2982,8 @@ definitions:
         type: string
       start:
         type: string
+      stock:
+        type: integer
       thumbnail:
         type: string
       timeId:
@@ -2943,6 +3020,8 @@ definitions:
         type: string
       sku:
         type: string
+      stock:
+        type: integer
       thumbnail:
         type: string
       title:
@@ -3154,26 +3233,6 @@ definitions:
       uuid:
         type: string
     type: object
-  handler.WranglerSettingsView:
-    properties:
-      accountId:
-        type: string
-      name:
-        type: string
-      route:
-        type: string
-      site:
-        properties:
-          bucket:
-            type: string
-        type: object
-      type:
-        type: string
-      workersDev:
-        type: boolean
-      zoneId:
-        type: string
-    type: object
   handler.ZoneView:
     properties:
       country:
@@ -3297,6 +3356,8 @@ definitions:
         type: string
       sku:
         type: string
+      stock:
+        type: integer
       title:
         type: string
       type:
@@ -3322,6 +3383,8 @@ definitions:
         type: string
       sku:
         type: string
+      stock:
+        type: integer
       value:
         $ref: '#/definitions/models.Value'
         type: object
@@ -4953,6 +5016,37 @@ paths:
           schema:
             $ref: '#/definitions/handler.HTTPError'
       summary: Get dashboard
+  /api/v1/dump:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/octet-stream
+      responses:
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Get dump
+      tags:
+      - util
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.DumpResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      summary: Post dump
+      tags:
+      - util
   /api/v1/email:
     post:
       consumes:
@@ -5176,6 +5270,29 @@ paths:
       tags:
       - frontend
   /api/v1/forms:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.FormsView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get forms
+      tags:
+      - form
     post:
       consumes:
       - application/json
@@ -5300,6 +5417,71 @@ paths:
       summary: Update form
       tags:
       - form
+  /api/v1/forms/{id}/messages:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Form ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.MessagesView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get messages
+      tags:
+      - message
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Form ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: body
+        in: body
+        name: option
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewMessage'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.MessageView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Create message
+      tags:
+      - message
   /api/v1/forms/list:
     post:
       consumes:
@@ -5771,6 +5953,29 @@ paths:
       tags:
       - menu
   /api/v1/messages:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.MessagesView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get transports
+      tags:
+      - message
     post:
       consumes:
       - application/json
@@ -7532,7 +7737,7 @@ paths:
       summary: Set hugo settings
       tags:
       - settings
-  /api/v1/settings/wrangler:
+  /api/v1/settings/publisher:
     get:
       consumes:
       - application/json
@@ -7542,7 +7747,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handler.BasicWranglerView'
+            $ref: '#/definitions/handler.BasicPublisherView'
         "404":
           description: Not Found
           schema:
@@ -7551,7 +7756,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handler.HTTPError'
-      summary: Get wrangler settings
+      summary: Get publisher settings
       tags:
       - settings
     put:
@@ -7563,7 +7768,7 @@ paths:
         name: category
         required: true
         schema:
-          $ref: '#/definitions/handler.WranglerSettingsView'
+          $ref: '#/definitions/handler.PublisherSettingsView'
       produces:
       - application/json
       responses:
@@ -7581,7 +7786,7 @@ paths:
             $ref: '#/definitions/handler.HTTPError'
       security:
       - BasicAuth: []
-      summary: Set wrangler settings
+      summary: Set publisher settings
       tags:
       - settings
   /api/v1/tags:

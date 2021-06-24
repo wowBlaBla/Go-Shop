@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"archive/zip"
 	"bufio"
 	"bytes"
 	"crypto/aes"
@@ -377,6 +378,8 @@ func GetFiber() *fiber.App {
 	//
 	//v1.Post("/forms/:id", /*csrf,*/ postMessageHandler)
 	//
+	v1.Get("/dump", getDumpHandler)
+	v1.Post("/dump", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), postDumpHandler)
 	v1.Post("/email", postEmailHandler)
 	v1.Get("/test", getTestHandler)
 	v1.Post("/test", getTestHandler)
@@ -5203,6 +5206,102 @@ type EmailRequest struct {
 	Email string
 }
 
+
+
+// GetDump godoc
+// @Summary Get dump
+// @Accept json
+// @Produce application/octet-stream
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/dump [get]
+// @Tags util
+func getDumpHandler(c *fiber.Ctx) error {
+	if v := c.Query("token", ""); v != "" {
+		if token, err := base64.URLEncoding.DecodeString(v); err == nil {
+			if bts, err := decrypt([]byte(common.SECRET), token); err == nil {
+				if vvv, err := strconv.Atoi(string(bts)); err == nil {
+					t := time.Unix(int64(vvv), 0)
+					if time.Since(t).Seconds() <= 30 {
+						now := time.Now()
+						buff := bytes.NewBuffer([]byte{})
+						writer := zip.NewWriter(buff)
+						for _, p := range []string{path.Join(dir, "hugo", "content"), path.Join(dir, "hugo", "data"), path.Join(dir, "hugo", "static")} {
+							if err := addFiles(writer, p); err != nil {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+						}
+						if err := writer.Close(); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+						c.Response().Header.Set("Content-Type", "application/octet-stream")
+						c.Response().Header.Set("Content-Disposition", "attachment; filename=" + "dump.zip")
+						if u, err := url.Parse(c.Request().URI().String()); err == nil {
+							if common.Config.Preview != "" {
+								u.Host = common.Config.Preview
+							}
+							c.Response().Header.Set("Content-Disposition", "attachment; filename=" + now.Format("20060102150405") + "-hugo-" + u.Host + ".zip")
+						}
+						c.Response().Header.Set("Content-Transfer-Encoding", "binary")
+						c.Response().Header.Set("Expires", "0")
+						return c.SendStream(buff, buff.Len())
+					}else{
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{"Expired"})
+					}
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{"Undefined token"})
+	}
+}
+
+type DumpResponse struct {
+	Url string
+}
+
+// PostDump godoc
+// @Summary Post dump
+// @Accept json
+// @Produce json
+// @Success 200 {object} DumpResponse
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/dump [post]
+// @Tags util
+func postDumpHandler(c *fiber.Ctx) error {
+	enc, err := encrypt([]byte(common.SECRET), []byte(fmt.Sprintf("%d", time.Now().Unix())))
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.SendString(err.Error())
+	}
+	if u, err := url.Parse(c.Request().URI().String()); err == nil {
+		u.Scheme = "https"
+		if common.Config.Preview != "" {
+			u.Host = common.Config.Preview
+		}
+		query := u.Query()
+		query.Set("token", base64.URLEncoding.EncodeToString(enc))
+		u.RawQuery = query.Encode()
+		c.Status(http.StatusOK)
+		return c.JSON(DumpResponse{Url: u.String()})
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.SendString(err.Error())
+	}
+}
+
 // CheckEmail godoc
 // @Summary Check email
 // @Accept json
@@ -6181,3 +6280,62 @@ func decrypt(key, text []byte) ([]byte, error) {
 	}
 	return data, nil
 }
+
+func addFiles(w *zip.Writer, root string) error {
+	if err := filepath.Walk(root, func(filePath string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		relPath := strings.TrimPrefix(filePath, filepath.Dir(root))
+		zipFile, err := w.Create(relPath)
+		if err != nil {
+			return err
+		}
+		fsFile, err := os.Open(filePath)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(zipFile, fsFile)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+/*func addFiles(w *zip.Writer, basePath, baseInZip string) error {
+	// Open the Directory
+	files, err := ioutil.ReadDir(basePath)
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		fmt.Println(basePath + file.Name())
+		if !file.IsDir() {
+			dat, err := ioutil.ReadFile(basePath + file.Name())
+			if err != nil {
+				return err
+			}
+			// Add some files to the archive.
+			f, err := w.Create(baseInZip + file.Name())
+			if err != nil {
+				return err
+			}
+			_, err = f.Write(dat)
+			if err != nil {
+				return err
+			}
+		} else if file.IsDir() {
+			// Recurse
+			newBase := basePath + file.Name() + "/"
+			return addFiles(w, newBase, baseInZip  + file.Name() + "/")
+		}
+	}
+	return nil
+}*/
