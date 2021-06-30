@@ -129,15 +129,59 @@ func postPriceAllHandler(c *fiber.Ctx) error {
 			}
 		}
 		//
-		logger.Infof("price: %+v", price)
-		//
-		var id uint
 		var err error
-		if id, err = models.CreatePrice(common.Database, price); err != nil {
+		if _, err = models.CreatePrice(common.Database, price); err != nil {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
 		}
-		logger.Infof("id: %+v, err: %+v", id, err)
+	}
+	return c.JSON(HTTPMessage{"OK"})
+}
+
+type ExistingPrice struct {
+	ID uint
+	Price float64
+	Availability string
+	Sending string
+	Sku string
+	Stock uint
+}
+
+type ExistingPrices []ExistingPrice
+
+// @security BasicAuth
+// UpdatePrices godoc
+// @Summary Update prices
+// @Accept json
+// @Produce json
+// @Param price body NewPrices true "body"
+// @Success 200 {object} HTTPMessage
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/prices/all [put]
+// @Tags price
+func putPriceAllHandler(c *fiber.Ctx) error {
+	var requests []ExistingPrice
+	if err := c.BodyParser(&requests); err != nil {
+		return err
+	}
+	//
+	for _, request := range requests {
+		if price, err := models.GetPrice(common.Database, int(request.ID)); err == nil {
+			price.Price = request.Price
+			price.Availability = request.Availability
+			price.Sending = request.Sending
+			price.Sku = request.Sku
+			price.Stock = request.Stock
+			//
+			var err error
+			if err = models.UpdatePrice(common.Database, price); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+		}else{
+			logger.Warningf("%+v", err)
+		}
 	}
 	return c.JSON(HTTPMessage{"OK"})
 }

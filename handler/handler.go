@@ -196,6 +196,7 @@ func GetFiber() *fiber.App {
 	//v1.Post("/prices/list", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), postPricesListHandler)
 	v1.Post("/prices", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("price created"), postPriceHandler)
 	v1.Post("/prices/all", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("prices created"), postPriceAllHandler)
+	v1.Put("/prices/all", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("prices updated"), putPriceAllHandler)
 	v1.Get("/prices/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getPriceHandler)
 	v1.Put("/prices/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("price updated"), putPriceHandler)
 	v1.Delete("/prices/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("price deleted"), deletePriceHandler)
@@ -5876,11 +5877,15 @@ type ProductView struct {
 	Content string
 	Properties []struct {
 		ID uint
+		Type string `json:",omitempty"`
+		Size string `json:",omitempty"`
 		Name string
 		Title string
 		Filtering bool
 		Option struct {
 			ID uint
+			Type string `json:",omitempty"`
+			Size string `json:",omitempty"`
 			Name string
 			Title string
 			Description string `json:",omitempty"`
@@ -5936,11 +5941,15 @@ type VariationView struct {
 	Prices []*PriceView
 	Properties []struct {
 		ID uint
+		Type string `json:",omitempty"`
+		Size string `json:",omitempty"`
 		Name string
 		Title string
 		Filtering bool
 		Option struct {
 			ID uint
+			Type string `json:",omitempty"`
+			Size string `json:",omitempty"`
 			Name string
 			Title string
 			Description string `json:",omitempty"`
