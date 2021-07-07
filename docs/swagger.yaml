@@ -2072,7 +2072,11 @@ definitions:
                   type: integer
                 name:
                   type: string
+                size:
+                  type: string
                 title:
+                  type: string
+                type:
                   type: string
               type: object
             rates:
@@ -2103,7 +2107,11 @@ definitions:
                     type: object
                 type: object
               type: array
+            size:
+              type: string
             title:
+              type: string
+            type:
               type: string
           type: object
         type: array
@@ -2544,6 +2552,82 @@ definitions:
     items:
       $ref: '#/definitions/handler.TariffView'
     type: array
+  handler.ThemeLayoutLocation:
+    properties:
+      name:
+        type: string
+      plugins:
+        items:
+          $ref: '#/definitions/handler.ThemeLayoutPluginInstance'
+        type: array
+      title:
+        type: string
+    type: object
+  handler.ThemeLayoutPlugin:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      title:
+        type: string
+    type: object
+  handler.ThemeLayoutPluginInstance:
+    properties:
+      name:
+        type: string
+      params:
+        additionalProperties: true
+        type: object
+      title:
+        type: string
+    type: object
+  handler.ThemeLayoutView:
+    properties:
+      locations:
+        description: "Content struct {\n\t\tHeader struct {\n\t\t\tPlugins []ThemeLayoutPlugin\n\t\t}\n\t\tBody struct {\n\t\t\tColumns []ThemeLayoutColumn\n\t\t}\n\t\tFooter struct {\n\t\t\tPlugins []ThemeLayoutPlugin\n\t\t}\n\t}"
+        items:
+          $ref: '#/definitions/handler.ThemeLayoutLocation'
+        type: array
+      modTime:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+      plugins:
+        items:
+          $ref: '#/definitions/handler.ThemeLayoutPlugin'
+        type: array
+      raw:
+        type: string
+      size:
+        type: integer
+    type: object
+  handler.ThemeShortView:
+    properties:
+      modTime:
+        type: string
+      name:
+        type: string
+      size:
+        type: integer
+    type: object
+  handler.ThemeView:
+    properties:
+      modTime:
+        type: string
+      name:
+        type: string
+      size:
+        type: integer
+      title:
+        type: string
+    type: object
+  handler.ThemesShortView:
+    items:
+      $ref: '#/definitions/handler.ThemeShortView'
+    type: array
   handler.TimeListItem:
     properties:
       enabled:
@@ -2941,7 +3025,11 @@ definitions:
                   type: integer
                 name:
                   type: string
+                size:
+                  type: string
                 title:
+                  type: string
+                type:
                   type: string
               type: object
             rates:
@@ -2972,7 +3060,11 @@ definitions:
                     type: object
                 type: object
               type: array
+            size:
+              type: string
             title:
+              type: string
+            type:
               type: string
           type: object
         type: array
@@ -6979,6 +7071,36 @@ paths:
       summary: Create prices
       tags:
       - price
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: body
+        in: body
+        name: price
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NewPrices'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Update prices
+      tags:
+      - price
   /api/v1/products:
     get:
       consumes:
@@ -7990,6 +8112,124 @@ paths:
       security:
       - BasicAuth: []
       summary: Get tariffs
+  /api/v1/themes:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ThemesShortView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get plugins
+      tags:
+      - theme
+  /api/v1/themes/{name}:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ThemeView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get themes
+      tags:
+      - theme
+  /api/v1/themes/{name}/layouts/{any}:
+    delete:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HTTPMessage'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Delete theme layout
+      tags:
+      - theme
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ThemeLayoutView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Get theme layout
+      tags:
+      - theme
+    put:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ThemeLayoutView'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.HTTPError'
+      security:
+      - BasicAuth: []
+      summary: Put theme layout
+      tags:
+      - theme
   /api/v1/times:
     get:
       consumes:

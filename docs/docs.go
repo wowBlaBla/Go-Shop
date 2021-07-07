@@ -5459,6 +5459,54 @@ var doc = `{
             }
         },
         "/api/v1/prices/all": {
+            "put": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "price"
+                ],
+                "summary": "Update prices",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "price",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.NewPrices"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -7247,6 +7295,197 @@ var doc = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handler.TariffsView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/themes": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "theme"
+                ],
+                "summary": "Get plugins",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ThemesShortView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/themes/{name}": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "theme"
+                ],
+                "summary": "Get themes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ThemeView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/themes/{name}/layouts/{any}": {
+            "get": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "theme"
+                ],
+                "summary": "Get theme layout",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ThemeLayoutView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "theme"
+                ],
+                "summary": "Put theme layout",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ThemeLayoutView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BasicAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "theme"
+                ],
+                "summary": "Delete theme layout",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HTTPMessage"
                         }
                     },
                     "404": {
@@ -13017,7 +13256,13 @@ var doc = `{
                                     "name": {
                                         "type": "string"
                                     },
+                                    "size": {
+                                        "type": "string"
+                                    },
                                     "title": {
+                                        "type": "string"
+                                    },
+                                    "type": {
                                         "type": "string"
                                     }
                                 }
@@ -13065,7 +13310,13 @@ var doc = `{
                                     }
                                 }
                             },
+                            "size": {
+                                "type": "string"
+                            },
                             "title": {
+                                "type": "string"
+                            },
+                            "type": {
                                 "type": "string"
                             }
                         }
@@ -13736,6 +13987,122 @@ var doc = `{
                 "$ref": "#/definitions/handler.TariffView"
             }
         },
+        "handler.ThemeLayoutLocation": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "plugins": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.ThemeLayoutPluginInstance"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.ThemeLayoutPlugin": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.ThemeLayoutPluginInstance": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "params": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.ThemeLayoutView": {
+            "type": "object",
+            "properties": {
+                "locations": {
+                    "description": "Content struct {\n\t\tHeader struct {\n\t\t\tPlugins []ThemeLayoutPlugin\n\t\t}\n\t\tBody struct {\n\t\t\tColumns []ThemeLayoutColumn\n\t\t}\n\t\tFooter struct {\n\t\t\tPlugins []ThemeLayoutPlugin\n\t\t}\n\t}",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.ThemeLayoutLocation"
+                    }
+                },
+                "modTime": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "plugins": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.ThemeLayoutPlugin"
+                    }
+                },
+                "raw": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.ThemeShortView": {
+            "type": "object",
+            "properties": {
+                "modTime": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.ThemeView": {
+            "type": "object",
+            "properties": {
+                "modTime": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.ThemesShortView": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/handler.ThemeShortView"
+            }
+        },
         "handler.TimeListItem": {
             "type": "object",
             "properties": {
@@ -14343,7 +14710,13 @@ var doc = `{
                                     "name": {
                                         "type": "string"
                                     },
+                                    "size": {
+                                        "type": "string"
+                                    },
                                     "title": {
+                                        "type": "string"
+                                    },
+                                    "type": {
                                         "type": "string"
                                     }
                                 }
@@ -14391,7 +14764,13 @@ var doc = `{
                                     }
                                 }
                             },
+                            "size": {
+                                "type": "string"
+                            },
                             "title": {
+                                "type": "string"
+                            },
+                            "type": {
                                 "type": "string"
                             }
                         }

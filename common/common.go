@@ -33,7 +33,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210624142134"
+	COMPILED = "20210706180227"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -106,6 +106,7 @@ type OptionCF struct {
 
 type ValueCF struct {
 	ID uint
+	Color string `json:",omitempty"`
 	Thumbnail string
 	Title string
 	Value string
@@ -225,6 +226,7 @@ type ProductFile struct {
 	Votes int `json:",omitempty"`
 	Comments []CommentPF `json:",omitempty"`
 	Sort int
+	Vars map[string]interface{} `json:",omitempty"`
 	//
 	Content string
 }
@@ -348,6 +350,7 @@ type ValuePF struct {
 	Id uint
 	Enabled bool
 	Title string
+	Color string `json:",omitempty"`
 	Thumbnail string `json:",omitempty"`
 	Description string `json:",omitempty"`
 	Value string
@@ -399,6 +402,7 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Max float64 `json:",omitempty"`
 		Votes int `json:",omitempty"`
 		Comments []CommentPF `json:",omitempty"`
+		Vars map[string]interface{} `json:",omitempty"`
 		Sort int
 	}{
 		ID: p.ID,
@@ -424,6 +428,7 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Max: p.Max,
 		Votes: p.Votes,
 		Comments: p.Comments,
+		Vars: p.Vars,
 		Sort: p.Sort,
 	}); err == nil {
 		bts = append(bts, "\n\n"...)

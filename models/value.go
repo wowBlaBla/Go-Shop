@@ -8,6 +8,7 @@ type Value struct {
 	//
 	Title string
 	Description string `json:",omitempty"`
+	Color string `json:",omitempty"`
 	Thumbnail string
 	Value string
 	Availability string

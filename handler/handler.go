@@ -343,6 +343,20 @@ func GetFiber() *fiber.App {
 	v1.Post("/render", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), postRenderHandler)
 	v1.Post("/publish", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), postPublishHandler)
 	//
+	v1.Get("/themes", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getThemesHandler)
+	//v1.Post("/themes", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), postThemeHandler)
+	//v1.Post("/themes/list", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getThemesListHandler)
+	v1.Get("/themes/:name", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getThemeHandler)
+	//v1.Put("/themes/:name", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), putThemeHandler)
+	//v1.Delete("/themes/:name", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), delThemeHandler)
+	v1.Get("/themes/:name/layouts/*", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getThemeLayoutHandler)
+	//v1.Post("/themes/:name/layouts/*", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), postThemeLayoutHandler)
+	v1.Put("/themes/:name/layouts/*", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), putThemeLayoutHandler)
+	//v1.Patch("/themes/:name/layouts/*", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), patchThemeLayoutHandler)
+	v1.Delete("/themes/:name/layouts/*", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), delThemeLayoutHandler)
+	//v1.Get("/themes/:name/plugins", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getThemePluginsHandler)
+	/*v1.Get("/themes/:name/plugins/:name2", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getThemePluginHandler)*/
+	//
 	v1.Get("/account", authRequired, getAccountHandler)
 	v1.Post("/account", csrf, postAccountHandler)
 	v1.Put("/account", authRequired, putAccountHandler)
@@ -5896,9 +5910,12 @@ type ProductView struct {
 			Value struct {
 				ID uint
 				Title string
+				Color string `json:",omitempty"`
 				Thumbnail string `json:",omitempty"`
+				Value string
 				Availability string `json:",omitempty"`
 				Sending string `json:",omitempty"`
+				OptionId uint `json:",omitempty"`
 			}
 			Price float64
 			Availability string `json:",omitempty"`
@@ -6318,33 +6335,37 @@ func addFiles(w *zip.Writer, root string) error {
 	return nil
 }
 
-/*func addFiles(w *zip.Writer, basePath, baseInZip string) error {
-	// Open the Directory
-	files, err := ioutil.ReadDir(basePath)
-	if err != nil {
-		return err
-	}
-	for _, file := range files {
-		fmt.Println(basePath + file.Name())
-		if !file.IsDir() {
-			dat, err := ioutil.ReadFile(basePath + file.Name())
-			if err != nil {
-				return err
+func ParseArguments(str string) []string {
+	var words []string
+	var start int
+	var in bool
+	for i, char := range str {
+		//fmt.Printf("%d: %c, %v\n", i, char, char == '"')
+		if char == '"' && (i == 0 || (i > 0 && str[i-1:i] != `\`)) {
+			//fmt.Printf("case 1\n")
+			in = !in
+			if in {
+				start = i
+			} else {
+				word := str[start:i+1]
+				word = regexp.MustCompile(`^"`).ReplaceAllString(word, "")
+				word = regexp.MustCompile(`"$`).ReplaceAllString(word, "")
+				words = append(words, word)
+				start = i + 1
 			}
-			// Add some files to the archive.
-			f, err := w.Create(baseInZip + file.Name())
-			if err != nil {
-				return err
+		}else if !in && char == ' ' {
+			//fmt.Printf("case 2\n")
+			word := str[start:i]
+			word = regexp.MustCompile(`^"`).ReplaceAllString(word, "")
+			word = regexp.MustCompile(`"$`).ReplaceAllString(word, "")
+			if word = strings.TrimSpace(word); word != "" {
+				words = append(words, word)
 			}
-			_, err = f.Write(dat)
-			if err != nil {
-				return err
-			}
-		} else if file.IsDir() {
-			// Recurse
-			newBase := basePath + file.Name() + "/"
-			return addFiles(w, newBase, baseInZip  + file.Name() + "/")
+			start = i + 1
+		}else if i == len(str) - 1 {
+			//fmt.Printf("case 3\n")
+			words = append(words, strings.TrimLeft(strings.TrimRight(str[start:], `"`), `"`))
 		}
 	}
-	return nil
-}*/
+	return words
+}

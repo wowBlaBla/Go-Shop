@@ -749,6 +749,7 @@ var renderCmd = &cobra.Command{
 																		//
 																		categoryFile.Options[i].Values = append(categoryFile.Options[i].Values, &common.ValueCF{
 																			ID:        parameter.Value.ID,
+																			Color:     parameter.Value.Color,
 																			Thumbnail: thumbnail,
 																			Title:     parameter.Value.Title,
 																			Value:     parameter.Value.Value,
@@ -784,6 +785,7 @@ var renderCmd = &cobra.Command{
 																//
 																opt.Values = append(opt.Values, &common.ValueCF{
 																	ID:        parameter.Value.ID,
+																	Color:     parameter.Value.Color,
 																	Thumbnail: thumbnail,
 																	Title:     parameter.Value.Title,
 																	Value:     parameter.Value.Value,
@@ -800,10 +802,10 @@ var renderCmd = &cobra.Command{
 															for i, opt := range categoryFile.Options {
 																if opt.ID == property.Option.ID {
 																	//logger.Infof("TEST001 property ID: %v, Country: %v FOUND", property.ID, property.Country)
-																	for _, price := range property.Rates {
+																	for _, rate := range property.Rates {
 																		var found bool
 																		for _, value := range opt.Values {
-																			if value.ID == price.Value.ID {
+																			if value.ID == rate.Value.ID {
 																				found = true
 																				break
 																			}
@@ -811,8 +813,8 @@ var renderCmd = &cobra.Command{
 																		if !found {
 																			//
 																			var thumbnail string
-																			if price.Value.Thumbnail != "" {
-																				if p1 := path.Join(dir, "storage", price.Value.Thumbnail); len(p1) > 0 {
+																			if rate.Value.Thumbnail != "" {
+																				if p1 := path.Join(dir, "storage", rate.Value.Thumbnail); len(p1) > 0 {
 																					if fi, err := os.Stat(p1); err == nil {
 																						filename := filepath.Base(p1)
 																						filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
@@ -825,13 +827,16 @@ var renderCmd = &cobra.Command{
 																					}
 																				}
 																			}
-																			//
-																			categoryFile.Options[i].Values = append(categoryFile.Options[i].Values, &common.ValueCF{
-																				ID:        price.Value.ID,
-																				Thumbnail: thumbnail,
-																				Title:     price.Value.Title,
-																				Value:     price.Value.Value,
-																			})
+																			// Only if the value is a part of some Option
+																			if rate.Value.OptionId > 0 {
+																				categoryFile.Options[i].Values = append(categoryFile.Options[i].Values, &common.ValueCF{
+																					ID:        rate.Value.ID,
+																					Color: rate.Value.Color,
+																					Thumbnail: thumbnail,
+																					Title:     rate.Value.Title,
+																					Value:     rate.Value.Value,
+																				})
+																			}
 																			//
 																		}
 																	}
@@ -846,12 +851,12 @@ var renderCmd = &cobra.Command{
 																	Name:  property.Option.Name,
 																	Title: property.Option.Title,
 																}
-																for _, price := range property.Rates {
-																	if price.Enabled {
+																for _, rate := range property.Rates {
+																	if rate.Enabled {
 																		//
 																		var thumbnail string
-																		if price.Value.Thumbnail != "" {
-																			if p1 := path.Join(dir, "storage", price.Value.Thumbnail); len(p1) > 0 {
+																		if rate.Value.Thumbnail != "" {
+																			if p1 := path.Join(dir, "storage", rate.Value.Thumbnail); len(p1) > 0 {
 																				if fi, err := os.Stat(p1); err == nil {
 																					filename := filepath.Base(p1)
 																					filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
@@ -864,13 +869,16 @@ var renderCmd = &cobra.Command{
 																				}
 																			}
 																		}
-																		//
-																		opt.Values = append(opt.Values, &common.ValueCF{
-																			ID:        price.Value.ID,
-																			Thumbnail: thumbnail,
-																			Title:     price.Value.Title,
-																			Value:     price.Value.Value,
-																		})
+																		// Only if the value is a part of some Option
+																		if rate.Value.OptionId > 0 {
+																			opt.Values = append(opt.Values, &common.ValueCF{
+																				ID:        rate.Value.ID,
+																				Color:     rate.Value.Color,
+																				Thumbnail: thumbnail,
+																				Title:     rate.Value.Title,
+																				Value:     rate.Value.Value,
+																			})
+																		}
 																	}
 																}
 																//logger.Infof("TEST001 property ID: %v, Country: %v ADD %+v", property.ID, property.Country, opt)
@@ -885,10 +893,10 @@ var renderCmd = &cobra.Command{
 															for i, opt := range categoryFile.Options {
 																if opt.ID == property.Option.ID {
 																	//logger.Infof("TEST001 property ID: %v, Country: %v FOUND", property.ID, property.Country)
-																	for _, price := range property.Rates {
+																	for _, rate := range property.Rates {
 																		var found bool
 																		for _, value := range opt.Values {
-																			if value.ID == price.Value.ID {
+																			if value.ID == rate.Value.ID {
 																				found = true
 																				break
 																			}
@@ -896,8 +904,8 @@ var renderCmd = &cobra.Command{
 																		if !found {
 																			//
 																			var thumbnail string
-																			if price.Value.Thumbnail != "" {
-																				if p1 := path.Join(dir, "storage", price.Value.Thumbnail); len(p1) > 0 {
+																			if rate.Value.Thumbnail != "" {
+																				if p1 := path.Join(dir, "storage", rate.Value.Thumbnail); len(p1) > 0 {
 																					if fi, err := os.Stat(p1); err == nil {
 																						filename := filepath.Base(p1)
 																						filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
@@ -910,13 +918,16 @@ var renderCmd = &cobra.Command{
 																					}
 																				}
 																			}
-																			//
-																			categoryFile.Options[i].Values = append(categoryFile.Options[i].Values, &common.ValueCF{
-																				ID:        price.Value.ID,
-																				Thumbnail: thumbnail,
-																				Title:     price.Value.Title,
-																				Value:     price.Value.Value,
-																			})
+																			// Only if the value is a part of some Option
+																			if rate.Value.OptionId > 0 {
+																				categoryFile.Options[i].Values = append(categoryFile.Options[i].Values, &common.ValueCF{
+																					ID:        rate.Value.ID,
+																					Color:     rate.Value.Color,
+																					Thumbnail: thumbnail,
+																					Title:     rate.Value.Title,
+																					Value:     rate.Value.Value,
+																				})
+																			}
 																			//
 																		}
 																	}
@@ -931,12 +942,12 @@ var renderCmd = &cobra.Command{
 																	Name:  property.Option.Name,
 																	Title: property.Option.Title,
 																}
-																for _, price := range property.Rates {
-																	if price.Enabled {
+																for _, rate := range property.Rates {
+																	if rate.Enabled {
 																		//
 																		var thumbnail string
-																		if price.Value.Thumbnail != "" {
-																			if p1 := path.Join(dir, "storage", price.Value.Thumbnail); len(p1) > 0 {
+																		if rate.Value.Thumbnail != "" {
+																			if p1 := path.Join(dir, "storage", rate.Value.Thumbnail); len(p1) > 0 {
 																				if fi, err := os.Stat(p1); err == nil {
 																					filename := filepath.Base(p1)
 																					filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
@@ -951,10 +962,11 @@ var renderCmd = &cobra.Command{
 																		}
 																		//
 																		opt.Values = append(opt.Values, &common.ValueCF{
-																			ID:        price.Value.ID,
+																			ID:        rate.Value.ID,
+																			Color:     rate.Value.Color,
 																			Thumbnail: thumbnail,
-																			Title:     price.Value.Title,
-																			Value:     price.Value.Value,
+																			Title:     rate.Value.Title,
+																			Value:     rate.Value.Value,
 																		})
 																	}
 																}
@@ -1366,6 +1378,7 @@ var renderCmd = &cobra.Command{
 													Enabled: price.Enabled,
 													Title:   price.Value.Title,
 													Description: price.Value.Description,
+													Color: price.Value.Color,
 													//Thumbnail: price.Value.Thumbnail,
 													Value: price.Value.Value,
 													Availability: price.Value.Availability,
@@ -1698,6 +1711,36 @@ var renderCmd = &cobra.Command{
 					}
 				}
 				if err = ioutil.WriteFile(path.Join(p, "menus.json"), bts, 0755); err != nil {
+					logger.Warningf("%+v", err)
+				}
+			}
+		}
+		// Options
+		if options, err := models.GetOptionsFull(common.Database); err == nil {
+			var data handler.OptionsFullView
+			if bts, err := json.Marshal(options); err == nil {
+				if err = json.Unmarshal(bts, &data); err == nil {
+					for i, option := range data {
+						for j, value := range option.Values {
+							if cache, err := models.GetCacheValueByValueId(common.Database, value.ID); err == nil {
+								data[i].Values[j].Thumbnail = cache.Thumbnail
+							}else{
+								logger.Warningf("%+v", err)
+							}
+						}
+					}
+				}else{
+					logger.Warningf("%+v", err)
+				}
+			}
+			if bts, err := json.MarshalIndent(data, " ", "   "); err == nil {
+				p := path.Join(dir, "hugo", "data")
+				if _, err = os.Stat(p); err != nil {
+					if err = os.MkdirAll(p, 0755); err != nil {
+						logger.Warningf("%+v", err)
+					}
+				}
+				if err = ioutil.WriteFile(path.Join(p, "options.json"), bts, 0755); err != nil {
 					logger.Warningf("%+v", err)
 				}
 			}

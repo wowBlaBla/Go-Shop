@@ -65,6 +65,7 @@ type ValueView struct {
 	ID uint
 	Title string `json:",omitempty"`
 	Description string `json:",omitempty"`
+	Color string `json:",omitempty"`
 	Thumbnail string `json:",omitempty"`
 	Value string `json:",omitempty"`
 	Availability string `json:",omitempty"`
@@ -74,6 +75,7 @@ type ValueView struct {
 
 type NewValue struct {
 	Title string
+	Color string
 	Thumbnail string
 	Value string
 	Sort int
@@ -125,6 +127,10 @@ func postValueHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Description"]; found && len(v) > 0 {
 				description = strings.TrimSpace(v[0])
 			}
+			var color string
+			if v, found := data.Value["Color"]; found && len(v) > 0 {
+				color = strings.TrimSpace(v[0])
+			}
 			var val string
 			if v, found := data.Value["Value"]; found && len(v) > 0 {
 				val = strings.TrimSpace(v[0])
@@ -141,7 +147,7 @@ func postValueHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Sort"]; found && len(v) > 0 {
 				sort, _ = strconv.Atoi(v[0])
 			}
-			value := &models.Value{Title: title, Description: description, Value: val, OptionId: option.ID, Availability: availability, Sort: sort}
+			value := &models.Value{Title: title, Description: description, Color: color, Value: val, OptionId: option.ID, Availability: availability, Sort: sort}
 			if id, err := models.CreateValue(common.Database, value); err == nil {
 				value.Sort = int(id)
 				if err = models.UpdateValue(common.Database, value); err != nil {
@@ -471,6 +477,10 @@ func putValueHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Description"]; found && len(v) > 0 {
 				description = strings.TrimSpace(v[0])
 			}
+			var color string
+			if v, found := data.Value["Color"]; found && len(v) > 0 {
+				color = strings.TrimSpace(v[0])
+			}
 			var val string
 			if v, found := data.Value["Value"]; found && len(v) > 0 {
 				val = strings.TrimSpace(v[0])
@@ -489,6 +499,7 @@ func putValueHandler(c *fiber.Ctx) error {
 			}
 			value.Title = title
 			value.Description = description
+			value.Color = color
 			value.Value = val
 			value.Availability = availability
 			//value.Sending = sending

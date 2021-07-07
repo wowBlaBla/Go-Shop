@@ -19,7 +19,7 @@ type OptionShortView struct {
 	Name string `json:",omitempty"`
 	Title string `json:",omitempty"`
 	Description string `json:",omitempty"`
-	ValueId uint
+	ValueId uint `json:",omitempty"`
 	Standard bool
 	Sort int `json:",omitempty"`
 }
