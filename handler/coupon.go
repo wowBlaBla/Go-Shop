@@ -254,11 +254,11 @@ type CouponView struct {
 	End time.Time
 	Amount string
 	Minimum float64
-	Count int `json:",omitempty"`
-	Limit int `json:",omitempty"`
-	ApplyTo string `json:",omitempty"`
-	Categories []models.CategoryView `json:",omitempty"`
-	Products []ProductShortView `json:",omitempty"`
+	Count int                           `json:",omitempty"`
+	Limit int                           `json:",omitempty"`
+	ApplyTo string                      `json:",omitempty"`
+	Categories []models.CatalogItemView `json:",omitempty"`
+	Products []ProductShortView         `json:",omitempty"`
 }
 
 type DiscountsView []DiscountView

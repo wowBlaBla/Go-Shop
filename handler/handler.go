@@ -2624,14 +2624,14 @@ func postWidgetsListHandler(c *fiber.Ctx) error {
 type WidgetView struct {
 	ID uint
 	Enabled bool
-	Name string `json:",omitempty"`
-	Title string `json:",omitempty"`
-	Description string `json:",omitempty"`
-	Content string `json:",omitempty"`
-	Location string `json:",omitempty"`
-	ApplyTo string `json:",omitempty"`
-	Categories []models.CategoryView `json:",omitempty"`
-	Products []ProductShortView `json:",omitempty"`
+	Name string                         `json:",omitempty"`
+	Title string                        `json:",omitempty"`
+	Description string                  `json:",omitempty"`
+	Content string                      `json:",omitempty"`
+	Location string                     `json:",omitempty"`
+	ApplyTo string                      `json:",omitempty"`
+	Categories []models.CatalogItemView `json:",omitempty"`
+	Products []ProductShortView         `json:",omitempty"`
 }
 
 // @security BasicAuth
@@ -5240,7 +5240,7 @@ func getDumpHandler(c *fiber.Ctx) error {
 						now := time.Now()
 						buff := bytes.NewBuffer([]byte{})
 						writer := zip.NewWriter(buff)
-						for _, p := range []string{path.Join(dir, "hugo", "content"), path.Join(dir, "hugo", "data"), path.Join(dir, "hugo", "static")} {
+						for _, p := range []string{path.Join(dir, "hugo", "content"), path.Join(dir, "hugo", "data"), path.Join(dir, "hugo", "static"), path.Join(dir, "hugo", "themes")} {
 							if err := addFiles(writer, p); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
@@ -5419,7 +5419,7 @@ func postVATHandler(c *fiber.Ctx) error {
 type FilterRequest ListRequest
 
 type ProductsFilterResponse struct {
-	Categories *models.CategoryView
+	Categories *models.CatalogItemView
 	Data []ProductsFilterItem
 	Filtered int64
 	Total int64
@@ -5465,13 +5465,13 @@ func postFilterHandler(c *fiber.Ctx) error {
 		return c.JSON(HTTPError{"relPath required"})
 	}
 	if category, err := models.GetCacheCategoryByLink(common.Database, relPath); err == nil {
-		if tree, err := models.GetCategoriesView(common.Database, int(category.CategoryID), 999, true, false); err == nil {
+		if tree, err := models.GetCategoriesView(common.Database, int(category.CategoryID), 999, true, false, false); err == nil {
 			response.Categories = tree
 		}else{
 			logger.Warningf("%+v", err)
 		}
 	} else {
-		if tree, err := models.GetCategoriesView(common.Database, 0, 999, true, false); err == nil {
+		if tree, err := models.GetCategoriesView(common.Database, 0, 999, true, false, false); err == nil {
 			response.Categories = tree
 		}else{
 			logger.Warningf("%+v", err)
@@ -5889,39 +5889,7 @@ type ProductView struct {
 	Sku string
 	Stock uint
 	Content string
-	Properties []struct {
-		ID uint
-		Type string `json:",omitempty"`
-		Size string `json:",omitempty"`
-		Name string
-		Title string
-		Filtering bool
-		Option struct {
-			ID uint
-			Type string `json:",omitempty"`
-			Size string `json:",omitempty"`
-			Name string
-			Title string
-			Description string `json:",omitempty"`
-		}
-		Rates []struct {
-			ID uint
-			Enabled bool
-			Value struct {
-				ID uint
-				Title string
-				Color string `json:",omitempty"`
-				Thumbnail string `json:",omitempty"`
-				Value string
-				Availability string `json:",omitempty"`
-				Sending string `json:",omitempty"`
-				OptionId uint `json:",omitempty"`
-			}
-			Price float64
-			Availability string `json:",omitempty"`
-			Sending string `json:",omitempty"`
-		}
-	} `json:",omitempty"`
+	Properties []ProductPropertyView `json:",omitempty"`
 	Variations []VariationView `json:",omitempty"`
 	Files []File2View `json:",omitempty"`
 	ImageId int `json:",omitempty"`
@@ -5930,12 +5898,50 @@ type ProductView struct {
 	VendorId int `json:",omitempty"`
 	TimeId int `json:",omitempty"`
 	//
-	Categories []models.CategoryView `json:",omitempty"`
-	Tags []TagView `json:",omitempty"`
-	RelatedProducts []RelatedProduct `json:",omitempty"`
+	Categories []models.CatalogItemView `json:",omitempty"`
+	Tags []TagView                      `json:",omitempty"`
+	RelatedProducts []RelatedProduct    `json:",omitempty"`
 	//
 	Customization string `json:",omitempty"`
 	New bool `json:",omitempty"`
+}
+
+type ProductPropertyView struct {
+	ID uint
+	Type string `json:",omitempty"`
+	Size string `json:",omitempty"`
+	Mode string `json:",omitempty"`
+	Name string
+	Title string
+	Filtering bool
+	Option struct {
+		ID uint
+		Type string `json:",omitempty"`
+		Size string `json:",omitempty"`
+		Name string
+		Title string
+		Description string `json:",omitempty"`
+	}
+	Rates []struct {
+		ID uint
+		Enabled bool
+		Value struct {
+			ID uint
+			Title string
+			Description string `json:",omitempty"`
+			Color string `json:",omitempty"`
+			Thumbnail string `json:",omitempty"`
+			Value string
+			Availability string `json:",omitempty"`
+			Sending string `json:",omitempty"`
+			OptionId uint `json:",omitempty"`
+		}
+		Price float64
+		Availability string `json:",omitempty"`
+		Sending string `json:",omitempty"`
+		ValueId uint `json:",omitempty"`
+	}
+	OptionId uint `json:",omitempty"`
 }
 
 type RelatedProduct struct {

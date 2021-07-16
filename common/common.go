@@ -28,12 +28,14 @@ const (
 	DEFAULT_PAGINATE = 32
 	PRODUCTS_NAME    = "products"
 	SECRET = "goshop"
+	//
+	AVAILABILITY_AVAILABLE = "available"
 )
 
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210706180227"
+	COMPILED = "20210716120259"
 	STORAGE storage.Storage
 	//
 	Started          time.Time

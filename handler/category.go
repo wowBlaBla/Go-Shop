@@ -26,7 +26,7 @@ import (
 // @Produce json
 // @Param id query int false "Root ID"
 // @Param depth query int false "Depth, default 1"
-// @Success 200 {object} models.CategoryView
+// @Success 200 {object} models.CatalogItemView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/categories [get]
@@ -46,7 +46,7 @@ func getCategoriesHandler(c *fiber.Ctx) error {
 			noProducts = vv
 		}
 	}
-	view, err := models.GetCategoriesView(common.Database, id, depth, noProducts, true)
+	view, err := models.GetCategoriesView(common.Database, id, depth, noProducts, true, false)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
@@ -72,13 +72,13 @@ type NewCategory struct {
 // @Produce json
 // @Param parent_id query int false "Parent id"
 // @Param category body NewCategory true "body"
-// @Success 200 {object} models.CategoriesView
+// @Success 200 {object} models.CatalogView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/categories [post]
 // @Tags category
 func postCategoryHandler(c *fiber.Ctx) error {
-	var view models.CategoryView
+	var view models.CatalogItemView
 	var request NewCategory
 	if err := c.BodyParser(&request); err != nil {
 		return err
@@ -584,13 +584,13 @@ func patchCategoryHandler(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param category body NewCategory true "body"
-// @Success 200 {object} models.CategoryView
+// @Success 200 {object} models.CatalogItemView
 // @Failure 404 {object} HTTPError
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/categories/{id} [put]
 // @Tags category
 func putCategoryHandler(c *fiber.Ctx) error {
-	var view models.CategoryView
+	var view models.CatalogItemView
 	var id int
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)

@@ -329,6 +329,8 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 			categoryId := rItem.CategoryId
 			item := &models.Item{
 				Uuid:     rItem.UUID,
+				ProductId: uint(productId),
+				VariationId: uint(variationId),
 				CategoryId: rItem.CategoryId,
 				Title:    product.Title,
 				BasePrice: basePrice,

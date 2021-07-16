@@ -15,6 +15,7 @@ import (
 type NewProperty struct {
 	Type      string
 	Size string
+	Mode string
 	Name      string
 	Title     string
 	OptionId  uint
@@ -48,6 +49,7 @@ func postPropertyHandler(c *fiber.Ctx) error {
 	property := &models.Property{
 		Type: request.Type,
 		Size: request.Size,
+		Mode: request.Mode,
 		Name:        request.Name,
 		Title:       request.Title,
 		OptionId:    request.OptionId,
@@ -99,7 +101,7 @@ func postPropertyHandler(c *fiber.Ctx) error {
 			})
 		}
 	}
-	logger.Infof("property.Rates: %+v", property.Rates)
+	//logger.Infof("property.Rates: %+v", property.Rates)
 	//
 	if _, err := models.CreateProperty(common.Database, property); err != nil {
 		c.Status(http.StatusInternalServerError)
@@ -286,16 +288,20 @@ func postPropertiesListHandler(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 
+type PropertiesView []PropertyView
+
 type PropertyView struct {
 	ID uint
 	Type string
 	Size string
+	Mode string
 	Name string
 	Title string
 	OptionId uint
 	Sku string
 	Filtering bool
 	Stock uint
+	Rates []*RateView `json:",omitempty"`
 }
 
 // @security BasicAuth
@@ -314,9 +320,9 @@ func getPropertyHandler(c *fiber.Ctx) error {
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)
 	}
-	if property, err := models.GetProperty(common.Database, id); err == nil {
+	if property, err := models.GetPropertyFull(common.Database, id); err == nil {
 		var view PropertyView
-		if bts, err := json.MarshalIndent(property, "", "   "); err == nil {
+		if bts, err := json.Marshal(property); err == nil {
 			if err = json.Unmarshal(bts, &view); err == nil {
 				return c.JSON(view)
 			}else{
@@ -366,6 +372,7 @@ func putPropertyHandler(c *fiber.Ctx) error {
 			}
 			property.Type = request.Type
 			property.Size = request.Size
+			property.Mode = request.Mode
 			property.Title = request.Title
 			property.Sku = request.Sku
 			property.Filtering = request.Filtering

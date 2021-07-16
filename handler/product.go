@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -393,9 +394,10 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	var keys2 []string
 	var values2 []interface{}
 	if request.Search != "" {
-		search := "%" + strings.TrimSpace(request.Search) + "%"
-		keys1 = append(keys1, "(products.Title like ? OR products.Description like ? OR products.Sku like ?)")
-		values1 = append(values1, search, search, search)
+		term := strings.TrimSpace(request.Search)
+		term2 := "%" + term + "%"
+		keys1 = append(keys1, "(products.ID = ? OR products.Title like ? OR products.Description like ? OR products.Sku like ?)")
+		values1 = append(values1, term, term2, term2, term2)
 	}
 	if len(request.Filter) > 0 {
 		for key, value := range request.Filter {
@@ -599,6 +601,7 @@ type ProductPatchRequest struct {
 	Enabled string
 	AddFile uint
 	AddImage uint
+	Properties PropertiesView
 }
 
 // @security BasicAuth
@@ -613,7 +616,7 @@ type ProductPatchRequest struct {
 // @Failure 500 {object} HTTPError
 // @Router /api/v1/products/{id} [patch]
 // @Tags product
-func patchProductHandler(c *fiber.Ctx) error {
+func patchProduct0Handler(c *fiber.Ctx) error {
 	var request ProductPatchRequest
 	if err := c.BodyParser(&request); err != nil {
 		return err
@@ -627,47 +630,754 @@ func patchProductHandler(c *fiber.Ctx) error {
 	}
 	var product *models.Product
 	var err error
-	if product, err = models.GetProductFull(common.Database, int(id)); err != nil {
+	if product, err = models.GetProductFull(common.Database, id); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
-	if request.Enabled == "true" {
-		product.Enabled = true
-	}else if request.Enabled == "false" {
-		product.Enabled = false
-	}
-	if request.AddFile > 0 {
-		for _, file := range product.Files {
-			if file.ID == request.AddFile {
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		logger.Infof("contentType: %+v", contentType)
+		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON){
+			if request.Enabled == "true" {
+				product.Enabled = true
+			}else if request.Enabled == "false" {
+				product.Enabled = false
+			}
+			if request.AddFile > 0 {
+				for _, file := range product.Files {
+					if file.ID == request.AddFile {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{"File already added"})
+					}
+				}
+				if file, err := models.GetFile(common.Database, int(request.AddFile)); err == nil {
+					product.Files = append(product.Files, file)
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+			if request.AddImage > 0 {
+				for _, image := range product.Images {
+					if image.ID == request.AddImage {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{"Image already added"})
+					}
+				}
+				if image, err := models.GetImage(common.Database, int(request.AddImage)); err == nil {
+					product.Images = append(product.Images, image)
+				}else{
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+		} else if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
+			data, err := c.Request().MultipartForm()
+			if err != nil {
+				return err
+			}
+			var properties PropertiesView
+			if v, found := data.Value["Properties"]; found {
+				if err = json.Unmarshal([]byte(v[0]), &properties); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}else{
 				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"File already added"})
+				return c.JSON(HTTPError{"Properties missed"})
+			}
+			//
+			if c.Query("action", "") == "setProperties" {
+				logger.Infof("setProperties: %+v", len(properties))
+				var properties2 []*models.Property
+				for i, p := range properties {
+					logger.Infof("Property #%d: %+v", i, p)
+					var property *models.Property
+					if p.ID == 0 {
+						// new
+						logger.Infof("New Property")
+						property = &models.Property{
+							ProductId: product.ID,
+							OptionId:  p.OptionId,
+						}
+					}else{
+						// existing
+						if property, err = models.GetPropertyFull(common.Database, int(p.ID)); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+						//
+						logger.Infof("Existing Property: %+v", property)
+					}
+
+					property.Type = p.Type
+					property.Size = p.Size
+					property.Mode = p.Mode
+					property.Name = p.Name
+					property.Title = p.Title
+					property.Sku = p.Sku
+					property.Stock = p.Stock
+					property.Filtering = p.Filtering
+
+					for j, r := range p.Rates {
+						logger.Infof("Rate #%d: %+v", j, r)
+						var rate *models.Rate
+						if r.ID == 0 {
+							// new
+							logger.Infof("New Rate")
+							rate = &models.Rate{
+								Enabled: r.Enabled,
+								ValueId: r.ValueId,
+							}
+						} else {
+							// existing
+							if rate, err = models.GetRate(common.Database, int(r.ID)); err != nil {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+							logger.Infof("Existing Rate: %+v", rate)
+						}
+
+						rate.Price = r.Price
+						rate.Availability = r.Availability
+						rate.Sending = r.Sending
+						rate.Sku = r.Sku
+						rate.Stock = r.Stock
+
+						//var value *models.Value
+						if r.ValueId == 0 {
+							// new
+							logger.Infof("New Value")
+							rate.Value = &models.Value{}
+						}else{
+							// existing
+							if rate.Value, err = models.GetValue(common.Database, int(r.ValueId)); err == nil {
+								r.ValueId = rate.Value.ID
+							}
+							logger.Infof("Existing Value: %+v", rate.Value)
+						}
+
+						rate.Value.Title = r.Value.Title
+						rate.Value.Thumbnail = r.Value.Thumbnail
+						rate.Value.Description = r.Value.Description
+						rate.Value.Color = r.Value.Color
+						rate.Value.Value = r.Value.Value
+						rate.Value.OptionId = r.Value.OptionId
+						rate.Value.Availability = r.Value.Availability
+						rate.Value.Sort = r.Value.Sort
+
+						property.Rates = append(property.Rates, rate)
+					}
+
+					properties2 = append(properties2, property)
+					if property.ID == 0 {
+						logger.Infof("To create")
+						if _, err := models.CreateProperty(common.Database, property); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+					}else {
+						logger.Infof("To update")
+						if err := models.UpdateProperty(common.Database, property); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+					}
+
+				}
+				// Properties
+				for _, property := range properties2 {
+					for _, rate := range property.Rates {
+						if value := rate.Value; value != nil {
+							if thumbnail := value.Thumbnail; thumbnail != "" {
+								if v, found := data.File[thumbnail]; found && len(v) > 0 {
+									p := path.Join(dir, "storage", "values")
+									if _, err := os.Stat(p); err != nil {
+										if err = os.MkdirAll(p, 0755); err != nil {
+											logger.Errorf("%v", err)
+										}
+									}
+									filename := fmt.Sprintf("%d-%s-thumbnail%s", value.ID, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(value.Title, "-"), path.Ext(v[0].Filename))
+									if p := path.Join(p, filename); len(p) > 0 {
+										if in, err := v[0].Open(); err == nil {
+											out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
+											if err != nil {
+												c.Status(http.StatusInternalServerError)
+												return c.JSON(HTTPError{err.Error()})
+											}
+											defer out.Close()
+											if _, err := io.Copy(out, in); err != nil {
+												c.Status(http.StatusInternalServerError)
+												return c.JSON(HTTPError{err.Error()})
+											}
+											value.Thumbnail = "/" + path.Join("values", filename)
+											if err = models.UpdateValue(common.Database, value); err != nil {
+												c.Status(http.StatusInternalServerError)
+												return c.JSON(HTTPError{err.Error()})
+											}
+											//
+											if p1 := path.Join(dir, "storage", "values", filename); len(p1) > 0 {
+												if fi, err := os.Stat(p1); err == nil {
+													filename := filepath.Base(p1)
+													filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+													logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
+													var paths string
+													if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+														paths = strings.Join(thumbnails, ",")
+													} else {
+														logger.Warningf("%v", err)
+													}
+													// Cache
+													if err = models.DeleteCacheValueByValueId(common.Database, value.ID); err != nil {
+														logger.Warningf("%v", err)
+													}
+													if _, err = models.CreateCacheValue(common.Database, &models.CacheValue{
+														ValueID: value.ID,
+														Title:     value.Title,
+														Thumbnail: paths,
+														Value: value.Value,
+													}); err != nil {
+														logger.Warningf("%v", err)
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
 			}
 		}
-		if file, err := models.GetFile(common.Database, int(request.AddFile)); err == nil {
-			product.Files = append(product.Files, file)
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{"Missed Content-Type header"})
 	}
-	if request.AddImage > 0 {
-		for _, image := range product.Images {
-			if image.ID == request.AddImage {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{"Image already added"})
-			}
-		}
-		if image, err := models.GetImage(common.Database, int(request.AddImage)); err == nil {
-			product.Images = append(product.Images, image)
-		}else{
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{err.Error()})
-		}
-	}
+	//
 	if err = models.UpdateProduct(common.Database, product); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
+	return c.JSON(HTTPMessage{"OK"})
+}
+
+func patchProductHandler(c *fiber.Ctx) error {
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
+	}
+	var product *models.Product
+	var err error
+	if product, err = models.GetProductFull(common.Database, id); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON){
+
+			if action := c.Query("action", ""); action != "" {
+				switch action {
+				case "setEnable":
+					var request struct {
+						Enabled bool
+					}
+					if err := c.BodyParser(&request); err != nil {
+						return err
+					}
+					product.Enabled = request.Enabled
+					if err = models.UpdateProduct(common.Database, product); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					c.Status(http.StatusOK)
+					return c.JSON(HTTPMessage{"OK"})
+				case "addFile":
+					var request struct {
+						File uint
+					}
+					if err := c.BodyParser(&request); err != nil {
+						return err
+					}
+					for _, file := range product.Files {
+						if file.ID == request.File {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{"File already added"})
+						}
+					}
+					if file, err := models.GetFile(common.Database, int(request.File)); err == nil {
+						product.Files = append(product.Files, file)
+					}else{
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					if err = models.UpdateProduct(common.Database, product); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					c.Status(http.StatusOK)
+					return c.JSON(HTTPMessage{"OK"})
+				case "addImage":
+					var request struct {
+						Image uint
+					}
+					if err := c.BodyParser(&request); err != nil {
+						return err
+					}
+					for _, image := range product.Images {
+						if image.ID == request.Image {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{"Image already added"})
+						}
+					}
+					if image, err := models.GetImage(common.Database, int(request.Image)); err == nil {
+						product.Images = append(product.Images, image)
+					}else{
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					if err = models.UpdateProduct(common.Database, product); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					c.Status(http.StatusOK)
+					return c.JSON(HTTPMessage{"OK"})
+				default:
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{"Unknown action"})
+				}
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"No action defined"})
+			}
+		} else if strings.HasPrefix(contentType, fiber.MIMEMultipartForm) {
+			data, err := c.Request().MultipartForm()
+			if err != nil {
+				return err
+			}
+			var propertyViews PropertiesView
+			if v, found := data.Value["Properties"]; found {
+				if err = json.Unmarshal([]byte(v[0]), &propertyViews); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"Properties missed"})
+			}
+			logger.Infof("propertyViews: %+v", propertyViews)
+			var properties, properties2 []*models.Property
+			if properties, err = models.GetPropertiesByProductId(common.Database, int(product.ID)); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			var resized bool
+			logger.Infof("Existing Properties: %+v", len(properties))
+			for _, property := range properties{
+				logger.Infof("Existing Property: %+v", property)
+				var found bool
+				for i, p := range propertyViews {
+					if property.ID == p.ID {
+						logger.Infof("Match to incoming property #%+v", p)
+						// TODO: To update
+						property.Type = p.Type
+						property.Size = p.Size
+						property.Mode = p.Mode
+						property.Name = p.Name
+						property.Title = p.Title
+						property.Sku = p.Sku
+						property.Stock = p.Stock
+						property.Filtering = p.Filtering
+
+						// TODO: Check rates
+						logger.Infof("Existing Rates: %+v", len(property.Rates))
+						//for i, rate := range property.Rates {
+						for i := 0; i < len(property.Rates); i++ {
+							rate := property.Rates[i]
+							if bts, err := json.Marshal(rate); err == nil {
+								logger.Infof("%d: %+v", i, string(bts))
+							}
+							var found bool
+							for j := 0; j < len(p.Rates); j++ {
+								r := p.Rates[j]
+								if rate.ID == r.ID {
+									logger.Infof("Match to incoming rate #%+v", r.ID)
+									// TODO: Update
+									rate.Enabled = r.Enabled
+									rate.Price = r.Price
+									rate.Availability = r.Availability
+									rate.Sending = r.Sending
+									rate.Sku = r.Sku
+									rate.Stock = r.Stock
+									if rate.Value.OptionId == 0 {
+										if value, err := models.GetValue(common.Database, int(rate.ValueId)); err == nil {
+											value.Title = r.Value.Title
+											value.Description = r.Value.Description
+											value.Color = r.Value.Color
+											value.Value = r.Value.Value
+											value.OptionId = r.Value.OptionId
+											value.Availability = r.Value.Availability
+											value.Sort = r.Value.Sort
+											if value.Thumbnail != "" && r.Value.Thumbnail == "" {
+												// TODO: To delete thumbnail
+												logger.Infof("Existing thumbnail should be %v deleted", value.Thumbnail)
+												value.Thumbnail = ""
+												if err = models.DeleteCacheValueByValueId(common.Database, value.ID); err != nil {
+													logger.Warningf("%+v", err)
+												}
+											}else if _, found := data.File[r.Value.Thumbnail]; r.Value.Thumbnail != "" && found {
+												logger.Infof("New thumbnail will be loaded: %v", r.Value.Thumbnail)
+												value.Thumbnail = r.Value.Thumbnail
+											}else{
+												logger.Infof("Thumbnail %v rejected", r.Value.Thumbnail)
+											}
+											logger.Infof("Updating value %+v", value)
+											if err := models.UpdateValue(common.Database, value); err != nil {
+												c.Status(http.StatusInternalServerError)
+												return c.JSON(HTTPError{err.Error()})
+											}
+										}else{
+											c.Status(http.StatusInternalServerError)
+											return c.JSON(HTTPError{err.Error()})
+										}
+									}
+									logger.Infof("Updating rate %+v", rate)
+									if err := models.UpdateRate(common.Database, rate); err != nil {
+										c.Status(http.StatusInternalServerError)
+										return c.JSON(HTTPError{err.Error()})
+									}
+
+									//p.Rates = append(p.Rates[:j], p.Rates[j + 1:]...)
+									copy(p.Rates[j:], p.Rates[j+1:])
+									p.Rates[len(p.Rates) - 1] = nil
+									p.Rates = p.Rates[:len(p.Rates)-1]
+									j--
+									found = true
+									break
+								}
+							}
+							if !found {
+								// TODO: Delete rate
+								logger.Infof("Delete rate %+v", rate)
+								copy(property.Rates[i:], property.Rates[i+1:])
+								property.Rates[len(property.Rates)-1] = nil
+								property.Rates = property.Rates[:len(property.Rates)-1]
+								i--
+								if err := models.DeleteRate(common.Database, rate); err != nil {
+									c.Status(http.StatusInternalServerError)
+									return c.JSON(HTTPError{err.Error()})
+								}
+							}
+						}
+
+						for _, r := range p.Rates {
+							// TODO: Add rate
+							rate := &models.Rate{
+								Enabled: r.Enabled,
+							}
+							if r.ValueId == 0 {
+								rate.Value = &models.Value{
+									Title: r.Value.Title,
+									Thumbnail: r.Value.Thumbnail,
+									Description: r.Value.Description,
+									Color: r.Value.Color,
+									Value: r.Value.Value,
+									OptionId: r.Value.OptionId,
+									Availability: r.Value.Availability,
+									Sort: r.Value.Sort,
+								}
+							}else{
+								rate.ValueId = r.ValueId
+							}
+							rate.Price = r.Price
+							rate.Availability = r.Availability
+							rate.Sending = r.Sending
+							rate.Sku = r.Sku
+							rate.Stock = r.Stock
+
+							if _, err := models.CreateRate(common.Database, rate); err != nil {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+
+							property.Rates = append(property.Rates, rate)
+						}
+
+						logger.Infof("Updating property %+v", property)
+						if err := models.UpdateProperty(common.Database, property); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+
+						properties2 = append(properties2, property)
+						if i == len(propertyViews) - 1 {
+							propertyViews = propertyViews[:i]
+						}else{
+							propertyViews = append(propertyViews[:i], propertyViews[i + 1:]...)
+						}
+						found = true
+						break
+					}
+				}
+				if !found {
+					// TODO: Delete property
+					logger.Infof("Delete property %+v", property)
+					for _, rate := range property.Rates {
+						if rate.Value.OptionId == 0 {
+							if err = models.DeleteValue(common.Database, rate.Value); err != nil {
+								logger.Warningf("%+v", err)
+							}
+						}
+						if err = models.DeleteRate(common.Database, rate); err != nil {
+							logger.Warningf("%+v", err)
+						}
+					}
+					if err := models.DeleteProperty(common.Database, property); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+
+					resized = true
+				}
+			}
+			logger.Infof("New properties: %+v", len(propertyViews))
+			for _, p := range propertyViews {
+				logger.Infof("New property: %+v", p)
+				property := &models.Property{
+					Type: p.Type,
+					Size: p.Size,
+					Mode: p.Mode,
+					Name: p.Name,
+					Title: p.Title,
+					Sku: p.Sku,
+					Stock: p.Stock,
+					OptionId: p.OptionId,
+					Filtering: p.Filtering,
+				}
+
+				property.ProductId = product.ID
+
+				// TODO: Add rates
+				for _, r := range p.Rates {
+					// TODO: Add rate
+					rate := &models.Rate{
+						Enabled: r.Enabled,
+					}
+					if r.ValueId == 0 {
+						rate.Value = &models.Value{
+							Title: r.Value.Title,
+							Thumbnail: r.Value.Thumbnail,
+							Description: r.Value.Description,
+							Color: r.Value.Color,
+							Value: r.Value.Value,
+							OptionId: r.Value.OptionId,
+							Availability: r.Value.Availability,
+							Sort: r.Value.Sort,
+						}
+					}else{
+						rate.ValueId = r.ValueId
+					}
+					rate.Price = r.Price
+					rate.Availability = r.Availability
+					rate.Sending = r.Sending
+					rate.Sku = r.Sku
+					rate.Stock = r.Stock
+
+					property.Rates = append(property.Rates, rate)
+				}
+				logger.Infof("Creating Property: %+v", property)
+				if _, err := models.CreateProperty(common.Database, property); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+				properties2 = append(properties2, property)
+				resized = true
+			}
+
+			// Properties
+			for _, property := range properties2 {
+				for _, rate := range property.Rates {
+					if value := rate.Value; value != nil {
+						if thumbnail := value.Thumbnail; thumbnail != "" {
+							if v, found := data.File[thumbnail]; found && len(v) > 0 {
+								p := path.Join(dir, "storage", "values")
+								if _, err := os.Stat(p); err != nil {
+									if err = os.MkdirAll(p, 0755); err != nil {
+										logger.Errorf("%v", err)
+									}
+								}
+								filename := fmt.Sprintf("%d-%s-thumbnail%s", value.ID, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(value.Title, "-"), path.Ext(v[0].Filename))
+								if p := path.Join(p, filename); len(p) > 0 {
+									if in, err := v[0].Open(); err == nil {
+										out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
+										if err != nil {
+											c.Status(http.StatusInternalServerError)
+											return c.JSON(HTTPError{err.Error()})
+										}
+										defer out.Close()
+										if _, err := io.Copy(out, in); err != nil {
+											c.Status(http.StatusInternalServerError)
+											return c.JSON(HTTPError{err.Error()})
+										}
+										value.Thumbnail = "/" + path.Join("values", filename)
+										if err = models.UpdateValue(common.Database, value); err != nil {
+											c.Status(http.StatusInternalServerError)
+											return c.JSON(HTTPError{err.Error()})
+										}
+										//
+										if p1 := path.Join(dir, "storage", "values", filename); len(p1) > 0 {
+											if fi, err := os.Stat(p1); err == nil {
+												filename := filepath.Base(p1)
+												filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+												logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
+												var paths string
+												if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+													paths = strings.Join(thumbnails, ",")
+												} else {
+													logger.Warningf("%v", err)
+												}
+												// Cache
+												if err = models.DeleteCacheValueByValueId(common.Database, value.ID); err != nil {
+													logger.Warningf("%v", err)
+												}
+												if _, err = models.CreateCacheValue(common.Database, &models.CacheValue{
+													ValueID: value.ID,
+													Title:     value.Title,
+													Thumbnail: paths,
+													Value: value.Value,
+												}); err != nil {
+													logger.Warningf("%v", err)
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// Prices
+			if resized {
+				logger.Infof("Prices reset REQUIRED")
+				logger.Infof("Delete old prices")
+				if prices, err := models.GetPricesByProductId(common.Database, product.ID); err == nil {
+					for _, price := range prices {
+						if err = models.DeletePrice(common.Database, price); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+					}
+				} else {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+			}
+			//
+			var table [][]uint
+			for i := 0; i < len(properties2); i++ {
+				var row []uint
+				for j := 0; j < len(properties2[i].Rates); j++ {
+					row = append(row, properties2[i].Rates[j].ID)
+				}
+				table = append(table, row)
+			}
+
+			logger.Infof("table: %+v", table)
+
+			var matrix = [][]uint{}
+			vector := make([]int, len(table))
+			for counter := 0; ; counter++ {
+				var line []uint
+				for i, index := range vector {
+					line = append(line, table[i][index])
+				}
+				var done bool
+				for i := len(vector) - 1; i >= 0; i-- {
+					if vector[i] < len(table[i]) - 1 {
+						vector[i]++
+						done = true
+						break
+					}else{
+						vector[i] = 0
+					}
+				}
+				matrix = append(matrix, line)
+				if !done {
+					break
+				}
+			}
+			//
+			var existingPrices []*models.Price
+			if existingPrices, err = models.GetPricesByProductId(common.Database, product.ID); err != nil {
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{err.Error()})
+			}
+			logger.Infof("existingPrices: %+v", len(existingPrices))
+			logger.Infof("matrix: %+v", matrix)
+			logger.Infof("===========================")
+			//
+			for _, row := range matrix {
+				logger.Infof("row: %+v", row)
+				price := &models.Price{
+					Enabled: true,
+					ProductId: product.ID,
+					Availability: common.AVAILABILITY_AVAILABLE,
+				}
+				for _, rateId := range row {
+					if rateId > 0 {
+						if rate, err := models.GetRate(common.Database, int(rateId)); err == nil {
+							price.Rates = append(price.Rates, rate)
+						}
+					}
+				}
+				logger.Infof("price: %+v", price)
+
+				var match bool
+				for _, existingPrice := range existingPrices {
+					logger.Infof("existingPrice: %+v", existingPrice)
+					match = len(price.Rates) == len(existingPrice.Rates)
+					logger.Infof("match1: %+v", match)
+					if match {
+						for _, rate1 := range price.Rates {
+							var found bool
+							for _, rate2 := range existingPrice.Rates {
+								if rate1.ID == rate2.ID {
+									logger.Infof("Match found %+v and %+v", rate1, rate2)
+									found = true
+									break
+								}
+							}
+							if !found {
+								logger.Infof("Match not found %+v", rate1)
+								match = false
+								break
+							}
+						}
+					}
+					logger.Infof("match2: %+v", match)
+
+					if match {
+						logger.Infof("Price exists: %+v", existingPrice)
+						break
+					}
+				}
+
+				if !match {
+					if _, err = models.CreatePrice(common.Database, price); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					logger.Infof("New price created: %+v", price)
+				}
+			}
+		}
+	}
+
+	c.Status(http.StatusOK)
 	return c.JSON(HTTPMessage{"OK"})
 }
 

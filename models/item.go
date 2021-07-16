@@ -7,6 +7,8 @@ type Item struct {
 	//
 	Uuid        string
 	CategoryId  uint
+	ProductId uint
+	VariationId uint
 	Title       string
 	Description string `json:",omitempty"`
 	Path string
@@ -25,6 +27,15 @@ type Item struct {
 	//
 	CommentId uint
 	Comment       *Comment `gorm:"foreignKey:comment_id;"`
+}
+
+func GetItemsCountByProductId(connector *gorm.DB, productId uint) (int64, error) {
+	db := connector
+	var count int64
+	if err := db.Model(&Item{}).Where("product_id = ?", productId).Count(&count).Error; err != nil {
+		return count, err
+	}
+	return count, nil
 }
 
 func GetItem(connector *gorm.DB, id int) (*Item, error) {

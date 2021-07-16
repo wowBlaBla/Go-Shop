@@ -32,6 +32,7 @@ type PriceView struct {
 	//RateIds string
 	Rates []*RateView
 	Price float64
+	Prices []*PriceView
 	Availability string
 	Sending string
 	Sku string

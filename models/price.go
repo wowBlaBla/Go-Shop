@@ -1,6 +1,8 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+)
 
 type Price struct {
 	gorm.Model // ID is here
@@ -21,6 +23,10 @@ type Price struct {
 	Stock uint
 }
 
+func (p *Price) AfterDelete(tx *gorm.DB) error {
+	return tx.Debug().Exec("delete from prices_rates where price_id = ?", p.ID).Error
+}
+
 func GetPricesByProductId(connector *gorm.DB, productId uint) ([]*Price, error) {
 	db := connector
 	var prices []*Price
@@ -34,6 +40,15 @@ func GetPricesByVariationId(connector *gorm.DB, variationId uint) ([]*Price, err
 	db := connector
 	var prices []*Price
 	if err := db.Debug().Preload("Rates").Preload("Rates.Property").Preload("Rates.Value").Where("variation_id = ?", variationId).Find(&prices).Error; err != nil {
+		return nil, err
+	}
+	return prices, nil
+}
+
+func GetPricesOfRate(connector *gorm.DB, rate *Rate) ([]*Price, error) {
+	db := connector
+	var prices []*Price
+	if err := db.Model(&rate).Association("Prices").Find(&prices); err != nil {
 		return nil, err
 	}
 	return prices, nil

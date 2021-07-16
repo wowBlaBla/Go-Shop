@@ -71,6 +71,7 @@ type ValueView struct {
 	Availability string `json:",omitempty"`
 	Sending string `json:",omitempty"`
 	Sort int `json:",omitempty"`
+	OptionId uint `json:",omitempty"`
 }
 
 type NewValue struct {

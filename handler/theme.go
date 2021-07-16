@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"github.com/BurntSushi/toml"
@@ -11,6 +12,7 @@ import (
 	"html"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"regexp"
@@ -33,6 +35,8 @@ var (
 		Path: path.Join("layouts", "products", "single.html"),
 	},
 	}
+	//
+	reRemoveRelative = regexp.MustCompile(`^\./`)
 )
 
 type ThemeShortView struct {
@@ -241,6 +245,7 @@ func getThemeLayoutHandler(c *fiber.Ctx) error {
 	filepath := path.Join(dir, "hugo", "themes", name, "layouts", p)
 	if fi, err := os.Stat(filepath); err == nil {
 		if bts, err := ioutil.ReadFile(filepath); err == nil {
+
 			doc, err := goquery.NewDocumentFromReader(bytes.NewReader(bts))
 			if err != nil {
 				c.Status(http.StatusInternalServerError)
@@ -268,40 +273,58 @@ func getThemeLayoutHandler(c *fiber.Ctx) error {
 						Title: title,
 					}
 					if v, err := s.Html(); err == nil {
-						html := html.UnescapeString(v)
-						for _, res := range regexp.MustCompile(`{{ partial "plugins/([^/]+)/index.html" \( dict "context" . (.*?)\) }}`).FindAllStringSubmatch(html, -1) {
-							name := res[1]
-							instance := ThemeLayoutPluginInstanceView{
-								Name: name,
-							}
-							pairs := ParseArguments(strings.TrimSpace(res[2]))
-							var left string
-							for i, pair := range pairs {
-								if i % 2 == 0 {
-									left = pair
-								}else{
-									var typ, description string
-									for _, plugin := range plugins {
-										if plugin.Name == name {
-											for _, param := range plugin.Params {
-												if param.Name == left {
-													typ = param.Type
-													description = param.Description
-													break
-												}
-											}
-											break
+						fragment := html.UnescapeString(v)
+						for _, line := range strings.Split(fragment, "\n") {
+							reader := csv.NewReader(strings.NewReader(strings.TrimSpace(line)))
+							reader.Comma = ' ' // space
+							if cells, err := reader.Read(); err == nil {
+								if len(cells) > 6 {
+									if res := regexp.MustCompile(`plugins/([^/]+)/index.html`).FindStringSubmatch(cells[2]); len(res) > 1 {
+										name := res[1]
+										instance := ThemeLayoutPluginInstanceView{
+											Name: name,
 										}
+										pairs := cells[7: len(cells) - 3]
+										var left string
+										for i, pair := range pairs {
+											if i % 2 == 0 {
+												left = pair
+											}else{
+												var typ, description string
+												for _, plugin := range plugins {
+													if plugin.Name == name {
+														for _, param := range plugin.Params {
+															if param.Name == left {
+																typ = param.Type
+																description = param.Description
+																break
+															}
+														}
+														break
+													}
+												}
+												param := PluginParamView{
+													Type: typ,
+													Name: left,
+													Description: description,
+												}
+
+												if v, err := url.QueryUnescape(pair); err == nil {
+													param.Value = reRemoveRelative.ReplaceAllString(v, "")
+												}else{
+													param.Value = pair
+												}
+
+												instance.Params = append(instance.Params, param)
+											}
+										}
+										location.Plugins = append(location.Plugins, instance)
 									}
-									instance.Params = append(instance.Params, PluginParamView{
-										Type: typ,
-										Name: left,
-										Description: description,
-										Value: pair,
-									})
 								}
+							}else{
+								fmt.Println(err)
+								return
 							}
-							location.Plugins = append(location.Plugins, instance)
 						}
 					}
 					layout.Locations = append(layout.Locations, location)
@@ -373,24 +396,29 @@ func putThemeLayoutHandler(c *fiber.Ctx) error {
 
 	for _, location := range request.Locations {
 		doc.Find("[data-place=" + location.Name + "]").Each(func(i int, s *goquery.Selection) {
-			code := ""
+			var codes []string
 			for _, plugin := range location.Plugins {
-				var params string
+				var params []string
 				for _, param := range plugin.Params {
 					switch param.Value.(type) {
 					case int:
-						params += fmt.Sprintf(`"%s" %v `, param.Name, param.Value)
+						params = append(params, fmt.Sprintf(`"%s" %v`, param.Name, param.Value))
 					case float64:
-						params += fmt.Sprintf(`"%s" %v `, param.Name, param.Value)
+						params =  append(params, fmt.Sprintf(`"%s" %v`, param.Name, param.Value))
 					default:
-						params += fmt.Sprintf(`"%s" "%v" `, param.Name, param.Value)
+						if param.Value != nil {
+							t := &url.URL{Path: fmt.Sprintf("%v", param.Value)}
+							params = append(params, fmt.Sprintf(`"%s" "%s"`, param.Name, t.String()))
+						}else{
+							params = append(params, fmt.Sprintf(`"%s" "%s"`, param.Name, ""))
+						}
 					}
 				}
-				code += fmt.Sprintf(`{{ partial "plugins/%s/index.html" ( dict "context" . %s ) }}`, plugin.Name, strings.TrimSpace(params))
+				codes = append(codes, fmt.Sprintf(`{{ partial "plugins/%s/index.html" ( dict "context" . %s ) }}`, plugin.Name, strings.Join(params, " ")))
 			}
-
+			//
 			if a, err := goquery.OuterHtml(s); err == nil {
-				s.SetHtml(code)
+				s.SetHtml(strings.Join(codes, "\n"))
 				b, _ := goquery.OuterHtml(s)
 				content = strings.Replace(content, html.UnescapeString(a), html.UnescapeString(b), 1)
 			}

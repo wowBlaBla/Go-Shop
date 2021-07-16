@@ -186,8 +186,9 @@ type RateView struct {
 	ID uint
 	Enabled bool
 	PropertyId uint
-	Property PropertyView
-	Value ValueView
+	Property PropertyView `json:",omitempty"`
+	Prices []*PriceView `json:",omitempty"`
+	Value ValueView `json:",omitempty"`
 	ValueId uint
 	Price float64
 	Availability string
@@ -410,8 +411,8 @@ func deleteRateHandler(c *fiber.Ctx) error {
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)
 	}
-	if price, err := models.GetRate(common.Database, id); err == nil {
-		if err = models.DeleteRate(common.Database, price); err != nil {
+	if rate, err := models.GetRate(common.Database, id); err == nil {
+		if err = models.DeleteRate(common.Database, rate); err != nil {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
 		}

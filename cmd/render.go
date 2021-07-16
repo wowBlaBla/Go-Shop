@@ -331,22 +331,6 @@ var renderCmd = &cobra.Command{
 		} else {
 			logger.Warningf("%+v", err)
 		}
-		// Catalog
-		if tree, err := models.GetCategoriesView(common.Database, 0, 999, false, true); err == nil {
-			if bts, err := json.MarshalIndent(tree, " ", "   "); err == nil {
-				p := path.Join(dir, "hugo", "data")
-				if _, err = os.Stat(p); err != nil {
-					if err = os.MkdirAll(p, 0755); err != nil {
-						logger.Warningf("%+v", err)
-					}
-				}
-				if err = ioutil.WriteFile(path.Join(p, "catalog.json"), bts, 0755); err != nil {
-					logger.Warningf("%+v", err)
-				}
-			}
-		}else{
-			logger.Warningf("%+v", err)
-		}
 		if categories, err := models.GetCategories(common.Database); err == nil {
 			// Clear existing "products" folder
 			if common.Config.Products != "" {
@@ -368,7 +352,7 @@ var renderCmd = &cobra.Command{
 					Path:    "/" + strings.ToLower(common.Config.Products),
 					Type:    "categories",
 				}
-				if tree, err := models.GetCategoriesView(common.Database, 0, 999, true, true); err == nil {
+				if tree, err := models.GetCategoriesView(common.Database, 0, 999, true, true, false); err == nil {
 					categoryFile.Count = tree.Count
 				}else{
 					logger.Warningf("%+v", err)
@@ -476,7 +460,7 @@ var renderCmd = &cobra.Command{
 									}
 								}
 								//
-								if tree, err := models.GetCategoriesView(common.Database, int(category.ID), 999, true, true); err == nil {
+								if tree, err := models.GetCategoriesView(common.Database, int(category.ID), 999, true, true, false); err == nil {
 									categoryFile.Count = tree.Count
 								}else{
 									logger.Warningf("%+v", err)
@@ -1582,6 +1566,22 @@ var renderCmd = &cobra.Command{
 			return
 		}
 		//
+		// Catalog
+		if tree, err := models.GetCategoriesView(common.Database, 0, 999, false, true, true); err == nil {
+			if bts, err := json.MarshalIndent(tree, " ", "   "); err == nil {
+				p := path.Join(dir, "hugo", "data")
+				if _, err = os.Stat(p); err != nil {
+					if err = os.MkdirAll(p, 0755); err != nil {
+						logger.Warningf("%+v", err)
+					}
+				}
+				if err = ioutil.WriteFile(path.Join(p, "catalog.json"), bts, 0755); err != nil {
+					logger.Warningf("%+v", err)
+				}
+			}
+		}else{
+			logger.Warningf("%+v", err)
+		}
 		// Options
 		if options, err := models.GetOptions(common.Database); err == nil {
 			if remove {
@@ -1745,8 +1745,53 @@ var renderCmd = &cobra.Command{
 				}
 			}
 		}
+		// Data
+		var data struct {
+			Plugins map[string]interface{}
+		}
+
+		var instagram InstagramData
+
+		for _, url := range []string{
+			"https://cdn.dasmoebelhaus.de/theme/instagram/1-min.jpg",
+			"https://cdn.dasmoebelhaus.de/theme/instagram/2-min.jpg",
+			"https://cdn.dasmoebelhaus.de/theme/instagram/3-min.jpg",
+			"https://cdn.dasmoebelhaus.de/theme/instagram/4-min.jpg",
+			"https://cdn.dasmoebelhaus.de/theme/instagram/5-min.jpg",
+			"https://cdn.dasmoebelhaus.de/theme/instagram/6-min.jpg",
+			"https://cdn.dasmoebelhaus.de/theme/instagram/7-min.jpg",
+			"https://cdn.dasmoebelhaus.de/theme/instagram/8-min.jpg",
+		}{
+			instagram.Posts = append(instagram.Posts, InstagramPost{
+				Url: url,
+			})
+		}
+
+		data.Plugins = make(map[string]interface{})
+		data.Plugins["instagram"] = instagram
+
+		if bts, err := json.MarshalIndent(data, " ", "   "); err == nil {
+			p := path.Join(dir, "hugo", "data")
+			if _, err = os.Stat(p); err != nil {
+				if err = os.MkdirAll(p, 0755); err != nil {
+					logger.Warningf("%+v", err)
+				}
+			}
+			if err = ioutil.WriteFile(path.Join(p, "data.json"), bts, 0755); err != nil {
+				logger.Warningf("%+v", err)
+			}
+		}
+
 		logger.Infof("Rendered ~ %.3f ms", float64(time.Since(t1).Nanoseconds())/1000000)
 	},
+}
+
+type InstagramData struct {
+	Posts []InstagramPost
+}
+
+type InstagramPost struct {
+	Url string
 }
 
 func createMenu(root *common.MenuItemView, bts []byte) {
@@ -1764,7 +1809,7 @@ func createMenu(root *common.MenuItemView, bts []byte) {
 	//
 	if err := json.Unmarshal(bts, &raw); err == nil {
 		if raw.Data.Type == "category" {
-			if categoriesView, err := models.GetCategoriesView(common.Database, raw.Data.Id, 999, true, true); err == nil {
+			if categoriesView, err := models.GetCategoriesView(common.Database, raw.Data.Id, 999, true, true, false); err == nil {
 				root.Type = raw.Data.Type
 				root.ID = categoriesView.ID
 				root.Name = categoriesView.Name

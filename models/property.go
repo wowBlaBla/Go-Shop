@@ -8,6 +8,7 @@ type Property struct {
 	gorm.Model
 	Type string // select / radio
 	Size string // small / medium / large
+	Mode string // image (default) / color
 	Name        string
 	Title       string
 	ProductId uint
@@ -34,10 +35,28 @@ func GetProperties(connector *gorm.DB) ([]*Property, error) {
 	return properties, nil
 }
 
+func GetPropertiesByProductId(connector *gorm.DB, productId int) ([]*Property, error) {
+	db := connector
+	var properties []*Property
+	if err := db.Debug().Preload("Option").Preload("Rates").Preload("Rates.Value").Where("product_id = ?", productId).Find(&properties).Error; err != nil {
+		return nil, err
+	}
+	return properties, nil
+}
+
 func GetProperty(connector *gorm.DB, id int) (*Property, error) {
 	db := connector
 	var property Property
 	if err := db.Debug().Preload("Option").First(&property, id).Error; err != nil {
+		return nil, err
+	}
+	return &property, nil
+}
+
+func GetPropertyFull(connector *gorm.DB, id int) (*Property, error) {
+	db := connector
+	var property Property
+	if err := db.Debug().Preload("Option").Preload("Rates").Preload("Rates.Value").First(&property, id).Error; err != nil {
 		return nil, err
 	}
 	return &property, nil

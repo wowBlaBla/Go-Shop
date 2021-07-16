@@ -28,7 +28,9 @@ func CreateCacheCategory(connector *gorm.DB, category *CacheCategory) (uint, err
 func GetCacheCategoryByCategoryId(connector *gorm.DB, categoryId uint) (*CacheCategory, error){
 	db := connector
 	var cacheCategory CacheCategory
-	db.Where("category_id = ?", categoryId).First(&cacheCategory)
+	if err := db.Where("category_id = ?", categoryId).First(&cacheCategory).Error; err != nil {
+		return nil, err
+	}
 	return &cacheCategory, db.Error
 }
 
