@@ -6,6 +6,7 @@ type Parameter struct {
 	gorm.Model
 	Name        string
 	Title       string
+	Type string
 	// Select from existing option
 	Option *Option `gorm:"foreignKey:OptionId"`
 	OptionId      uint
@@ -17,6 +18,15 @@ type Parameter struct {
 	Filtering bool
 	//
 	ProductId uint
+}
+
+func GetParametersByProductId(connector *gorm.DB, productId int) ([]*Parameter, error) {
+	db := connector
+	var parameters []*Parameter
+	if err := db.Debug().Where("product_id = ?", productId).Find(&parameters).Error; err != nil {
+		return nil, err
+	}
+	return parameters, nil
 }
 
 func GetParametersByProductAndName(connector *gorm.DB, productId int, name string) ([]*Parameter, error) {

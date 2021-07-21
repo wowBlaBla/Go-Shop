@@ -16,6 +16,7 @@ type Price struct {
 	Rates      []*Rate `gorm:"many2many:prices_rates;"`
 	//
 	Enabled bool
+	Thumbnail string `gorm:"many2many:prices_rates;"`
 	Price float64
 	Availability string
 	Sending string
@@ -25,6 +26,16 @@ type Price struct {
 
 func (p *Price) AfterDelete(tx *gorm.DB) error {
 	return tx.Debug().Exec("delete from prices_rates where price_id = ?", p.ID).Error
+}
+
+func GetPrices(connector *gorm.DB) ([]*Price, error) {
+	db := connector
+	var prices []*Price
+	db.Debug().Find(&prices)
+	if err := db.Error; err != nil {
+		return nil, err
+	}
+	return prices, nil
 }
 
 func GetPricesByProductId(connector *gorm.DB, productId uint) ([]*Price, error) {

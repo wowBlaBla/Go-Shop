@@ -9,7 +9,8 @@ import (
 
 type Variation struct {
 	gorm.Model
-	ID        uint `gorm:"primarykey"`
+	ID uint `gorm:"primarykey"`
+	Enabled bool
 	Name string
 	Title string
 	Description string

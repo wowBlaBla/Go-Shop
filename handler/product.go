@@ -543,6 +543,18 @@ func getProductHandler(c *fiber.Ctx) error {
 						}
 					}
 				}
+				for i, price := range view.Prices {
+					if price.Thumbnail != "" {
+						if cache, err := models.GetCachePriceByPriceId(common.Database, price.ID); err == nil {
+							arr := strings.Split(cache.Thumbnail, ",")
+							if len(arr) > 1 {
+								view.Prices[i].Thumbnail = strings.Split(arr[1], " ")[0]
+							}else{
+								view.Prices[i].Thumbnail = strings.Split(arr[0], " ")[0]
+							}
+						}
+					}
+				}
 				for i := 0; i < len(view.Images); i++ {
 					if cache, err := models.GetCacheImageByImageId(common.Database, view.Images[i].ID); err == nil {
 						view.Images[i].Thumbnail = cache.Thumbnail
@@ -877,7 +889,6 @@ func patchProductHandler(c *fiber.Ctx) error {
 	}
 	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
 		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON){
-
 			if action := c.Query("action", ""); action != "" {
 				switch action {
 				case "setEnable":
@@ -957,9 +968,9 @@ func patchProductHandler(c *fiber.Ctx) error {
 			if err != nil {
 				return err
 			}
-			var propertyViews PropertiesView
+			var newProperties PropertiesView
 			if v, found := data.Value["Properties"]; found {
-				if err = json.Unmarshal([]byte(v[0]), &propertyViews); err != nil {
+				if err = json.Unmarshal([]byte(v[0]), &newProperties); err != nil {
 					c.Status(http.StatusInternalServerError)
 					return c.JSON(HTTPError{err.Error()})
 				}
@@ -967,71 +978,60 @@ func patchProductHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Properties missed"})
 			}
-			logger.Infof("propertyViews: %+v", propertyViews)
-			var properties, properties2 []*models.Property
-			if properties, err = models.GetPropertiesByProductId(common.Database, int(product.ID)); err != nil {
+			var existingProperties, updatedProperties []*models.Property
+			if existingProperties, err = models.GetPropertiesByProductId(common.Database, int(product.ID)); err != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
 			var resized bool
-			logger.Infof("Existing Properties: %+v", len(properties))
-			for _, property := range properties{
-				logger.Infof("Existing Property: %+v", property)
+			for _, existingProperty := range existingProperties{
 				var found bool
-				for i, p := range propertyViews {
-					if property.ID == p.ID {
-						logger.Infof("Match to incoming property #%+v", p)
-						// TODO: To update
-						property.Type = p.Type
-						property.Size = p.Size
-						property.Mode = p.Mode
-						property.Name = p.Name
-						property.Title = p.Title
-						property.Sku = p.Sku
-						property.Stock = p.Stock
-						property.Filtering = p.Filtering
+				for i, newProperty := range newProperties {
+					if existingProperty.ID == newProperty.ID {
+						logger.Infof("Existing property #%+v", existingProperty.ID)
+						existingProperty.Type = newProperty.Type
+						existingProperty.Size = newProperty.Size
+						existingProperty.Mode = newProperty.Mode
+						existingProperty.Name = newProperty.Name
+						existingProperty.Title = newProperty.Title
+						existingProperty.Sku = newProperty.Sku
+						existingProperty.Stock = newProperty.Stock
+						existingProperty.Filtering = newProperty.Filtering
 
 						// TODO: Check rates
-						logger.Infof("Existing Rates: %+v", len(property.Rates))
+						logger.Infof("Existing Rates: %+v", len(existingProperty.Rates))
 						//for i, rate := range property.Rates {
-						for i := 0; i < len(property.Rates); i++ {
-							rate := property.Rates[i]
-							if bts, err := json.Marshal(rate); err == nil {
-								logger.Infof("%d: %+v", i, string(bts))
-							}
+						for i := 0; i < len(existingProperty.Rates); i++ {
+							existingRate := existingProperty.Rates[i]
 							var found bool
-							for j := 0; j < len(p.Rates); j++ {
-								r := p.Rates[j]
-								if rate.ID == r.ID {
-									logger.Infof("Match to incoming rate #%+v", r.ID)
-									// TODO: Update
-									rate.Enabled = r.Enabled
-									rate.Price = r.Price
-									rate.Availability = r.Availability
-									rate.Sending = r.Sending
-									rate.Sku = r.Sku
-									rate.Stock = r.Stock
-									if rate.Value.OptionId == 0 {
-										if value, err := models.GetValue(common.Database, int(rate.ValueId)); err == nil {
-											value.Title = r.Value.Title
-											value.Description = r.Value.Description
-											value.Color = r.Value.Color
-											value.Value = r.Value.Value
-											value.OptionId = r.Value.OptionId
-											value.Availability = r.Value.Availability
-											value.Sort = r.Value.Sort
-											if value.Thumbnail != "" && r.Value.Thumbnail == "" {
+							for j := 0; j < len(newProperty.Rates); j++ {
+								newRate := newProperty.Rates[j]
+								if existingRate.ID == newRate.ID {
+									existingRate.Enabled = newRate.Enabled
+									existingRate.Price = newRate.Price
+									existingRate.Availability = newRate.Availability
+									existingRate.Sending = newRate.Sending
+									existingRate.Sku = newRate.Sku
+									existingRate.Stock = newRate.Stock
+									if existingRate.Value.OptionId == 0 {
+										if value, err := models.GetValue(common.Database, int(existingRate.ValueId)); err == nil {
+											value.Title = newRate.Value.Title
+											value.Description = newRate.Value.Description
+											value.Color = newRate.Value.Color
+											value.Value = newRate.Value.Value
+											value.OptionId = newRate.Value.OptionId
+											value.Availability = newRate.Value.Availability
+											value.Sort = newRate.Value.Sort
+											if value.Thumbnail != "" && newRate.Value.Thumbnail == "" {
 												// TODO: To delete thumbnail
 												logger.Infof("Existing thumbnail should be %v deleted", value.Thumbnail)
 												value.Thumbnail = ""
 												if err = models.DeleteCacheValueByValueId(common.Database, value.ID); err != nil {
 													logger.Warningf("%+v", err)
 												}
-											}else if _, found := data.File[r.Value.Thumbnail]; r.Value.Thumbnail != "" && found {
-												logger.Infof("New thumbnail will be loaded: %v", r.Value.Thumbnail)
-												value.Thumbnail = r.Value.Thumbnail
-											}else{
-												logger.Infof("Thumbnail %v rejected", r.Value.Thumbnail)
+											}else if _, found := data.File[newRate.Value.Thumbnail]; newRate.Value.Thumbnail != "" && found {
+												logger.Infof("New thumbnail will be loaded: %v", newRate.Value.Thumbnail)
+												value.Thumbnail = newRate.Value.Thumbnail
 											}
 											logger.Infof("Updating value %+v", value)
 											if err := models.UpdateValue(common.Database, value); err != nil {
@@ -1043,79 +1043,74 @@ func patchProductHandler(c *fiber.Ctx) error {
 											return c.JSON(HTTPError{err.Error()})
 										}
 									}
-									logger.Infof("Updating rate %+v", rate)
-									if err := models.UpdateRate(common.Database, rate); err != nil {
+									if err := models.UpdateRate(common.Database, existingRate); err != nil {
 										c.Status(http.StatusInternalServerError)
 										return c.JSON(HTTPError{err.Error()})
 									}
-
-									//p.Rates = append(p.Rates[:j], p.Rates[j + 1:]...)
-									copy(p.Rates[j:], p.Rates[j+1:])
-									p.Rates[len(p.Rates) - 1] = nil
-									p.Rates = p.Rates[:len(p.Rates)-1]
+									copy(newProperty.Rates[j:], newProperty.Rates[j+1:])
+									newProperty.Rates[len(newProperty.Rates) - 1] = nil
+									newProperty.Rates = newProperty.Rates[:len(newProperty.Rates)-1]
 									j--
 									found = true
 									break
 								}
 							}
 							if !found {
-								// TODO: Delete rate
-								logger.Infof("Delete rate %+v", rate)
-								copy(property.Rates[i:], property.Rates[i+1:])
-								property.Rates[len(property.Rates)-1] = nil
-								property.Rates = property.Rates[:len(property.Rates)-1]
+								copy(existingProperty.Rates[i:], existingProperty.Rates[i+1:])
+								existingProperty.Rates[len(existingProperty.Rates)-1] = nil
+								existingProperty.Rates = existingProperty.Rates[:len(existingProperty.Rates)-1]
 								i--
-								if err := models.DeleteRate(common.Database, rate); err != nil {
+								if err := models.DeleteRate(common.Database, existingRate); err != nil {
 									c.Status(http.StatusInternalServerError)
 									return c.JSON(HTTPError{err.Error()})
 								}
 							}
 						}
 
-						for _, r := range p.Rates {
+						for _, newRate := range newProperty.Rates {
 							// TODO: Add rate
 							rate := &models.Rate{
-								Enabled: r.Enabled,
+								Enabled: newRate.Enabled,
 							}
-							if r.ValueId == 0 {
+							if newRate.ValueId == 0 {
 								rate.Value = &models.Value{
-									Title: r.Value.Title,
-									Thumbnail: r.Value.Thumbnail,
-									Description: r.Value.Description,
-									Color: r.Value.Color,
-									Value: r.Value.Value,
-									OptionId: r.Value.OptionId,
-									Availability: r.Value.Availability,
-									Sort: r.Value.Sort,
+									Title: newRate.Value.Title,
+									Thumbnail: newRate.Value.Thumbnail,
+									Description: newRate.Value.Description,
+									Color: newRate.Value.Color,
+									Value: newRate.Value.Value,
+									OptionId: newRate.Value.OptionId,
+									Availability: newRate.Value.Availability,
+									Sort: newRate.Value.Sort,
 								}
 							}else{
-								rate.ValueId = r.ValueId
+								rate.ValueId = newRate.ValueId
 							}
-							rate.Price = r.Price
-							rate.Availability = r.Availability
-							rate.Sending = r.Sending
-							rate.Sku = r.Sku
-							rate.Stock = r.Stock
+							rate.Price = newRate.Price
+							rate.Availability = newRate.Availability
+							rate.Sending = newRate.Sending
+							rate.Sku = newRate.Sku
+							rate.Stock = newRate.Stock
 
 							if _, err := models.CreateRate(common.Database, rate); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
 							}
 
-							property.Rates = append(property.Rates, rate)
+							existingProperty.Rates = append(existingProperty.Rates, rate)
 						}
 
-						logger.Infof("Updating property %+v", property)
-						if err := models.UpdateProperty(common.Database, property); err != nil {
+						logger.Infof("Updating property %+v", existingProperty)
+						if err := models.UpdateProperty(common.Database, existingProperty); err != nil {
 							c.Status(http.StatusInternalServerError)
 							return c.JSON(HTTPError{err.Error()})
 						}
 
-						properties2 = append(properties2, property)
-						if i == len(propertyViews) - 1 {
-							propertyViews = propertyViews[:i]
+						updatedProperties = append(updatedProperties, existingProperty)
+						if i == len(newProperties) - 1 {
+							newProperties = newProperties[:i]
 						}else{
-							propertyViews = append(propertyViews[:i], propertyViews[i + 1:]...)
+							newProperties = append(newProperties[:i], newProperties[i + 1:]...)
 						}
 						found = true
 						break
@@ -1123,8 +1118,8 @@ func patchProductHandler(c *fiber.Ctx) error {
 				}
 				if !found {
 					// TODO: Delete property
-					logger.Infof("Delete property %+v", property)
-					for _, rate := range property.Rates {
+					logger.Infof("Delete property %+v", existingProperty)
+					for _, rate := range existingProperty.Rates {
 						if rate.Value.OptionId == 0 {
 							if err = models.DeleteValue(common.Database, rate.Value); err != nil {
 								logger.Warningf("%+v", err)
@@ -1134,7 +1129,7 @@ func patchProductHandler(c *fiber.Ctx) error {
 							logger.Warningf("%+v", err)
 						}
 					}
-					if err := models.DeleteProperty(common.Database, property); err != nil {
+					if err := models.DeleteProperty(common.Database, existingProperty); err != nil {
 						c.Status(http.StatusInternalServerError)
 						return c.JSON(HTTPError{err.Error()})
 					}
@@ -1142,62 +1137,61 @@ func patchProductHandler(c *fiber.Ctx) error {
 					resized = true
 				}
 			}
-			logger.Infof("New properties: %+v", len(propertyViews))
-			for _, p := range propertyViews {
-				logger.Infof("New property: %+v", p)
+			logger.Infof("New properties: %+v", len(newProperties))
+			for _, newProperty := range newProperties {
+				logger.Infof("New property: %+v", newProperty)
 				property := &models.Property{
-					Type: p.Type,
-					Size: p.Size,
-					Mode: p.Mode,
-					Name: p.Name,
-					Title: p.Title,
-					Sku: p.Sku,
-					Stock: p.Stock,
-					OptionId: p.OptionId,
-					Filtering: p.Filtering,
+					Type: newProperty.Type,
+					Size: newProperty.Size,
+					Mode: newProperty.Mode,
+					Name: newProperty.Name,
+					Title: newProperty.Title,
+					Sku: newProperty.Sku,
+					Stock: newProperty.Stock,
+					OptionId: newProperty.OptionId,
+					Filtering: newProperty.Filtering,
 				}
 
 				property.ProductId = product.ID
 
 				// TODO: Add rates
-				for _, r := range p.Rates {
+				for _, newRate := range newProperty.Rates {
 					// TODO: Add rate
 					rate := &models.Rate{
-						Enabled: r.Enabled,
+						Enabled: newRate.Enabled,
 					}
-					if r.ValueId == 0 {
+					if newRate.ValueId == 0 {
 						rate.Value = &models.Value{
-							Title: r.Value.Title,
-							Thumbnail: r.Value.Thumbnail,
-							Description: r.Value.Description,
-							Color: r.Value.Color,
-							Value: r.Value.Value,
-							OptionId: r.Value.OptionId,
-							Availability: r.Value.Availability,
-							Sort: r.Value.Sort,
+							Title: newRate.Value.Title,
+							Thumbnail: newRate.Value.Thumbnail,
+							Description: newRate.Value.Description,
+							Color: newRate.Value.Color,
+							Value: newRate.Value.Value,
+							OptionId: newRate.Value.OptionId,
+							Availability: newRate.Value.Availability,
+							Sort: newRate.Value.Sort,
 						}
 					}else{
-						rate.ValueId = r.ValueId
+						rate.ValueId = newRate.ValueId
 					}
-					rate.Price = r.Price
-					rate.Availability = r.Availability
-					rate.Sending = r.Sending
-					rate.Sku = r.Sku
-					rate.Stock = r.Stock
+					rate.Price = newRate.Price
+					rate.Availability = newRate.Availability
+					rate.Sending = newRate.Sending
+					rate.Sku = newRate.Sku
+					rate.Stock = newRate.Stock
 
 					property.Rates = append(property.Rates, rate)
 				}
-				logger.Infof("Creating Property: %+v", property)
 				if _, err := models.CreateProperty(common.Database, property); err != nil {
 					c.Status(http.StatusInternalServerError)
 					return c.JSON(HTTPError{err.Error()})
 				}
-				properties2 = append(properties2, property)
+				updatedProperties = append(updatedProperties, property)
 				resized = true
 			}
 
 			// Properties
-			for _, property := range properties2 {
+			for _, property := range updatedProperties {
 				for _, rate := range property.Rates {
 					if value := rate.Value; value != nil {
 						if thumbnail := value.Thumbnail; thumbnail != "" {
@@ -1262,8 +1256,7 @@ func patchProductHandler(c *fiber.Ctx) error {
 
 			// Prices
 			if resized {
-				logger.Infof("Prices reset REQUIRED")
-				logger.Infof("Delete old prices")
+				logger.Infof("Resize %v", resized)
 				if prices, err := models.GetPricesByProductId(common.Database, product.ID); err == nil {
 					for _, price := range prices {
 						if err = models.DeletePrice(common.Database, price); err != nil {
@@ -1278,15 +1271,13 @@ func patchProductHandler(c *fiber.Ctx) error {
 			}
 			//
 			var table [][]uint
-			for i := 0; i < len(properties2); i++ {
+			for i := 0; i < len(updatedProperties); i++ {
 				var row []uint
-				for j := 0; j < len(properties2[i].Rates); j++ {
-					row = append(row, properties2[i].Rates[j].ID)
+				for j := 0; j < len(updatedProperties[i].Rates); j++ {
+					row = append(row, updatedProperties[i].Rates[j].ID)
 				}
 				table = append(table, row)
 			}
-
-			logger.Infof("table: %+v", table)
 
 			var matrix = [][]uint{}
 			vector := make([]int, len(table))
@@ -1316,52 +1307,49 @@ func patchProductHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
-			logger.Infof("existingPrices: %+v", len(existingPrices))
-			logger.Infof("matrix: %+v", matrix)
-			logger.Infof("===========================")
 			//
 			for _, row := range matrix {
-				logger.Infof("row: %+v", row)
 				price := &models.Price{
 					Enabled: true,
 					ProductId: product.ID,
 					Availability: common.AVAILABILITY_AVAILABLE,
 				}
+				var ids = []uint{product.ID, 0}
 				for _, rateId := range row {
 					if rateId > 0 {
 						if rate, err := models.GetRate(common.Database, int(rateId)); err == nil {
+							ids = append(ids, rate.ID)
 							price.Rates = append(price.Rates, rate)
 						}
 					}
 				}
-				logger.Infof("price: %+v", price)
+
+				var sku []string
+				for _, id := range ids {
+					sku = append(sku, fmt.Sprintf("%d", id))
+				}
+				price.Sku = strings.Join(sku, ".")
 
 				var match bool
 				for _, existingPrice := range existingPrices {
-					logger.Infof("existingPrice: %+v", existingPrice)
 					match = len(price.Rates) == len(existingPrice.Rates)
-					logger.Infof("match1: %+v", match)
 					if match {
 						for _, rate1 := range price.Rates {
 							var found bool
 							for _, rate2 := range existingPrice.Rates {
 								if rate1.ID == rate2.ID {
-									logger.Infof("Match found %+v and %+v", rate1, rate2)
 									found = true
 									break
 								}
 							}
 							if !found {
-								logger.Infof("Match not found %+v", rate1)
 								match = false
 								break
 							}
 						}
 					}
-					logger.Infof("match2: %+v", match)
 
 					if match {
-						logger.Infof("Price exists: %+v", existingPrice)
 						break
 					}
 				}
@@ -1371,7 +1359,6 @@ func patchProductHandler(c *fiber.Ctx) error {
 						c.Status(http.StatusInternalServerError)
 						return c.JSON(HTTPError{err.Error()})
 					}
-					logger.Infof("New price created: %+v", price)
 				}
 			}
 		}
@@ -1461,6 +1448,62 @@ func putProductHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Notes"]; found && len(v) > 0 {
 				notes = strings.TrimSpace(v[0])
 			}
+			//
+			if v, found := data.Value["Parameters"]; found && len(v) > 0 {
+				var newParameters []*ParameterView
+				if err = json.Unmarshal([]byte(v[0]), &newParameters); err == nil {
+					var existingParameters []*models.Parameter
+					if existingParameters, err = models.GetParametersByProductId(common.Database, int(product.ID)); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					for _, existingParameter := range existingParameters {
+						var found bool
+						for i, newParameter := range newParameters {
+							if existingParameter.ID == newParameter.ID {
+								existingParameter.Title = newParameter.Title
+								existingParameter.ValueId =  newParameter.ValueId
+								existingParameter.CustomValue = newParameter.CustomValue
+								if err := models.UpdateParameter(common.Database, existingParameter); err != nil {
+									c.Status(http.StatusInternalServerError)
+									return c.JSON(HTTPError{err.Error()})
+								}
+								if i == len(newParameters) - 1 {
+									newParameters = newParameters[:i]
+								}else{
+									newParameters = append(newParameters[:i], newParameters[i + 1:]...)
+								}
+								found = true
+								break
+							}
+						}
+						if !found {
+							if err := models.DeleteParameter(common.Database, existingParameter); err != nil {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+						}
+					}
+					for _, newParameter := range newParameters {
+						parameter := &models.Parameter{
+							Name: newParameter.Name,
+							Title: newParameter.Title,
+							Type: newParameter.Type,
+							OptionId:  newParameter.OptionId,
+							ValueId: newParameter.ValueId,
+							CustomValue: newParameter.CustomValue,
+							ProductId: product.ID,
+						}
+						if _, err := models.CreateParameter(common.Database, parameter); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+					}
+				}else{
+					logger.Warningf("%+v", err)
+				}
+			}
+			//
 			var customParameters string
 			if v, found := data.Value["CustomParameters"]; found && len(v) > 0 {
 				customParameters = strings.TrimSpace(v[0])
@@ -1472,6 +1515,10 @@ func putProductHandler(c *fiber.Ctx) error {
 			var variation string
 			if v, found := data.Value["Variation"]; found && len(v) > 0 {
 				variation = strings.TrimSpace(v[0])
+			}
+			var typ string
+			if v, found := data.Value["Type"]; found && len(v) > 0 {
+				typ = strings.TrimSpace(v[0])
 			}
 			var size string
 			if v, found := data.Value["Size"]; found && len(v) > 0 {
@@ -1588,6 +1635,7 @@ func putProductHandler(c *fiber.Ctx) error {
 			oldBasePrice := product.BasePrice
 			product.Container = container
 			product.Variation = variation
+			product.Type = typ
 			product.Size = size
 			product.BasePrice = basePrice
 			oldSalePrice := product.SalePrice

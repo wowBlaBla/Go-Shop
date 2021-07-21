@@ -20,6 +20,7 @@ type Product struct {
 	// ONLY TO USE AS DEFAULT VALUE FOR VIRIATIONS
 	Container bool // if true skip Default variation
 	Variation string
+	Type string // select, rectangle, swatch, Radio
 	Size string // small, medium, large
 	BasePrice float64          `sql:"type:decimal(8,2);"`
 	SalePrice float64          `sql:"type:decimal(8,2);"`

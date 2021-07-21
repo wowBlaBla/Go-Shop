@@ -199,6 +199,7 @@ func GetFiber() *fiber.App {
 	v1.Put("/prices/all", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("prices updated"), putPriceAllHandler)
 	v1.Get("/prices/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getPriceHandler)
 	v1.Put("/prices/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("price updated"), putPriceHandler)
+	v1.Patch("/prices/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("price updated"), patchPriceHandler)
 	v1.Delete("/prices/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("price deleted"), deletePriceHandler)
 	//
 	v1.Get("/tags", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getTagsHandler)
@@ -5523,8 +5524,8 @@ func postFilterHandler(c *fiber.Ctx) error {
 					}else{
 						logger.Warningf("%+v", err)
 					}
-					keys1 = append(keys1, "(cache_products.Title like ? or cache_products.Description like ? or cache_products.Sku like ?)")
-					values1 = append(values1, "%" + value + "%", "%" + value + "%", "%" + value + "%")
+					keys1 = append(keys1, "(cache_products.Product_Id = ? or cache_products.Title like ? or cache_products.Description like ? or cache_products.Sku like ?)")
+					values1 = append(values1, value, "%" + value + "%", "%" + value + "%", "%" + value + "%")
 				default:
 					if strings.Index(key, "Option-") >= -1 {
 						if res := regexp.MustCompile(`Option-(\d+)`).FindAllStringSubmatch(key, 1); len(res) > 0 && len(res[0]) > 1 {
@@ -5952,6 +5953,7 @@ type VariationsView []VariationView
 
 type VariationView struct {
 	ID uint
+	Enabled bool
 	Name string
 	Title string
 	Description string `json:",omitempty"`
