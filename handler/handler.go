@@ -5968,6 +5968,7 @@ type VariationView struct {
 		ID uint
 		Type string `json:",omitempty"`
 		Size string `json:",omitempty"`
+		Mode string `json:",omitempty"`
 		Name string
 		Title string
 		Filtering bool
@@ -5985,14 +5986,20 @@ type VariationView struct {
 			Value struct {
 				ID uint
 				Title string
+				Description string `json:",omitempty"`
+				Color string `json:",omitempty"`
 				Thumbnail string `json:",omitempty"`
+				Value string
 				Availability string `json:",omitempty"`
 				Sending string `json:",omitempty"`
+				OptionId uint `json:",omitempty"`
 			}
 			Price float64
 			Availability string `json:",omitempty"`
 			Sending string `json:",omitempty"`
+			ValueId uint `json:",omitempty"`
 		}
+		OptionId uint `json:",omitempty"`
 	}
 	Pattern string `json:",omitempty"`
 	Dimensions string `json:",omitempty"`
@@ -6009,6 +6016,7 @@ type VariationView struct {
 	Stock uint
 	Files []File2View `json:",omitempty"`
 	Images []ImageView `json:",omitempty"`
+	Siblings []VariationShortView `json:",omitempty"`
 	ProductId uint
 	Customization string
 	New bool `json:",omitempty"`

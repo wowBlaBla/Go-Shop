@@ -1449,57 +1449,117 @@ func putProductHandler(c *fiber.Ctx) error {
 					}
 					//
 					for _, row := range matrix {
-						price := &models.Price{
-							Enabled: true,
-							ProductId: product.ID,
-							Availability: common.AVAILABILITY_AVAILABLE,
-						}
-						var ids = []uint{product.ID, 0}
-						for _, rateId := range row {
-							if rateId > 0 {
-								if rate, err := models.GetRate(common.Database, int(rateId)); err == nil {
-									ids = append(ids, rate.ID)
-									price.Rates = append(price.Rates, rate)
+						if len(row) > 0 {
+
+							price := &models.Price{
+								Enabled:      true,
+								ProductId:    product.ID,
+								Availability: common.AVAILABILITY_AVAILABLE,
+							}
+							var ids = []uint{product.ID, 0}
+							for _, rateId := range row {
+								if rateId > 0 {
+									if rate, err := models.GetRate(common.Database, int(rateId)); err == nil {
+										ids = append(ids, rate.ID)
+										price.Rates = append(price.Rates, rate)
+									}
 								}
 							}
-						}
 
-						var sku []string
-						for _, id := range ids {
-							sku = append(sku, fmt.Sprintf("%d", id))
-						}
-						price.Sku = strings.Join(sku, ".")
+							var sku []string
+							for _, id := range ids {
+								sku = append(sku, fmt.Sprintf("%d", id))
+							}
+							price.Sku = strings.Join(sku, ".")
 
-						var match bool
-						for _, existingPrice := range existingPrices {
-							match = len(price.Rates) == len(existingPrice.Rates)
-							if match {
-								for _, rate1 := range price.Rates {
-									var found bool
-									for _, rate2 := range existingPrice.Rates {
-										if rate1.ID == rate2.ID {
-											found = true
+							var match bool
+							for _, existingPrice := range existingPrices {
+								match = len(price.Rates) == len(existingPrice.Rates)
+								if match {
+									for _, rate1 := range price.Rates {
+										var found bool
+										for _, rate2 := range existingPrice.Rates {
+											if rate1.ID == rate2.ID {
+												found = true
+												break
+											}
+										}
+										if !found {
+											match = false
 											break
 										}
 									}
-									if !found {
-										match = false
-										break
-									}
+								}
+
+								if match {
+									break
 								}
 							}
 
-							if match {
+							if !match {
+								if _, err = models.CreatePrice(common.Database, price); err != nil {
+									c.Status(http.StatusInternalServerError)
+									return c.JSON(HTTPError{err.Error()})
+								}
+							}
+						}
+					}
+				}else{
+					logger.Warningf("%+v", err)
+				}
+			}
+			// Prices
+			if v, found := data.Value["Prices"]; found && len(v) > 0 {
+				var newPrices []*PriceView
+				if err = json.Unmarshal([]byte(v[0]), &newPrices); err == nil {
+					product.Prices = []*models.Price{}
+					var existingPrices []*models.Price
+					if existingPrices, err = models.GetPricesByProductId(common.Database, product.ID); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					for _, existingPrice := range existingPrices {
+						var found bool
+						for i, newPrice := range newPrices {
+							if existingPrice.ID == newPrice.ID {
+								existingPrice.Price = newPrice.Price
+								existingPrice.Availability =  newPrice.Availability
+								existingPrice.Sku =  newPrice.Sku
+								existingPrice.Stock = newPrice.Stock
+								if err := models.UpdatePrice(common.Database, existingPrice); err != nil {
+									c.Status(http.StatusInternalServerError)
+									return c.JSON(HTTPError{err.Error()})
+								}
+								product.Prices = append(product.Prices, existingPrice)
+								if i == len(newPrices) - 1 {
+									newPrices = newPrices[:i]
+								}else{
+									newPrices = append(newPrices[:i], newPrices[i + 1:]...)
+								}
+								found = true
 								break
 							}
 						}
-
-						if !match {
-							if _, err = models.CreatePrice(common.Database, price); err != nil {
+						if !found {
+							if err := models.DeletePrice(common.Database, existingPrice); err != nil {
 								c.Status(http.StatusInternalServerError)
 								return c.JSON(HTTPError{err.Error()})
 							}
 						}
+					}
+					for _, newPrice := range newPrices {
+						price := &models.Price{
+							Price: newPrice.Price,
+							Availability: newPrice.Availability,
+							Sku: newPrice.Sku,
+							Stock:  newPrice.Stock,
+							ProductId: product.ID,
+						}
+						if _, err := models.CreatePrice(common.Database, price); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+						product.Prices = append(product.Prices, price)
 					}
 				}else{
 					logger.Warningf("%+v", err)

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -464,6 +465,472 @@ func putVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Notes"]; found && len(v) > 0 {
 				notes = strings.TrimSpace(v[0])
 			}
+			// Properties
+			logger.Infof("BEFORE Properties: %+v", variation.Prices)
+			if v, found := data.Value["Properties"]; found {
+				var newProperties PropertiesView
+				if err = json.Unmarshal([]byte(v[0]), &newProperties); err == nil {
+					variation.Properties = []*models.Property{}
+					variation.Prices = []*models.Price{}
+					var existingProperties, updatedProperties []*models.Property
+					if existingProperties, err = models.GetPropertiesByVariationId(common.Database, int(variation.ID)); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					var resized bool
+					for _, existingProperty := range existingProperties{
+						var found bool
+						for i, newProperty := range newProperties {
+							if existingProperty.ID == newProperty.ID {
+								logger.Infof("Existing property #%+v", existingProperty.ID)
+								existingProperty.Type = newProperty.Type
+								existingProperty.Size = newProperty.Size
+								existingProperty.Mode = newProperty.Mode
+								existingProperty.Name = newProperty.Name
+								existingProperty.Title = newProperty.Title
+								existingProperty.Sku = newProperty.Sku
+								existingProperty.Stock = newProperty.Stock
+								existingProperty.Filtering = newProperty.Filtering
+
+								// TODO: Check rates
+								logger.Infof("Existing Rates: %+v", len(existingProperty.Rates))
+								//for i, rate := range property.Rates {
+								for i := 0; i < len(existingProperty.Rates); i++ {
+									existingRate := existingProperty.Rates[i]
+									var found bool
+									for j := 0; j < len(newProperty.Rates); j++ {
+										newRate := newProperty.Rates[j]
+										if existingRate.ID == newRate.ID {
+											existingRate.Enabled = newRate.Enabled
+											existingRate.Price = newRate.Price
+											existingRate.Availability = newRate.Availability
+											existingRate.Sending = newRate.Sending
+											existingRate.Sku = newRate.Sku
+											existingRate.Stock = newRate.Stock
+											if existingRate.Value.OptionId == 0 {
+												if value, err := models.GetValue(common.Database, int(existingRate.ValueId)); err == nil {
+													value.Title = newRate.Value.Title
+													value.Description = newRate.Value.Description
+													value.Color = newRate.Value.Color
+													value.Value = newRate.Value.Value
+													value.OptionId = newRate.Value.OptionId
+													value.Availability = newRate.Value.Availability
+													value.Sort = newRate.Value.Sort
+													if value.Thumbnail != "" && newRate.Value.Thumbnail == "" {
+														// TODO: To delete thumbnail
+														logger.Infof("Existing thumbnail should be %v deleted", value.Thumbnail)
+														value.Thumbnail = ""
+														if err = models.DeleteCacheValueByValueId(common.Database, value.ID); err != nil {
+															logger.Warningf("%+v", err)
+														}
+													}else if _, found := data.File[newRate.Value.Thumbnail]; newRate.Value.Thumbnail != "" && found {
+														logger.Infof("New thumbnail will be loaded: %v", newRate.Value.Thumbnail)
+														value.Thumbnail = newRate.Value.Thumbnail
+													}
+													logger.Infof("Updating value %+v", value)
+													if err := models.UpdateValue(common.Database, value); err != nil {
+														c.Status(http.StatusInternalServerError)
+														return c.JSON(HTTPError{err.Error()})
+													}
+												}else{
+													c.Status(http.StatusInternalServerError)
+													return c.JSON(HTTPError{err.Error()})
+												}
+											}
+											if err := models.UpdateRate(common.Database, existingRate); err != nil {
+												c.Status(http.StatusInternalServerError)
+												return c.JSON(HTTPError{err.Error()})
+											}
+											copy(newProperty.Rates[j:], newProperty.Rates[j+1:])
+											newProperty.Rates[len(newProperty.Rates) - 1] = nil
+											newProperty.Rates = newProperty.Rates[:len(newProperty.Rates)-1]
+											j--
+											found = true
+											break
+										}
+									}
+									if !found {
+										copy(existingProperty.Rates[i:], existingProperty.Rates[i+1:])
+										existingProperty.Rates[len(existingProperty.Rates)-1] = nil
+										existingProperty.Rates = existingProperty.Rates[:len(existingProperty.Rates)-1]
+										i--
+										if err := models.DeleteRate(common.Database, existingRate); err != nil {
+											c.Status(http.StatusInternalServerError)
+											return c.JSON(HTTPError{err.Error()})
+										}
+									}
+								}
+
+								for _, newRate := range newProperty.Rates {
+									// TODO: Add rate
+									rate := &models.Rate{
+										Enabled: newRate.Enabled,
+									}
+									if newRate.ValueId == 0 {
+										rate.Value = &models.Value{
+											Title: newRate.Value.Title,
+											Thumbnail: newRate.Value.Thumbnail,
+											Description: newRate.Value.Description,
+											Color: newRate.Value.Color,
+											Value: newRate.Value.Value,
+											OptionId: newRate.Value.OptionId,
+											Availability: newRate.Value.Availability,
+											Sort: newRate.Value.Sort,
+										}
+									}else{
+										rate.ValueId = newRate.ValueId
+									}
+									rate.Price = newRate.Price
+									rate.Availability = newRate.Availability
+									rate.Sending = newRate.Sending
+									rate.Sku = newRate.Sku
+									rate.Stock = newRate.Stock
+
+									if _, err := models.CreateRate(common.Database, rate); err != nil {
+										c.Status(http.StatusInternalServerError)
+										return c.JSON(HTTPError{err.Error()})
+									}
+
+									existingProperty.Rates = append(existingProperty.Rates, rate)
+								}
+
+								logger.Infof("Updating property %+v", existingProperty)
+								if err := models.UpdateProperty(common.Database, existingProperty); err != nil {
+									c.Status(http.StatusInternalServerError)
+									return c.JSON(HTTPError{err.Error()})
+								}
+
+								updatedProperties = append(updatedProperties, existingProperty)
+								if i == len(newProperties) - 1 {
+									newProperties = newProperties[:i]
+								}else{
+									newProperties = append(newProperties[:i], newProperties[i + 1:]...)
+								}
+								found = true
+								break
+							}
+						}
+						if !found {
+							// TODO: Delete property
+							logger.Infof("Delete property %+v", existingProperty)
+							for _, rate := range existingProperty.Rates {
+								if rate.Value.OptionId == 0 {
+									if err = models.DeleteValue(common.Database, rate.Value); err != nil {
+										logger.Warningf("%+v", err)
+									}
+								}
+								if err = models.DeleteRate(common.Database, rate); err != nil {
+									logger.Warningf("%+v", err)
+								}
+							}
+							if err := models.DeleteProperty(common.Database, existingProperty); err != nil {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+
+							resized = true
+						}
+					}
+					logger.Infof("New properties: %+v", len(newProperties))
+					for _, newProperty := range newProperties {
+						logger.Infof("New property: %+v", newProperty)
+						property := &models.Property{
+							Type: newProperty.Type,
+							Size: newProperty.Size,
+							Mode: newProperty.Mode,
+							Name: newProperty.Name,
+							Title: newProperty.Title,
+							Sku: newProperty.Sku,
+							Stock: newProperty.Stock,
+							OptionId: newProperty.OptionId,
+							Filtering: newProperty.Filtering,
+						}
+
+						property.VariationId = variation.ID
+
+						// TODO: Add rates
+						for _, newRate := range newProperty.Rates {
+							// TODO: Add rate
+							rate := &models.Rate{
+								Enabled: newRate.Enabled,
+							}
+							if newRate.ValueId == 0 {
+								rate.Value = &models.Value{
+									Title: newRate.Value.Title,
+									Thumbnail: newRate.Value.Thumbnail,
+									Description: newRate.Value.Description,
+									Color: newRate.Value.Color,
+									Value: newRate.Value.Value,
+									OptionId: newRate.Value.OptionId,
+									Availability: newRate.Value.Availability,
+									Sort: newRate.Value.Sort,
+								}
+							}else{
+								rate.ValueId = newRate.ValueId
+							}
+							rate.Price = newRate.Price
+							rate.Availability = newRate.Availability
+							rate.Sending = newRate.Sending
+							rate.Sku = newRate.Sku
+							rate.Stock = newRate.Stock
+
+							property.Rates = append(property.Rates, rate)
+						}
+						if _, err := models.CreateProperty(common.Database, property); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+						updatedProperties = append(updatedProperties, property)
+						resized = true
+					}
+
+					// Properties
+					for _, property := range updatedProperties {
+						for _, rate := range property.Rates {
+							if value := rate.Value; value != nil {
+								if thumbnail := value.Thumbnail; thumbnail != "" {
+									if v, found := data.File[thumbnail]; found && len(v) > 0 {
+										p := path.Join(dir, "storage", "values")
+										if _, err := os.Stat(p); err != nil {
+											if err = os.MkdirAll(p, 0755); err != nil {
+												logger.Errorf("%v", err)
+											}
+										}
+										filename := fmt.Sprintf("%d-%s-thumbnail%s", value.ID, regexp.MustCompile(`(?i)[^-a-z0-9]+`).ReplaceAllString(value.Title, "-"), path.Ext(v[0].Filename))
+										if p := path.Join(p, filename); len(p) > 0 {
+											if in, err := v[0].Open(); err == nil {
+												out, err := os.OpenFile(p, os.O_WRONLY | os.O_CREATE, 0644)
+												if err != nil {
+													c.Status(http.StatusInternalServerError)
+													return c.JSON(HTTPError{err.Error()})
+												}
+												defer out.Close()
+												if _, err := io.Copy(out, in); err != nil {
+													c.Status(http.StatusInternalServerError)
+													return c.JSON(HTTPError{err.Error()})
+												}
+												value.Thumbnail = "/" + path.Join("values", filename)
+												if err = models.UpdateValue(common.Database, value); err != nil {
+													c.Status(http.StatusInternalServerError)
+													return c.JSON(HTTPError{err.Error()})
+												}
+												//
+												if p1 := path.Join(dir, "storage", "values", filename); len(p1) > 0 {
+													if fi, err := os.Stat(p1); err == nil {
+														filename := filepath.Base(p1)
+														filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+														logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
+														var paths string
+														if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+															paths = strings.Join(thumbnails, ",")
+														} else {
+															logger.Warningf("%v", err)
+														}
+														// Cache
+														if err = models.DeleteCacheValueByValueId(common.Database, value.ID); err != nil {
+															logger.Warningf("%v", err)
+														}
+														if _, err = models.CreateCacheValue(common.Database, &models.CacheValue{
+															ValueID: value.ID,
+															Title:     value.Title,
+															Thumbnail: paths,
+															Value: value.Value,
+														}); err != nil {
+															logger.Warningf("%v", err)
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+
+					// Prices
+					if resized {
+						logger.Infof("Resize %v", resized)
+						variation.Prices = []*models.Price{}
+						if prices, err := models.GetPricesByVariationId(common.Database, variation.ID); err == nil {
+							for _, price := range prices {
+								if err = models.DeletePrice(common.Database, price); err != nil {
+									c.Status(http.StatusInternalServerError)
+									return c.JSON(HTTPError{err.Error()})
+								}
+							}
+						} else {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+					}
+					logger.Infof("updatedProperties: %+v", updatedProperties)
+					//
+					var table [][]uint
+					for i := 0; i < len(updatedProperties); i++ {
+						logger.Infof("i: %d", i)
+						var row []uint
+						for j := 0; j < len(updatedProperties[i].Rates); j++ {
+							logger.Infof("j: %d", j)
+							row = append(row, updatedProperties[i].Rates[j].ID)
+						}
+						table = append(table, row)
+					}
+					logger.Infof("table: %+v", table)
+					var matrix = [][]uint{}
+					vector := make([]int, len(table))
+					for counter := 0; ; counter++ {
+						var line []uint
+						for i, index := range vector {
+							line = append(line, table[i][index])
+						}
+						var done bool
+						for i := len(vector) - 1; i >= 0; i-- {
+							if vector[i] < len(table[i]) - 1 {
+								vector[i]++
+								done = true
+								break
+							}else{
+								vector[i] = 0
+							}
+						}
+						matrix = append(matrix, line)
+						if !done {
+							break
+						}
+					}
+					if len(matrix) > 250 {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{"Too many properties combinations, please reduce property values count"})
+					}
+					var existingPrices []*models.Price
+					if existingPrices, err = models.GetPricesByVariationId(common.Database, variation.ID); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					logger.Infof("matrix: %+v", matrix)
+					//
+					for _, row := range matrix {
+						logger.Infof("row: %+v", row)
+						if len(row) > 0 {
+							price := &models.Price{
+								Enabled: true,
+								VariationId: variation.ID,
+								Availability: common.AVAILABILITY_AVAILABLE,
+							}
+							var ids = []uint{variation.ProductId, variation.ID}
+							for _, rateId := range row {
+								if rateId > 0 {
+									if rate, err := models.GetRate(common.Database, int(rateId)); err == nil {
+										ids = append(ids, rate.ID)
+										price.Rates = append(price.Rates, rate)
+									}
+								}
+							}
+
+							var sku []string
+							for _, id := range ids {
+								sku = append(sku, fmt.Sprintf("%d", id))
+							}
+							price.Sku = strings.Join(sku, ".")
+
+							var match bool
+							for _, existingPrice := range existingPrices {
+								match = len(price.Rates) == len(existingPrice.Rates)
+								if match {
+									for _, rate1 := range price.Rates {
+										var found bool
+										for _, rate2 := range existingPrice.Rates {
+											if rate1.ID == rate2.ID {
+												found = true
+												break
+											}
+										}
+										if !found {
+											match = false
+											break
+										}
+									}
+								}
+
+								if match {
+									break
+								}
+							}
+
+							if !match {
+								if _, err = models.CreatePrice(common.Database, price); err != nil {
+									c.Status(http.StatusInternalServerError)
+									return c.JSON(HTTPError{err.Error()})
+								}
+								variation.Prices = append(variation.Prices, price)
+							}
+						}
+					}
+					variation.Properties = updatedProperties
+				}else{
+					logger.Warningf("%+v", err)
+				}
+			}
+			logger.Infof("AFTER Properties: %+v", variation.Prices)
+			// Prices
+			if v, found := data.Value["Prices"]; found && len(v) > 0 {
+				var newPrices []*PriceView
+				if err = json.Unmarshal([]byte(v[0]), &newPrices); err == nil {
+					variation.Prices = []*models.Price{}
+					var existingPrices []*models.Price
+					if existingPrices, err = models.GetPricesByVariationId(common.Database, variation.ID); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					for _, existingPrice := range existingPrices {
+						var found bool
+						for i, newPrice := range newPrices {
+							if existingPrice.ID == newPrice.ID {
+								existingPrice.Price = newPrice.Price
+								existingPrice.Availability =  newPrice.Availability
+								existingPrice.Sku =  newPrice.Sku
+								existingPrice.Stock = newPrice.Stock
+								if err := models.UpdatePrice(common.Database, existingPrice); err != nil {
+									c.Status(http.StatusInternalServerError)
+									return c.JSON(HTTPError{err.Error()})
+								}
+								variation.Prices = append(variation.Prices, existingPrice)
+								if i == len(newPrices) - 1 {
+									newPrices = newPrices[:i]
+								}else{
+									newPrices = append(newPrices[:i], newPrices[i + 1:]...)
+								}
+								found = true
+								break
+							}
+						}
+						if !found {
+							if err := models.DeletePrice(common.Database, existingPrice); err != nil {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+						}
+					}
+					for _, newPrice := range newPrices {
+						price := &models.Price{
+							Price: newPrice.Price,
+							Availability: newPrice.Availability,
+							Sku: newPrice.Sku,
+							Stock:  newPrice.Stock,
+							VariationId: variation.ID,
+						}
+						if _, err := models.CreatePrice(common.Database, price); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+						variation.Prices = append(variation.Prices, price)
+					}
+				}else{
+					logger.Warningf("%+v", err)
+				}
+			}
+			logger.Infof("AFTER Price: %+v", variation.Prices)
 			var basePrice float64
 			if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
 				if basePrice, err = strconv.ParseFloat(v[0], 10); err != nil {
@@ -725,6 +1192,15 @@ func getVariationHandler(c *fiber.Ctx) error {
 									view.Properties[i].Rates[j].Value.Thumbnail = arr[0]
 								}
 							}
+						}
+					}
+					if variations, err := models.GetVariationsByProduct(common.Database, variation.ProductId); err == nil {
+						for _, variation := range variations {
+							view.Siblings = append(view.Siblings, VariationShortView{
+								ID: variation.ID,
+								Name: variation.Name,
+								Title: variation.Title,
+							})
 						}
 					}
 					return c.JSON(view)

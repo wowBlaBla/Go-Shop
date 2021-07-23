@@ -44,6 +44,15 @@ func GetPropertiesByProductId(connector *gorm.DB, productId int) ([]*Property, e
 	return properties, nil
 }
 
+func GetPropertiesByVariationId(connector *gorm.DB, variationId int) ([]*Property, error) {
+	db := connector
+	var properties []*Property
+	if err := db.Debug().Preload("Option").Preload("Rates").Preload("Rates.Value").Where("variation_id = ?", variationId).Find(&properties).Error; err != nil {
+		return nil, err
+	}
+	return properties, nil
+}
+
 func GetProperty(connector *gorm.DB, id int) (*Property, error) {
 	db := connector
 	var property Property

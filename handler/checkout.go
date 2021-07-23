@@ -177,6 +177,8 @@ type ItemShortView struct {
 }
 
 type VariationShortView struct {
+	ID uint `json:",omitempty"`
+	Name string `json:",omitempty"`
 	Title string `json:",omitempty"`
 	Thumbnail string `json:",omitempty"`
 }
@@ -287,12 +289,14 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 			variationId := arr[1]
 			//var variation *models.Variation
 			var vId uint
+			var name string
 			var title string
 			var basePrice, salePrice, volume, weight float64
 			var start, end time.Time
 			//var dimensions string
 			var prices []*models.Price
 			if variationId == 0 {
+				name = "default"
 				title = "default"
 				basePrice = product.BasePrice
 				salePrice = product.SalePrice
@@ -310,6 +314,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 						continue
 					}
 					vId = variation.ID
+					name = variation.Name
 					title = variation.Title
 					basePrice = variation.BasePrice
 					salePrice = variation.SalePrice
@@ -495,6 +500,8 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 				logger.Warningf("%v", err.Error())
 			}
 			itemShortView.Variation = VariationShortView{
+				ID: uint(variationId),
+				Name: name,
 				Title: title,
 			}
 			itemShortView.Properties = propertiesShortView

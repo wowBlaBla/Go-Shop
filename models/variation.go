@@ -55,6 +55,15 @@ func GetVariations(connector *gorm.DB) ([]*Variation, error) {
 	return variations, nil
 }
 
+func GetVariationsByProduct(connector *gorm.DB, productId uint) ([]*Variation, error) {
+	db := connector
+	var variations []*Variation
+	if err := db.Debug().Where("product_id = ?", productId).Find(&variations).Error; err != nil {
+		return nil, err
+	}
+	return variations, nil
+}
+
 func GetVariationsByProductAndName(connector *gorm.DB, productId uint, name string) ([]*Variation, error) {
 	db := connector
 	var variations []*Variation

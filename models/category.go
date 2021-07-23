@@ -141,7 +141,7 @@ func GetChildrenOfCategory(connector *gorm.DB, category *Category) []*Category {
 func GetChildrenOfCategoryById(connector *gorm.DB, id uint) []*Category {
 	db := connector
 	var children []*Category
-	db.Where("parent_id = ?", id).Order("Sort asc, Title asc").Find(&children)
+	db.Where("parent_id = ?", id).Order("Title asc").Find(&children)
 	return children
 }
 

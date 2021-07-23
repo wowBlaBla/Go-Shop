@@ -135,6 +135,8 @@ func postAccountWishHandler(c *fiber.Ctx) error {
 					return c.JSON(fiber.Map{"ERROR": fmt.Sprintf("Product #%+v and Variation #%+v mismatch", productId, variationId)})
 				}
 				item.Variation = VariationShortView{
+					ID: variation.ID,
+					Name: variation.Name,
 					Title: variation.Title,
 				}
 				wish.Price = variation.BasePrice

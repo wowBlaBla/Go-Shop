@@ -92,7 +92,7 @@ func postImageHandler(c *fiber.Ctx) error {
 								}
 								if v := c.Query("pid"); len(v) > 0 {
 									if id, err := strconv.Atoi(v); err == nil {
-										if product, err := models.GetProductFull(common.Database, id); err == nil {
+										if product, err := models.GetProduct(common.Database, id); err == nil {
 											if err = models.AddImageToProduct(common.Database, product, img); err != nil {
 												logger.Errorf("%v", err.Error())
 											}
@@ -125,10 +125,12 @@ func postImageHandler(c *fiber.Ctx) error {
 												}
 											}
 											//
-											if product.Image == nil {
-												product.ImageId = img.ID
-												if err = models.UpdateProduct(common.Database, product); err != nil {
-													logger.Warningf("%+v", err)
+											if product, err = models.GetProduct(common.Database, id); err == nil {
+												if product.ImageId == 0 {
+													product.ImageId = img.ID
+													if err = models.UpdateProduct(common.Database, product); err != nil {
+														logger.Warningf("%+v", err)
+													}
 												}
 											}
 										}else{
