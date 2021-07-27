@@ -24,13 +24,16 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 )
 
 var (
 	dir, _  = filepath.Abs(filepath.Dir(os.Args[0]))
 	cfgFile string
 	v       *viper.Viper
+	reNotAbc = regexp.MustCompile("(?i)[^a-z0-9]+")
 )
 
 func init() {
@@ -357,6 +360,9 @@ var RootCmd = &cobra.Command{
 		if err := common.Database.AutoMigrate(&models.Message{}); err != nil {
 			logger.Warningf("%+v", err)
 		}
+		if err := common.Database.AutoMigrate(&models.Migration{}); err != nil {
+			logger.Warningf("%+v", err)
+		}
 		//
 		if err := common.Database.Exec(`CREATE TABLE IF NOT EXISTS categories_products_sort (
 		CategoryId BIGINT UNSIGNED NOT NULL,
@@ -396,6 +402,106 @@ var RootCmd = &cobra.Command{
 		if err := common.Database.Exec("update `values` set sort = id where sort is null or sort = 0").Error; err != nil {
 			logger.Errorf("%+v", err)
 		}
+		// Database Migration
+		now := time.Now()
+		migrations := []*models.Migration{
+			{
+				Timestamp: time.Date(2021, time.July, 27, 0, 0, 0, 0, now.Location()).Format(time.RFC3339),
+				Name: "Enable Variation by default",
+				Description: "To set Enabled = true for all variations created earlier",
+				Run: func() (string, error) {
+					var output string
+					common.Database.Exec("update variations set enabled = ?", true)
+					if err = common.Database.Error; err == nil {
+						output = "variations updated"
+					} else {
+						return output, err
+					}
+					return output, err
+				},
+			},
+			{
+				Timestamp: time.Date(2021, time.July, 27, 1, 0, 0, 0, now.Location()).Format(time.RFC3339),
+				Name: "Custom Parameters converter",
+				Description: "Convert CustomParameter product field to list of Parameters to get rid of legacy field",
+				Run: func() (string, error) {
+					var output string
+					var productsFound, paramsCreated, paramsRejected int
+					if rows, err := common.Database.Raw("select id, custom_parameters from products where custom_parameters <> ?", "").Rows(); err == nil {
+						defer rows.Close()
+						for rows.Next() {
+							var id uint
+							var customParameters string
+							if err = rows.Scan(&id, &customParameters); err == nil {
+								for _, line := range strings.Split(strings.TrimSpace(customParameters), "\n"){
+									if res := reKV.FindAllStringSubmatch(strings.TrimSpace(line), -1); len(res) > 0 && len(res[0]) > 1 {
+										var key, value string
+										key = strings.TrimSpace(res[0][1])
+										if len(res[0]) > 2 {
+											value = strings.TrimSpace(res[0][2])
+										}
+										if len(key) > 0 {
+											parameter := &models.Parameter{
+												Name: reNotAbc.ReplaceAllString(strings.ToLower(key), "-"),
+												Title: key,
+												CustomValue: value,
+												ProductId: id,
+											}
+											if _, err = models.CreateParameter(common.Database, parameter); err == nil {
+												common.Database.Exec("update products set custom_parameters = ? where id = ?", "", id)
+												paramsCreated ++
+											} else {
+												return output, err
+											}
+										}else{
+											paramsRejected ++
+										}
+									}
+								}
+							}else{
+								return output, err
+							}
+							productsFound ++
+						}
+						output = fmt.Sprintf("products found: %d, paremeters created: %d, paremeters rejected: %d", productsFound, paramsCreated, paramsRejected)
+					}else{
+						return output, err
+					}
+					return output, err
+				},
+			},
+		}
+		var newMigrations []*models.Migration
+		if existingMigrations, err := models.GetMigrations(common.Database); err == nil {
+			for i := 0; i < len(migrations); i++ {
+				var allow = true
+				for j := 0; j < len(existingMigrations); j++ {
+					if migrations[i].Timestamp <= existingMigrations[j].Timestamp {
+						allow = false
+					}
+				}
+				if allow {
+					newMigrations = append(newMigrations, migrations[i])
+				}
+			}
+		}
+		if len(newMigrations) > 0 {
+			logger.Infof("= Migration required: %d tasks =", len(newMigrations))
+			for i := 0; i < len(newMigrations); i++ {
+				migration := newMigrations[i]
+				if migration.Output, err = migration.Run(); err == nil {
+					if _, err = models.CreateMigration(common.Database, migration); err == nil {
+						logger.Infof("%+v", migration.Output)
+					} else {
+						logger.Warningf("%+v", err)
+					}
+				} else {
+					logger.Warningf("%+v", err)
+				}
+			}
+			logger.Infof("================================")
+		}
+		//
 		// Manual database migration
 		/*reDimension := regexp.MustCompile(`^([0-9\.,]+)\s*x\s*([0-9\.,]+)\s*x\s*([0-9\.,]+)\s*`)
 		if products, err := models.GetProducts(common.Database); err == nil {
