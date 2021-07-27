@@ -90,6 +90,8 @@ type Config struct {
 	Decimal string // , or .
 	Thousands string // . or ,
 	//
+	DimensionUnit string // cm
+	//
 	Payment PaymentConfig
 	Notification NotificationConfig
 	Swagger struct {

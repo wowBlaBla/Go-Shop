@@ -286,6 +286,14 @@ func postVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
 				dimensions = strings.TrimSpace(v[0])
 			}
+			var dimensionUnit string
+			if v, found := data.Value["DimensionUnit"]; found && len(v) > 0 {
+				dimensionUnit = strings.TrimSpace(v[0])
+			}else if common.Config.DimensionUnit != "" {
+				dimensionUnit = common.Config.DimensionUnit
+			}else{
+				dimensionUnit = "cm"
+			}
 			var width float64
 			if v, found := data.Value["Width"]; found && len(v) > 0 {
 				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
@@ -343,7 +351,7 @@ func postVariationHandler(c *fiber.Ctx) error {
 					stock = uint(vv)
 				}
 			}
-			variation := &models.Variation{Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Packages: packages, Availability: availability, TimeId: timeId, Sku: sku, Stock: stock}
+			variation := &models.Variation{Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, DimensionUnit: dimensionUnit, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Packages: packages, Availability: availability, TimeId: timeId, Sku: sku, Stock: stock}
 
 			if id, err := models.CreateVariation(common.Database, variation); err == nil {
 				if name == "" {
@@ -958,6 +966,14 @@ func putVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
 				dimensions = strings.TrimSpace(v[0])
 			}
+			var dimensionUnit string
+			if v, found := data.Value["DimensionUnit"]; found && len(v) > 0 {
+				dimensionUnit = strings.TrimSpace(v[0])
+			}else if common.Config.DimensionUnit != "" {
+				dimensionUnit = common.Config.DimensionUnit
+			}else{
+				dimensionUnit = "cm"
+			}
 			var width float64
 			if v, found := data.Value["Width"]; found && len(v) > 0 {
 				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
@@ -1029,6 +1045,7 @@ func putVariationHandler(c *fiber.Ctx) error {
 			variation.End = end
 			variation.Pattern = pattern
 			variation.Dimensions = dimensions
+			variation.DimensionUnit = dimensionUnit
 			variation.Width = width
 			variation.Height = height
 			variation.Depth = depth

@@ -755,6 +755,7 @@ type InfoView struct {
 	Decimal string `json:",omitempty"`
 	Thousands string `json:",omitempty"`
 	Pattern string `json:",omitempty"`
+	DimensionUnit string `json:",omitempty"`
 	Size string `json:",omitempty"`
 	Preview string `json:",omitempty"`
 	Authorization string `json:",omitempty"`
@@ -792,6 +793,7 @@ func getInfoHandler(c *fiber.Ctx) error {
 		view.Size = "medium"
 	}
 	view.Pattern = common.Config.Pattern
+	view.DimensionUnit = common.Config.DimensionUnit
 	view.Preview = common.Config.Preview
 	if v := c.Locals("authorization"); v != nil {
 		view.Authorization = v.(string)
@@ -986,6 +988,7 @@ type BasicSettingsView struct {
 	AbsolutePrice bool
 	Size string
 	Pattern string
+	DimensionUnit string
 	Preview      string
 	CDN      string
 	Payment      config.PaymentConfig
@@ -1016,6 +1019,7 @@ func getBasicSettingsHandler(c *fiber.Ctx) error {
 	conf.AbsolutePrice = common.Config.AbsolutePrice
 	conf.Size = common.Config.Size
 	conf.Pattern = common.Config.Pattern
+	conf.DimensionUnit = common.Config.DimensionUnit
 	conf.Preview = common.Config.Preview
 	conf.Payment = common.Config.Payment
 	conf.Resize = common.Config.Resize
@@ -1108,6 +1112,7 @@ func putBasicSettingsHandler(c *fiber.Ctx) error {
 	common.Config.AbsolutePrice = request.AbsolutePrice
 	common.Config.Size = request.Size
 	common.Config.Pattern = request.Pattern
+	common.Config.DimensionUnit = request.DimensionUnit
 	common.Config.Preview = request.Preview
 	// Payment
 	common.Config.Payment = request.Payment
@@ -5879,6 +5884,7 @@ type ProductView struct {
 	Prices []*PriceView
 	Pattern string `json:",omitempty"`
 	Dimensions string `json:",omitempty"`
+	DimensionUnit string `json:",omitempty"`
 	Width float64 `json:",omitempty"`
 	Height float64 `json:",omitempty"`
 	Depth float64 `json:",omitempty"`
@@ -6003,6 +6009,7 @@ type VariationView struct {
 	}
 	Pattern string `json:",omitempty"`
 	Dimensions string `json:",omitempty"`
+	DimensionUnit string `json:",omitempty"`
 	Width float64 `json:",omitempty"`
 	Height float64 `json:",omitempty"`
 	Depth float64 `json:",omitempty"`

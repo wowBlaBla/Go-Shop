@@ -185,6 +185,14 @@ func postProductsHandler(c *fiber.Ctx) error {
 	if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
 		dimensions = strings.TrimSpace(v[0])
 	}
+	var dimensionUnit string
+	if v, found := data.Value["DimensionUnit"]; found && len(v) > 0 {
+		dimensionUnit = strings.TrimSpace(v[0])
+	}else if common.Config.DimensionUnit != "" {
+		dimensionUnit = common.Config.DimensionUnit
+	}else{
+		dimensionUnit = "cm"
+	}
 	var width float64
 	if v, found := data.Value["Width"]; found && len(v) > 0 {
 		if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
@@ -249,7 +257,7 @@ func postProductsHandler(c *fiber.Ctx) error {
 	if v, found := data.Value["Customization"]; found && len(v) > 0 {
 		customization = strings.TrimSpace(v[0])
 	}
-	product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes, Parameters: parameters, CustomParameters: customParameters, Container: container, Variation: variation, Size: size, BasePrice: basePrice, Pattern: pattern, Dimensions: dimensions, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Packages: packages, Availability: availability, TimeId: timeId, Sku: sku, Stock: stock, Content: content, Customization: customization}
+	product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes, Parameters: parameters, CustomParameters: customParameters, Container: container, Variation: variation, Size: size, BasePrice: basePrice, Pattern: pattern, Dimensions: dimensions, DimensionUnit: dimensionUnit, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Packages: packages, Availability: availability, TimeId: timeId, Sku: sku, Stock: stock, Content: content, Customization: customization}
 	if _, err := models.CreateProduct(common.Database, product); err == nil {
 		// Create new product automatically
 		if name == "" {
@@ -1612,6 +1620,14 @@ func putProductHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Dimensions"]; found && len(v) > 0 {
 				dimensions = strings.TrimSpace(v[0])
 			}
+			var dimensionUnit string
+			if v, found := data.Value["DimensionUnit"]; found && len(v) > 0 {
+				dimensionUnit = strings.TrimSpace(v[0])
+			}else if common.Config.DimensionUnit != "" {
+				dimensionUnit = common.Config.DimensionUnit
+			}else{
+				dimensionUnit = "cm"
+			}
 			var width float64
 			if v, found := data.Value["Width"]; found && len(v) > 0 {
 				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
@@ -1708,6 +1724,7 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.End = end
 			product.Pattern = pattern
 			product.Dimensions = dimensions
+			product.DimensionUnit = dimensionUnit
 			product.Width = width
 			product.Height = height
 			product.Depth = depth

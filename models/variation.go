@@ -25,6 +25,7 @@ type Variation struct {
 	//
 	Pattern string
 	Dimensions string
+	DimensionUnit string
 	Width float64 `sql:"type:decimal(8,2);"`
 	Height float64 `sql:"type:decimal(8,2);"`
 	Depth float64 `sql:"type:decimal(8,2);"`

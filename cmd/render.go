@@ -646,6 +646,7 @@ var renderCmd = &cobra.Command{
 												variations := append([]*models.Variation{{
 													BasePrice: product.BasePrice,
 													Dimensions: product.Dimensions,
+													DimensionUnit: product.DimensionUnit,
 													Width: product.Width,
 													Height: product.Height,
 													Depth: product.Depth,
@@ -1217,6 +1218,7 @@ var renderCmd = &cobra.Command{
 									End:          product.End,
 									Prices: product.Prices,
 									Dimensions: product.Dimensions,
+									DimensionUnit: product.DimensionUnit,
 									Width:        product.Width,
 									Height:       product.Height,
 									Depth:        product.Depth,
@@ -1473,6 +1475,7 @@ var renderCmd = &cobra.Command{
 								productView.Path = "/" + path.Join(append(names, product.Name)...) + "/"
 								productView.Pattern = product.Pattern
 								productView.Dimensions = product.Dimensions
+								productView.DimensionUnit = product.DimensionUnit
 								productView.Volume = product.Volume
 								productView.Weight = product.Weight
 								productView.Availability = product.Availability

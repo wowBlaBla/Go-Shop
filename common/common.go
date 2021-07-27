@@ -256,6 +256,7 @@ type ProductPF struct {
 	CustomParameters []CustomParameterPF
 	Pattern string `json:",omitempty"`
 	Dimensions string `json:",omitempty"`
+	DimensionUnit string `json:",omitempty"`
 	Volume float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
 	Availability string `json:",omitempty"`
