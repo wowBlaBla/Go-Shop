@@ -225,6 +225,10 @@ type CatalogItemView struct {
 	Sort int                    `json:",omitempty"`
 }
 
+func (c *CatalogItemView) SetCount() {
+
+}
+
 func GetCategoriesView(connector *gorm.DB, id int, depth int, noProducts bool, count bool, stat bool) (*CatalogItemView, error) {
 	CATEGORIES = make(map[uint]string)
 	PRODUCTS = make(map[uint]string)

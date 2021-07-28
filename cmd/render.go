@@ -1177,6 +1177,9 @@ var renderCmd = &cobra.Command{
 									productFile.End = &product.End
 									//productView.End = &product.End
 								}
+								if product.ItemPrice > 0 {
+									productFile.ItemPrice = fmt.Sprintf("%.2f", product.ItemPrice)
+								}
 								//productView.Dimensions = product.Dimensions
 								//productView.Weight = product.Weight
 								//productView.Availability = product.Availability
@@ -1213,9 +1216,14 @@ var renderCmd = &cobra.Command{
 									Thumbnail:    product.Thumbnail,
 									Properties:   product.Properties,
 									BasePrice:    product.BasePrice,
+									ManufacturerPrice: product.ManufacturerPrice,
 									SalePrice:    product.SalePrice,
 									Start:        product.Start,
 									End:          product.End,
+									ItemPrice: product.ItemPrice,
+									MinQuantity: product.MinQuantity,
+									MaxQuantity: product.MaxQuantity,
+									PurchasableMultiply: product.PurchasableMultiply,
 									Prices: product.Prices,
 									Dimensions: product.Dimensions,
 									DimensionUnit: product.DimensionUnit,
@@ -1251,6 +1259,9 @@ var renderCmd = &cobra.Command{
 										productFile.Start = &product.Variations[0].Start
 										productFile.End = &product.Variations[0].End
 									}
+									if product.Variations[0].ItemPrice > 0 {
+										productFile.ItemPrice = fmt.Sprintf("%.2f", product.Variations[0].ItemPrice)
+									}
 									for _, variation := range product.Variations {
 										if variation.Enabled {
 											variationView := common.VariationPF{
@@ -1260,6 +1271,10 @@ var renderCmd = &cobra.Command{
 												//Thumbnail:   variation.Thumbnail,
 												Description: variation.Description,
 												BasePrice:   variation.BasePrice,
+												ItemPrice:   variation.ItemPrice,
+												MinQuantity:   variation.MinQuantity,
+												MaxQuantity:   variation.MaxQuantity,
+												PurchasableMultiply:   variation.PurchasableMultiply,
 												//Dimensions: variation.Dimensions,
 												Pattern:      variation.Pattern,
 												Dimensions:   variation.Dimensions,

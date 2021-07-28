@@ -173,6 +173,36 @@ func postProductsHandler(c *fiber.Ctx) error {
 			basePrice = vv
 		}
 	}
+	var manufacturerPrice float64
+	if v, found := data.Value["ManufacturerPrice"]; found && len(v) > 0 {
+		if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+			manufacturerPrice = vv
+		}
+	}
+	var salePrice float64
+	if v, found := data.Value["SalePrice"]; found && len(v) > 0 {
+		if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+			salePrice = vv
+		}
+	}
+	var itemPrice float64
+	if v, found := data.Value["ItemPrice"]; found && len(v) > 0 {
+		if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+			itemPrice = vv
+		}
+	}
+	var minQuantity int
+	if v, found := data.Value["MinQuantity"]; found && len(v) > 0 {
+		minQuantity, _ = strconv.Atoi(v[0])
+	}
+	var maxQuantity int
+	if v, found := data.Value["MaxQuantity"]; found && len(v) > 0 {
+		maxQuantity, _ = strconv.Atoi(v[0])
+	}
+	var purchasableMultiply int
+	if v, found := data.Value["PurchasableMultiply"]; found && len(v) > 0 {
+		purchasableMultiply, _ = strconv.Atoi(v[0])
+	}
 	var pattern string
 	if v, found := data.Value["Pattern"]; found && len(v) > 0 {
 		pattern = strings.TrimSpace(v[0])
@@ -223,6 +253,14 @@ func postProductsHandler(c *fiber.Ctx) error {
 			weight = vv
 		}
 	}
+	var weightUnit string
+	if v, found := data.Value["WeightUnit"]; found && len(v) > 0 {
+		weightUnit = strings.TrimSpace(v[0])
+	}else if common.Config.WeightUnit != "" {
+		weightUnit = common.Config.WeightUnit
+	}else{
+		weightUnit = "kg"
+	}
 	var packages int
 	if v, found := data.Value["Packages"]; found && len(v) > 0 {
 		if vv, _ := strconv.Atoi(v[0]); err == nil {
@@ -257,7 +295,15 @@ func postProductsHandler(c *fiber.Ctx) error {
 	if v, found := data.Value["Customization"]; found && len(v) > 0 {
 		customization = strings.TrimSpace(v[0])
 	}
-	product := &models.Product{Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes, Parameters: parameters, CustomParameters: customParameters, Container: container, Variation: variation, Size: size, BasePrice: basePrice, Pattern: pattern, Dimensions: dimensions, DimensionUnit: dimensionUnit, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Packages: packages, Availability: availability, TimeId: timeId, Sku: sku, Stock: stock, Content: content, Customization: customization}
+	product := &models.Product{
+		Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes, Parameters: parameters,
+		CustomParameters: customParameters, Container: container, Variation: variation, Size: size,
+		BasePrice: basePrice, ManufacturerPrice: manufacturerPrice, SalePrice: salePrice, ItemPrice: itemPrice,
+		MinQuantity: minQuantity, MaxQuantity: maxQuantity, PurchasableMultiply: purchasableMultiply,
+		Pattern: pattern, Dimensions: dimensions, DimensionUnit: dimensionUnit, Width: width, Height: height,
+		Depth: depth, Volume: volume, Weight: weight, WeightUnit: weightUnit, Packages: packages, Availability: availability, TimeId: timeId,
+		Sku: sku, Stock: stock, Content: content, Customization: customization,
+	}
 	if _, err := models.CreateProduct(common.Database, product); err == nil {
 		// Create new product automatically
 		if name == "" {
@@ -1064,6 +1110,44 @@ func putProductHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Notes"]; found && len(v) > 0 {
 				notes = strings.TrimSpace(v[0])
 			}
+			var basePrice float64
+			if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					basePrice = vv
+				}
+			}
+			var manufacturerPrice float64
+			if v, found := data.Value["ManufacturerPrice"]; found && len(v) > 0 {
+				manufacturerPrice, _ = strconv.ParseFloat(v[0], 10)
+			}
+			var salePrice float64
+			if v, found := data.Value["SalePrice"]; found && len(v) > 0 {
+				salePrice, _ = strconv.ParseFloat(v[0], 10)
+			}
+			var start time.Time
+			if v, found := data.Value["Start"]; found && len(v) > 0 {
+				start, _ = time.Parse(time.RFC3339, v[0])
+			}
+			var end time.Time
+			if v, found := data.Value["End"]; found && len(v) > 0 {
+				end, _ = time.Parse(time.RFC3339, v[0])
+			}
+			var itemPrice float64
+			if v, found := data.Value["ItemPrice"]; found && len(v) > 0 {
+				itemPrice, _ = strconv.ParseFloat(v[0], 10)
+			}
+			var minQuantity int
+			if v, found := data.Value["MinQuantity"]; found && len(v) > 0 {
+				minQuantity, _ = strconv.Atoi(v[0])
+			}
+			var maxQuantity int
+			if v, found := data.Value["MaxQuantity"]; found && len(v) > 0 {
+				maxQuantity, _ = strconv.Atoi(v[0])
+			}
+			var purchasableMultiply int
+			if v, found := data.Value["PurchasableMultiply"]; found && len(v) > 0 {
+				purchasableMultiply, _ = strconv.Atoi(v[0])
+			}
 			// Parameters
 			if v, found := data.Value["Parameters"]; found && len(v) > 0 {
 				var newParameters []*ParameterView
@@ -1594,24 +1678,6 @@ func putProductHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Size"]; found && len(v) > 0 {
 				size = strings.TrimSpace(v[0])
 			}
-			var basePrice float64
-			if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
-				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
-					basePrice = vv
-				}
-			}
-			var salePrice float64
-			if v, found := data.Value["SalePrice"]; found && len(v) > 0 {
-				salePrice, _ = strconv.ParseFloat(v[0], 10)
-			}
-			var start time.Time
-			if v, found := data.Value["Start"]; found && len(v) > 0 {
-				start, _ = time.Parse(time.RFC3339, v[0])
-			}
-			var end time.Time
-			if v, found := data.Value["End"]; found && len(v) > 0 {
-				end, _ = time.Parse(time.RFC3339, v[0])
-			}
 			var pattern string
 			if v, found := data.Value["Pattern"]; found && len(v) > 0 {
 				pattern = strings.TrimSpace(v[0])
@@ -1657,6 +1723,14 @@ func putProductHandler(c *fiber.Ctx) error {
 				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
 					weight = vv
 				}
+			}
+			var weightUnit string
+			if v, found := data.Value["WeightUnit"]; found && len(v) > 0 {
+				weightUnit = strings.TrimSpace(v[0])
+			}else if common.Config.WeightUnit != "" {
+				weightUnit = common.Config.WeightUnit
+			}else{
+				weightUnit = "kg"
 			}
 			var packages int
 			if v, found := data.Value["Packages"]; found && len(v) > 0 {
@@ -1710,18 +1784,25 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Description = description
 			product.Notes = notes
 			product.CustomParameters = customParameters
-			oldBasePrice := product.BasePrice
 			product.Container = container
 			product.Variation = variation
 			product.Type = typ
 			product.Size = size
+			oldBasePrice := product.BasePrice
 			product.BasePrice = basePrice
+			oldManufacturerPrice := product.ManufacturerPrice
+			product.ManufacturerPrice = oldManufacturerPrice
 			oldSalePrice := product.SalePrice
 			product.SalePrice = salePrice
 			oldStart := product.Start
 			product.Start = start
 			oldEnd := product.End
 			product.End = end
+			oldItemPrice := product.ItemPrice
+			product.ItemPrice = oldItemPrice
+			product.MinQuantity = minQuantity
+			product.MaxQuantity = maxQuantity
+			product.PurchasableMultiply = purchasableMultiply
 			product.Pattern = pattern
 			product.Dimensions = dimensions
 			product.DimensionUnit = dimensionUnit
@@ -1732,6 +1813,8 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Volume = volume
 			oldWeight := product.Weight
 			product.Weight = weight
+			oldWeightUnit := product.WeightUnit
+			product.WeightUnit = weightUnit
 			oldPackages := product.Packages
 			product.Packages = packages
 			oldAvailability := product.Availability
@@ -1751,8 +1834,14 @@ func putProductHandler(c *fiber.Ctx) error {
 						if math.Abs(oldBasePrice - basePrice) > 0.01 {
 							variation.BasePrice = product.BasePrice
 						}
+						if math.Abs(oldManufacturerPrice - manufacturerPrice) > 0.01 {
+							variation.ManufacturerPrice = product.ManufacturerPrice
+						}
 						if math.Abs(oldSalePrice - salePrice) > 0.01 {
 							variation.SalePrice = product.SalePrice
+						}
+						if math.Abs(oldItemPrice - itemPrice) > 0.01 {
+							variation.ItemPrice = product.ItemPrice
 						}
 						if !oldStart.Equal(start) {
 							variation.Start = product.Start
@@ -1765,6 +1854,9 @@ func putProductHandler(c *fiber.Ctx) error {
 						}
 						if math.Abs(oldWeight - weight) > 0.01 {
 							variation.Weight = product.Weight
+						}
+						if oldWeightUnit != weightUnit {
+							variation.WeightUnit = product.WeightUnit
 						}
 						if oldPackages != packages {
 							variation.Packages = product.Packages

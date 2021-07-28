@@ -23,9 +23,16 @@ type Product struct {
 	Type string // select, rectangle, swatch, Radio
 	Size string // small, medium, large
 	BasePrice float64          `sql:"type:decimal(8,2);"`
+	ManufacturerPrice float64          `sql:"type:decimal(8,2);"`
 	SalePrice float64          `sql:"type:decimal(8,2);"`
+	ItemPrice float64          `sql:"type:decimal(8,2);"`
 	Start time.Time
 	End time.Time
+	MinQuantity int
+	MaxQuantity int
+	PurchasableMultiply int
+	Measurement int
+	MeasurementUnit string // default kg
 	Prices []*Price `gorm:"foreignKey:ProductId"`
 	//
 	Pattern string
@@ -37,6 +44,7 @@ type Product struct {
 	Depth float64 `sql:"type:decimal(8,2);"`
 	Volume float64 `sql:"type:decimal(8,2);"`
 	Weight float64 `sql:"type:decimal(8,2);"`
+	WeightUnit string // default kg
 	Packages int
 	Availability string
 	//Sending string

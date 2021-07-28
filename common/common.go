@@ -35,7 +35,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210727120147"
+	COMPILED = "20210728234247"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -220,6 +220,10 @@ type ProductFile struct {
 	SalePrice  string `json:",omitempty"`
 	Start      *time.Time `json:",omitempty"`
 	End        *time.Time `json:",omitempty"`
+	ItemPrice  string `json:",omitempty"`
+	MinQuantity int `json:",omitempty"`
+	MaxQuantity int `json:",omitempty"`
+	PurchasableMultiply int `json:",omitempty"`
 	Product    ProductPF
 	Related    []string `json:",omitempty"`
 	Widgets    []WidgetCF `json:",omitempty"`
@@ -308,6 +312,10 @@ type VariationPF struct {
 	SalePrice  float64  `json:",omitempty"`
 	Start *time.Time    `json:",omitempty"`
 	End *time.Time      `json:",omitempty"`
+	ItemPrice  float64 `json:",omitempty"`
+	MinQuantity int `json:",omitempty"`
+	MaxQuantity int `json:",omitempty"`
+	PurchasableMultiply int `json:",omitempty"`
 	Prices []PricePF     `json:",omitempty"`
 	Pattern string      `json:",omitempty"`
 	Dimensions string   `json:",omitempty"`
@@ -400,6 +408,10 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		SalePrice  string `json:",omitempty"`
 		Start       *time.Time `json:",omitempty"`
 		End       *time.Time `json:",omitempty"`
+		ItemPrice  string `json:",omitempty"`
+		MinQuantity int `json:",omitempty"`
+		MaxQuantity int `json:",omitempty"`
+		PurchasableMultiply int `json:",omitempty"`
 		Product    ProductPF
 		Related []string `json:",omitempty"`
 		Widgets []WidgetCF `json:",omitempty"`
@@ -426,6 +438,10 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		SalePrice: p.SalePrice,
 		Start: p.Start,
 		End: p.End,
+		ItemPrice: p.ItemPrice,
+		MinQuantity: p.MinQuantity,
+		MaxQuantity: p.MaxQuantity,
+		PurchasableMultiply: p.PurchasableMultiply,
 		Product: p.Product,
 		Related: p.Related,
 		Widgets: p.Widgets,

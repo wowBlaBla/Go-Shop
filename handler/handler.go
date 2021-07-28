@@ -756,6 +756,7 @@ type InfoView struct {
 	Thousands string `json:",omitempty"`
 	Pattern string `json:",omitempty"`
 	DimensionUnit string `json:",omitempty"`
+	WeightUnit string `json:",omitempty"`
 	Size string `json:",omitempty"`
 	Preview string `json:",omitempty"`
 	Authorization string `json:",omitempty"`
@@ -794,6 +795,7 @@ func getInfoHandler(c *fiber.Ctx) error {
 	}
 	view.Pattern = common.Config.Pattern
 	view.DimensionUnit = common.Config.DimensionUnit
+	view.WeightUnit = common.Config.WeightUnit
 	view.Preview = common.Config.Preview
 	if v := c.Locals("authorization"); v != nil {
 		view.Authorization = v.(string)
@@ -989,6 +991,7 @@ type BasicSettingsView struct {
 	Size string
 	Pattern string
 	DimensionUnit string
+	WeightUnit string
 	Preview      string
 	CDN      string
 	Payment      config.PaymentConfig
@@ -1020,6 +1023,7 @@ func getBasicSettingsHandler(c *fiber.Ctx) error {
 	conf.Size = common.Config.Size
 	conf.Pattern = common.Config.Pattern
 	conf.DimensionUnit = common.Config.DimensionUnit
+	conf.WeightUnit = common.Config.WeightUnit
 	conf.Preview = common.Config.Preview
 	conf.Payment = common.Config.Payment
 	conf.Resize = common.Config.Resize
@@ -5427,6 +5431,7 @@ type FilterRequest ListRequest
 type ProductsFilterResponse struct {
 	Categories *models.CatalogItemView
 	Data []ProductsFilterItem
+	FlatUrl bool `json:",omitempty"`
 	Filtered int64
 	Total int64
 }
@@ -5448,6 +5453,8 @@ type ProductsFilterItem struct {
 	CategoryId uint
 	CategoryName string
 	CategoryTitle string
+	ProductId uint
+	VariationId uint
 }
 
 // @security BasicAuth
@@ -5496,6 +5503,7 @@ func postFilterHandler(c *fiber.Ctx) error {
 		request.Length = 100
 	}
 	// Filter
+	var search string
 	var keys1 []string
 	var values1 []interface{}
 	var keys2 []string
@@ -5525,12 +5533,12 @@ func postFilterHandler(c *fiber.Ctx) error {
 					}
 				case "Search":
 					if v, err := url.QueryUnescape(value); err == nil {
-						value = strings.TrimSpace(v)
+						search = strings.TrimSpace(v)
 					}else{
 						logger.Warningf("%+v", err)
 					}
-					keys1 = append(keys1, "(cache_products.Product_Id = ? or cache_products.Title like ? or cache_products.Description like ? or cache_products.Sku like ?)")
-					values1 = append(values1, value, "%" + value + "%", "%" + value + "%", "%" + value + "%")
+					keys1 = append(keys1, "(cache_products.Product_Id = ? or cache_products.Title like ? or cache_products.Description like ? or cache_products.Sku like ? or cache_products.Variations like ?)")
+					values1 = append(values1, search, "%" + search + "%", "%" + search + "%", "%" + search + "%", "%" + search + "%")
 				default:
 					if strings.Index(key, "Option-") >= -1 {
 						if res := regexp.MustCompile(`Option-(\d+)`).FindAllStringSubmatch(key, 1); len(res) > 0 && len(res[0]) > 1 {
@@ -5560,7 +5568,10 @@ func postFilterHandler(c *fiber.Ctx) error {
 		keys1 = append(keys1, fmt.Sprintf("(%v)", strings.Join(keys2, " or ")))
 		values1 = append(values1, values2...)
 	}
-	keys1 = append(keys1, "cache_products.Path LIKE ?")
+	//
+	var keys3 []string
+	var values3 []interface{}
+	keys3 = append(keys3, "cache_products.Path LIKE ?")
 	if common.Config.FlatUrl {
 		if prefix := "/" + strings.ToLower(common.Config.Products); prefix == relPath || prefix + "/" == relPath {
 			relPath = "/"
@@ -5568,8 +5579,7 @@ func postFilterHandler(c *fiber.Ctx) error {
 			relPath = "/" + strings.ToLower(common.Config.Products) + relPath
 		}
 	}
-	values1 = append(values1, relPath + "%")
-	////logger.Infof("keys1: %+v, values1: %+v", keys1, values1)
+	values3 = append(values3, relPath + "%")
 	//
 	// Sort
 	var order string
@@ -5590,13 +5600,14 @@ func postFilterHandler(c *fiber.Ctx) error {
 		order = strings.Join(orders, ", ")
 	}
 	//logger.Infof("order: %+v", order)
-	rows, err := common.Database.Debug().Model(&models.CacheProduct{}).Select("cache_products.ID, cache_products.Name, cache_products.Title, cache_products.Path, cache_products.Description, cache_products.Thumbnail, cache_products.Images, cache_products.Variations, cache_products.Price as Price, cache_products.Width as Width, cache_products.Height as Height, cache_products.Depth as Depth,  cache_products.Weight as Weight, cache_products.Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Product_ID = cache_products.Product_ID or properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join rates on rates.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...)/*.Having(strings.Join(keys2, " and "), values2...)*/.Rows()
+	rows, err := common.Database.Debug().Model(&models.CacheProduct{}).Select("cache_products.ID, cache_products.Name, cache_products.Title, cache_products.Path, cache_products.Description, cache_products.Thumbnail, cache_products.Images, cache_products.Variations, cache_products.Price as Price, cache_products.Width as Width, cache_products.Height as Height, cache_products.Depth as Depth,  cache_products.Weight as Weight, cache_products.Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Product_ID = cache_products.Product_ID or properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join rates on rates.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...).Group("cache_products.category_id, cache_products.product_id")/*.Having(strings.Join(keys2, " and "), values2...)*/.Rows()
 	if err == nil {
 		for rows.Next() {
 			var item ProductsFilterItem
 			if err = common.Database.ScanRows(rows, &item); err == nil {
 				//logger.Infof("Item: %+v, %+v, %+v", item.ID, item.Name, item.Path)
 				arr := strings.Split(strings.TrimLeft(item.Path, "/"), "/")
+				//logger.Infof("arr: %+v", arr)
 				root := response.Categories
 				for i, slug := range arr {
 					//logger.Infof("\t%d: %+v", i, slug)
@@ -5625,11 +5636,21 @@ func postFilterHandler(c *fiber.Ctx) error {
 		rows.Close()
 	}
 	//
-	rows, err = common.Database.Debug().Model(&models.CacheProduct{}).Select("cache_products.ID, cache_products.Name, cache_products.Title, cache_products.Path, cache_products.Description, cache_products.Thumbnail, cache_products.Images, cache_products.Variations, cache_products.Price as Price, cache_products.Width as Width, cache_products.Height as Height, cache_products.Depth as Depth,  cache_products.Weight as Weight, cache_products.Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Product_ID = cache_products.Product_ID or properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join rates on rates.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...)/*.Having(strings.Join(keys2, " and "), values2...)*/.Group("cache_products.product_id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err = common.Database.Debug().Model(&models.CacheProduct{}).Select("cache_products.ID, cache_products.Name, cache_products.Title, cache_products.Path, cache_products.Description, cache_products.Thumbnail, cache_products.Images, cache_products.Variations, cache_products.Price as Price, cache_products.Width as Width, cache_products.Height as Height, cache_products.Depth as Depth,  cache_products.Weight as Weight, cache_products.Product_Id as ProductId, cache_products.Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Product_ID = cache_products.Product_ID or properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join rates on rates.Property_Id = properties.Id").Where(strings.Join(append(keys1, keys3...), " and "), append(values1, values3...)...)/*.Having(strings.Join(keys2, " and "), values2...)*/.Group("cache_products.product_id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		for rows.Next() {
 			var item ProductsFilterItem
 			if err = common.Database.ScanRows(rows, &item); err == nil {
+				if search != "" {
+					for _, v := range strings.Split(item.Variations, ";") {
+						pair := strings.Split(v, ",")
+						if len(pair) > 1 && item.VariationId == 0 && strings.Contains(strings.ToLower(pair[1]), strings.ToLower(search)) {
+							if vv, err := strconv.Atoi(pair[0]); err == nil {
+								item.VariationId = uint(vv)
+							}
+						}
+					}
+				}
 				response.Data = append(response.Data, item)
 			} else {
 				logger.Errorf("%v", err)
@@ -5641,6 +5662,7 @@ func postFilterHandler(c *fiber.Ctx) error {
 	common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Price, Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Product_ID = cache_products.Product_ID or properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join rates on rates.Property_Id = properties.Id").Where(strings.Join(keys1, " and "), values1...).Count(&response.Filtered)
 	common.Database.Debug().Model(&models.CacheProduct{}).Select("Product_ID as ID, Name, Title, Path, Description, Thumbnail, Price, Category_Id as CategoryId").Joins("left join parameters on parameters.Product_ID = cache_products.Product_ID").Joins("left join variations on variations.Product_ID = cache_products.Product_ID").Joins("left join properties on properties.Product_ID = cache_products.Product_ID or properties.Variation_Id = variations.Id").Joins("left join options on options.Id = parameters.Option_Id or options.Id = properties.Option_Id").Joins("left join rates on rates.Property_Id = properties.Id").Where("Path LIKE ?", relPath + "%").Count(&response.Total)
 	//
+	response.FlatUrl = common.Config.FlatUrl
 	c.Status(http.StatusOK)
 	return c.JSON(response)
 }
@@ -5878,9 +5900,14 @@ type ProductView struct {
 	Variation string `json:",omitempty"`
 	Size string `json:",omitempty"`
 	BasePrice float64
+	ManufacturerPrice float64 `json:",omitempty"`
 	SalePrice float64 `json:",omitempty"`
+	ItemPrice float64 `json:",omitempty"`
 	Start *time.Time `json:",omitempty"`
 	End *time.Time `json:",omitempty"`
+	MinQuantity int `json:",omitempty"`
+	MaxQuantity int `json:",omitempty"`
+	PurchasableMultiply int `json:",omitempty"`
 	Prices []*PriceView
 	Pattern string `json:",omitempty"`
 	Dimensions string `json:",omitempty"`
@@ -5966,9 +5993,14 @@ type VariationView struct {
 	Notes string `json:",omitempty"`
 	Thumbnail string `json:",omitempty"`
 	BasePrice float64
+	ManufacturerPrice float64 `json:",omitempty"`
 	SalePrice float64 `json:",omitempty"`
+	ItemPrice float64 `json:",omitempty"`
 	Start *time.Time `json:",omitempty"`
 	End *time.Time `json:",omitempty"`
+	MinQuantity int `json:",omitempty"`
+	MaxQuantity int `json:",omitempty"`
+	PurchasableMultiply int `json:",omitempty"`
 	Prices []*PriceView
 	Properties []struct {
 		ID uint

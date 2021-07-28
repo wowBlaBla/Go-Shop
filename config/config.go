@@ -91,6 +91,7 @@ type Config struct {
 	Thousands string // . or ,
 	//
 	DimensionUnit string // cm
+	WeightUnit string // kg
 	//
 	Payment PaymentConfig
 	Notification NotificationConfig

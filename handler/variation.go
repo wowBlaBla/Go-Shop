@@ -270,9 +270,33 @@ func postVariationHandler(c *fiber.Ctx) error {
 					return c.JSON(HTTPError{"Invalid base price"})
 				}
 			}
+			var manufacturerPrice float64
+			if v, found := data.Value["ManufacturerPrice"]; found && len(v) > 0 {
+				if manufacturerPrice, err = strconv.ParseFloat(v[0], 10); err != nil {
+					logger.Warningf("%+v", err)
+				}
+			}
 			var salePrice float64
 			if v, found := data.Value["SalePrice"]; found && len(v) > 0 {
 				salePrice, _ = strconv.ParseFloat(v[0], 10)
+			}
+			var itemPrice float64
+			if v, found := data.Value["ItemPrice"]; found && len(v) > 0 {
+				if itemPrice, err = strconv.ParseFloat(v[0], 10); err != nil {
+					logger.Warningf("%+v", err)
+				}
+			}
+			var minQuantity int
+			if v, found := data.Value["MinQuantity"]; found && len(v) > 0 {
+				minQuantity, _ = strconv.Atoi(v[0])
+			}
+			var maxQuantity int
+			if v, found := data.Value["MaxQuantity"]; found && len(v) > 0 {
+				maxQuantity, _ = strconv.Atoi(v[0])
+			}
+			var purchasableMultiply int
+			if v, found := data.Value["PurchasableMultiply"]; found && len(v) > 0 {
+				purchasableMultiply, _ = strconv.Atoi(v[0])
 			}
 			var pattern string
 			if v, found := data.Value["Pattern"]; found && len(v) > 0 {
@@ -324,6 +348,14 @@ func postVariationHandler(c *fiber.Ctx) error {
 					weight = vv
 				}
 			}
+			var weightUnit string
+			if v, found := data.Value["WeightUnit"]; found && len(v) > 0 {
+				weightUnit = strings.TrimSpace(v[0])
+			}else if common.Config.WeightUnit != "" {
+				weightUnit = common.Config.WeightUnit
+			}else{
+				weightUnit = "kg"
+			}
 			var packages int
 			if v, found := data.Value["Packages"]; found && len(v) > 0 {
 				if vv, _ := strconv.Atoi(v[0]); err == nil {
@@ -351,7 +383,13 @@ func postVariationHandler(c *fiber.Ctx) error {
 					stock = uint(vv)
 				}
 			}
-			variation := &models.Variation{Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes, BasePrice: basePrice, SalePrice: salePrice, ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, DimensionUnit: dimensionUnit, Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, Packages: packages, Availability: availability, TimeId: timeId, Sku: sku, Stock: stock}
+			variation := &models.Variation{
+				Enabled: enabled, Name: name, Title: title, Description: description, Notes: notes,
+				BasePrice: basePrice, ManufacturerPrice: manufacturerPrice, SalePrice: salePrice, ItemPrice: itemPrice,
+				MinQuantity: minQuantity, MaxQuantity: maxQuantity, PurchasableMultiply: purchasableMultiply,
+				ProductId: product.ID, Pattern: pattern, Dimensions: dimensions, DimensionUnit: dimensionUnit,
+				Width: width, Height: height, Depth: depth, Volume: volume, Weight: weight, WeightUnit: weightUnit,
+				Packages: packages, Availability: availability, TimeId: timeId, Sku: sku, Stock: stock}
 
 			if id, err := models.CreateVariation(common.Database, variation); err == nil {
 				if name == "" {
@@ -473,8 +511,46 @@ func putVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Notes"]; found && len(v) > 0 {
 				notes = strings.TrimSpace(v[0])
 			}
+			var basePrice float64
+			if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
+				if basePrice, err = strconv.ParseFloat(v[0], 10); err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{"Invalid base price"})
+				}
+			}
+			var manufacturerPrice float64
+			if v, found := data.Value["ManufacturerPrice"]; found && len(v) > 0 {
+				manufacturerPrice, _ = strconv.ParseFloat(v[0], 10)
+			}
+			var salePrice float64
+			if v, found := data.Value["SalePrice"]; found && len(v) > 0 {
+				salePrice, _ = strconv.ParseFloat(v[0], 10)
+			}
+			var start time.Time
+			if v, found := data.Value["Start"]; found && len(v) > 0 {
+				start, _ = time.Parse(time.RFC3339, v[0])
+			}
+			var end time.Time
+			if v, found := data.Value["End"]; found && len(v) > 0 {
+				end, _ = time.Parse(time.RFC3339, v[0])
+			}
+			var itemPrice float64
+			if v, found := data.Value["ItemPrice"]; found && len(v) > 0 {
+				itemPrice, _ = strconv.ParseFloat(v[0], 10)
+			}
+			var minQuantity int
+			if v, found := data.Value["MinQuantity"]; found && len(v) > 0 {
+				minQuantity, _ = strconv.Atoi(v[0])
+			}
+			var maxQuantity int
+			if v, found := data.Value["MaxQuantity"]; found && len(v) > 0 {
+				maxQuantity, _ = strconv.Atoi(v[0])
+			}
+			var purchasableMultiply int
+			if v, found := data.Value["PurchasableMultiply"]; found && len(v) > 0 {
+				purchasableMultiply, _ = strconv.Atoi(v[0])
+			}
 			// Properties
-			logger.Infof("BEFORE Properties: %+v", variation.Prices)
 			if v, found := data.Value["Properties"]; found {
 				var newProperties PropertiesView
 				if err = json.Unmarshal([]byte(v[0]), &newProperties); err == nil {
@@ -938,26 +1014,6 @@ func putVariationHandler(c *fiber.Ctx) error {
 					logger.Warningf("%+v", err)
 				}
 			}
-			logger.Infof("AFTER Price: %+v", variation.Prices)
-			var basePrice float64
-			if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
-				if basePrice, err = strconv.ParseFloat(v[0], 10); err != nil {
-					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{"Invalid base price"})
-				}
-			}
-			var salePrice float64
-			if v, found := data.Value["SalePrice"]; found && len(v) > 0 {
-				salePrice, _ = strconv.ParseFloat(v[0], 10)
-			}
-			var start time.Time
-			if v, found := data.Value["Start"]; found && len(v) > 0 {
-				start, _ = time.Parse(time.RFC3339, v[0])
-			}
-			var end time.Time
-			if v, found := data.Value["End"]; found && len(v) > 0 {
-				end, _ = time.Parse(time.RFC3339, v[0])
-			}
 			var pattern string
 			if v, found := data.Value["Pattern"]; found && len(v) > 0 {
 				pattern = strings.TrimSpace(v[0])
@@ -1040,9 +1096,14 @@ func putVariationHandler(c *fiber.Ctx) error {
 			variation.Description = description
 			variation.Notes = notes
 			variation.BasePrice = basePrice
+			variation.ManufacturerPrice = manufacturerPrice
 			variation.SalePrice = salePrice
 			variation.Start = start
 			variation.End = end
+			variation.ItemPrice = itemPrice
+			variation.MinQuantity = minQuantity
+			variation.MaxQuantity = maxQuantity
+			variation.PurchasableMultiply = purchasableMultiply
 			variation.Pattern = pattern
 			variation.Dimensions = dimensions
 			variation.DimensionUnit = dimensionUnit

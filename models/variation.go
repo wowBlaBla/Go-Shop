@@ -18,9 +18,14 @@ type Variation struct {
 	Thumbnail string
 	Properties []*Property `gorm:"foreignKey:VariationId"`
 	BasePrice float64      `sql:"type:decimal(8,2);"`
+	ManufacturerPrice float64          `sql:"type:decimal(8,2);"`
 	SalePrice float64      `sql:"type:decimal(8,2);"`
+	ItemPrice float64          `sql:"type:decimal(8,2);"`
 	Start time.Time
 	End time.Time
+	MinQuantity int
+	MaxQuantity int
+	PurchasableMultiply int
 	Prices []*Price `gorm:"foreignKey:VariationId"`
 	//
 	Pattern string
@@ -31,6 +36,7 @@ type Variation struct {
 	Depth float64 `sql:"type:decimal(8,2);"`
 	Volume float64 `sql:"type:decimal(8,2);"`
 	Weight float64 `sql:"type:decimal(8,2);"`
+	WeightUnit string
 	Packages int
 	Availability string
 	//Sending string
