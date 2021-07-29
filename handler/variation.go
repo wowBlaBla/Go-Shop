@@ -1185,16 +1185,85 @@ func delVariationHandler(c *fiber.Ctx) error {
 		id, _ = strconv.Atoi(v)
 	}
 	if variation, err := models.GetVariation(common.Database, id); err == nil {
-		for _, property := range variation.Properties {
-			for _, price := range property.Rates {
-				if err = models.DeleteRate(common.Database, price); err != nil {
-					logger.Errorf("%v", err)
+		if variations, err := models.GetVariationsByProduct(common.Database, variation.ProductId); err == nil {
+			if len(variations) == 1 && id == int(variations[0].ID) {
+				logger.Infof("case1")
+				if product, err := models.GetProduct(common.Database, int(variation.ProductId)); err == nil {
+					product.BasePrice = variation.BasePrice
+					product.ManufacturerPrice = variation.ManufacturerPrice
+					product.SalePrice = variation.SalePrice
+					product.Start = variation.Start
+					product.End = variation.End
+					product.ItemPrice = variation.ItemPrice
+					product.MinQuantity = variation.MinQuantity
+					product.MaxQuantity = variation.MaxQuantity
+					product.PurchasableMultiply = variation.PurchasableMultiply
+					product.Pattern = variation.Pattern
+					product.Dimensions = variation.Dimensions
+					product.DimensionUnit = variation.DimensionUnit
+					product.Width = variation.Width
+					product.Height = variation.Height
+					product.Depth = variation.Depth
+					product.Volume = variation.Volume
+					product.Weight = variation.Weight
+					product.WeightUnit = variation.WeightUnit
+					product.Packages = variation.Packages
+					product.Availability = variation.Availability
+					product.TimeId = variation.TimeId
+					product.Sku = variation.Sku
+					product.Stock = variation.Stock
+
+					product.Container = false
+					if err = models.UpdateProduct(common.Database, product); err != nil {
+						logger.Warningf("%+v", err)
+					}
+					if err := common.Database.Exec("delete from properties where product_id = ?", product.ID).Error; err != nil {
+						logger.Warningf("%+v", err)
+					}
+					if properties, err := models.GetPropertiesByVariationId(common.Database, int(variation.ID)); err == nil {
+						for i := 0; i < len(properties); i++ {
+							properties[i].ProductId = product.ID
+							properties[i].VariationId = 0
+							if err = models.UpdateProperty(common.Database, properties[i]); err != nil {
+								logger.Warningf("%+v", err)
+							}
+						}
+					}
+					if err := common.Database.Exec("delete from prices where product_id = ?", product.ID).Error; err != nil {
+						logger.Warningf("%+v", err)
+					}
+					if prices, err := models.GetPricesByVariationId(common.Database, variation.ID); err == nil {
+						logger.Infof("Prices: %+v", len(prices))
+						for i := 0; i < len(prices); i++ {
+							prices[i].ProductId = product.ID
+							prices[i].VariationId = 0
+							if err = models.UpdatePrice(common.Database, prices[i]); err != nil {
+								logger.Warningf("%+v", err)
+							}
+							logger.Infof("%d: price: %+v", i, prices[i])
+						}
+					}
+				}
+			}else{
+				logger.Infof("case2")
+				for _, property := range variation.Properties {
+					for _, rate := range property.Rates {
+						if err = models.DeleteRate(common.Database, rate); err != nil {
+							logger.Errorf("%v", err)
+						}
+					}
+					if err = models.DeleteProperty(common.Database, property); err != nil {
+						logger.Errorf("%v", err)
+					}
+				}
+				for _, price := range variation.Prices {
+					if err = models.DeletePrice(common.Database, price); err != nil {
+						logger.Errorf("%v", err)
+					}
 				}
 			}
-			if err = models.DeleteProperty(common.Database, property); err != nil {
-				logger.Errorf("%v", err)
-			}
 		}
+		//
 		if variation.Thumbnail != "" {
 			p := path.Join(dir, "hugo", variation.Thumbnail)
 			if _, err := os.Stat(p); err == nil {

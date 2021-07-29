@@ -9,7 +9,6 @@ import (
 	"github.com/yonnic/goshop/models"
 	"image"
 	"io"
-	"math"
 	"net/http"
 	"os"
 	"path"
@@ -405,7 +404,8 @@ type ProductsListItem struct {
 	BasePrice float64
 	Sku string
 	Stock uint
-	Variations int
+	VariationIds string `json:",omitempty"`
+	Variations string `json:",omitempty"`
 	CategoryId uint `json:",omitempty"`
 	Sort int
 }
@@ -450,8 +450,8 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	if request.Search != "" {
 		term := strings.TrimSpace(request.Search)
 		term2 := "%" + term + "%"
-		keys1 = append(keys1, "(products.ID = ? OR products.Title like ? OR products.Description like ? OR products.Sku like ?)")
-		values1 = append(values1, term, term2, term2, term2)
+		keys1 = append(keys1, "(products.ID = ? OR products.Title like ? OR products.Description like ? OR variations.Title like ? OR products.Sku like ?)")
+		values1 = append(values1, term, term2, term2, term2, term2)
 	}
 	if len(request.Filter) > 0 {
 		for key, value := range request.Filter {
@@ -530,7 +530,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_images.Thumbnail as Thumbnail, products.Description, products.base_price as BasePrice, products.Sku, products.Stock, count(variations.ID) as Variations, categories_products_sort.Value as Sort").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join categories_products_sort on categories_products_sort.productId = products.id").Joins("left join cache_products on products.id = cache_products.product_id").Joins("left join cache_images on products.image_id = cache_images.image_id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_images.Thumbnail as Thumbnail, products.Description, products.base_price as BasePrice, products.Sku, products.Stock, group_concat(variations.Id, '') as VariationIds, group_concat(variations.Title, '') as Variations, categories_products_sort.Value as Sort")/*.Joins("left join categories_products on categories_products.product_id = products.id")*/.Joins("left join categories_products_sort on categories_products_sort.productId = products.id")/*.Joins("left join cache_products on products.id = cache_products.product_id")*/.Joins("left join cache_images on products.image_id = cache_images.image_id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -546,7 +546,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_images.Thumbnail as Thumbnail, products.Description, products.base_price as BasePrice, products.Sku, products.Stock, count(variations.ID) as Variations").Joins("left join categories_products on categories_products.product_id = products.id").Joins("left join cache_images on products.image_id = cache_images.image_id").Joins("left join variations on variations.product_id = products.id").Group("variations.product_id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_images.Thumbnail as Thumbnail, products.Description, products.base_price as BasePrice, products.Sku, products.Stock, group_concat(variations.Id, '') as VariationIds, group_concat(variations.Title, '') as Variations")/*.Joins("left join categories_products on categories_products.product_id = products.id")*/.Joins("left join cache_images on products.image_id = cache_images.image_id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -554,7 +554,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 		rows.Close()
 	}
 	//
-	if len(keys1) > 0 || len(keys2) > 0 {
+	if id > 0 {
 		common.Database.Debug().Model(&models.Product{}).Where("category_id = ?", id).Count(&response.Total)
 	}else{
 		response.Total = response.Filtered
@@ -1784,19 +1784,16 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Description = description
 			product.Notes = notes
 			product.CustomParameters = customParameters
+			oldContainer := product.Container
 			product.Container = container
 			product.Variation = variation
 			product.Type = typ
 			product.Size = size
-			oldBasePrice := product.BasePrice
 			product.BasePrice = basePrice
 			oldManufacturerPrice := product.ManufacturerPrice
 			product.ManufacturerPrice = oldManufacturerPrice
-			oldSalePrice := product.SalePrice
 			product.SalePrice = salePrice
-			oldStart := product.Start
 			product.Start = start
-			oldEnd := product.End
 			product.End = end
 			oldItemPrice := product.ItemPrice
 			product.ItemPrice = oldItemPrice
@@ -1809,73 +1806,98 @@ func putProductHandler(c *fiber.Ctx) error {
 			product.Width = width
 			product.Height = height
 			product.Depth = depth
-			oldVolume := product.Volume
 			product.Volume = volume
-			oldWeight := product.Weight
 			product.Weight = weight
-			oldWeightUnit := product.WeightUnit
 			product.WeightUnit = weightUnit
-			oldPackages := product.Packages
 			product.Packages = packages
-			oldAvailability := product.Availability
 			product.Availability = availability
-			oldSku := product.Sku
 			product.Sku = sku
-			oldStock := product.Stock
 			product.Stock = stock
 			product.ImageId = imageId
 			product.VendorId = vendorId
 			product.TimeId = timeId
 			product.Content = content
 			product.Customization = customization
-			if variations, err := models.GetProductVariations(common.Database, int(product.ID)); err == nil {
-				for _, variation := range variations {
-					if variation.Name == "default" {
-						if math.Abs(oldBasePrice - basePrice) > 0.01 {
-							variation.BasePrice = product.BasePrice
+			// Off => On
+			if container && !oldContainer {
+				if variations, err := models.GetProductVariations(common.Database, int(product.ID)); err == nil {
+					if len(variations) == 0 {
+						variation := &models.Variation{
+							Enabled: true,
+							Name: fmt.Sprintf("variation-1"), Title: fmt.Sprintf("Variation 1"),
+							BasePrice: basePrice, ManufacturerPrice: manufacturerPrice, SalePrice: salePrice,
+							ItemPrice: itemPrice, MinQuantity: minQuantity, MaxQuantity: maxQuantity,
+							PurchasableMultiply: purchasableMultiply, ProductId: product.ID, Pattern: pattern,
+							Dimensions: dimensions, DimensionUnit: dimensionUnit, Width: width, Height: height,
+							Depth: depth, Volume: volume, Weight: weight, WeightUnit: weightUnit, Packages: packages,
+							Availability: availability, TimeId: timeId, Sku: sku, Stock: stock,
 						}
-						if math.Abs(oldManufacturerPrice - manufacturerPrice) > 0.01 {
-							variation.ManufacturerPrice = product.ManufacturerPrice
-						}
-						if math.Abs(oldSalePrice - salePrice) > 0.01 {
-							variation.SalePrice = product.SalePrice
-						}
-						if math.Abs(oldItemPrice - itemPrice) > 0.01 {
-							variation.ItemPrice = product.ItemPrice
-						}
-						if !oldStart.Equal(start) {
-							variation.Start = product.Start
-						}
-						if !oldEnd.Equal(end) {
-							variation.End = product.End
-						}
-						if math.Abs(oldVolume - volume) > 0.01 {
-							variation.Volume = product.Volume
-						}
-						if math.Abs(oldWeight - weight) > 0.01 {
-							variation.Weight = product.Weight
-						}
-						if oldWeightUnit != weightUnit {
-							variation.WeightUnit = product.WeightUnit
-						}
-						if oldPackages != packages {
-							variation.Packages = product.Packages
-						}
-						if oldAvailability != availability {
-							variation.Availability = product.Availability
-						}
-						if oldSku != sku {
-							variation.Sku = product.Sku
-						}
-						if (oldStock != stock) {
-							variation.Stock = product.Stock
-						}
-						if err := models.UpdateVariation(common.Database, variation); err != nil {
-							logger.Warningf("%+v", err)
+						if vid, err := models.CreateVariation(common.Database, variation); err == nil {
+							m := make(map[uint]uint)
+							if properties, err := models.GetPropertiesByProductId(common.Database, int(product.ID)); err == nil {
+								var alpha []uint
+								for i := 0; i < len(properties); i++ {
+									properties[i].ID = 0
+									properties[i].ProductId = 0
+									properties[i].VariationId = vid
+									rates := properties[i].Rates
+									properties[i].Rates = []*models.Rate{}
+									for _, rate := range rates {
+										alpha = append(alpha, rate.ID)
+										rate.ID = 0
+										rate.Property = nil
+										rate.PropertyId = 0
+										properties[i].Rates = append(properties[i].Rates, rate)
+									}
+									variation.Properties = append(variation.Properties, properties[i])
+								}
+								if err = models.UpdateVariation(common.Database, variation); err != nil {
+									c.Status(http.StatusInternalServerError)
+									return c.JSON(HTTPError{err.Error()})
+								}
+								// then create save new ids
+								var beta []uint
+								for i := 0; i < len(properties); i++ {
+									for j := 0; j < len(properties[i].Rates); j++ {
+										beta = append(beta, properties[i].Rates[j].ID)
+									}
+								}
+								// this map contains old => new match
+								for i := 0; i < len(alpha); i++ {
+									m[alpha[i]] = beta[i]
+								}
+							}
+
+							if prices, err := models.GetPricesByProductId(common.Database, product.ID); err == nil {
+								for i := 0; i < len(prices); i++ {
+									prices[i].ID = 0
+									prices[i].ProductId = 0
+									prices[i].VariationId = vid
+									rates := prices[i].Rates
+									prices[i].Rates = []*models.Rate{}
+									for _, rate := range rates {
+										// update old ids to new
+										if v, found := m[rate.ID]; found {
+											rate.ID = v
+										}
+										prices[i].Rates = append(prices[i].Rates, rate)
+									}
+									variation.Prices = append(variation.Prices, prices[i])
+								}
+							}
+
+							if err = models.UpdateVariation(common.Database, variation); err != nil {
+								c.Status(http.StatusInternalServerError)
+								return c.JSON(HTTPError{err.Error()})
+							}
+						} else {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
 						}
 					}
 				}
 			}
+			//
 			if v, found := data.Value["Thumbnail"]; found && len(v) > 0 && v[0] == "" {
 				// To delete existing
 				if product.Thumbnail != "" {
