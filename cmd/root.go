@@ -485,6 +485,80 @@ var RootCmd = &cobra.Command{
 					return output, err
 				},
 			},
+			{
+				Timestamp: time.Date(2021, time.July, 30, 1, 0, 0, 0, now.Location()).Format(time.RFC3339),
+				Name: "Split Unit from Dimensions in Products",
+				Description: "Split Unit from Dimensions in Products",
+				Run: func() (string, error) {
+					var output string
+					var productsFound, dimensionsCreated, dimensionsUpdated int
+					if rows, err := common.Database.Raw("select id, dimensions from products where dimensions <> ?", "").Rows(); err == nil {
+						defer rows.Close()
+						for rows.Next() {
+							var id uint
+							var dimensions string
+							if err = rows.Scan(&id, &dimensions); err == nil {
+								if res := regexp.MustCompile(`^(.+?)\s*([cm]?m)?$`).FindStringSubmatch(dimensions); len(res) > 2 {
+									var unit string
+									if res[2] != "" {
+										unit = res[2]
+										dimensionsUpdated ++
+									}else if common.Config.DimensionUnit != "" {
+										unit = common.Config.DimensionUnit
+										dimensionsCreated ++
+									}
+									common.Database.Exec("update products set dimensions = ?, dimension_unit = ? where id = ?", res[1], unit, id)
+									if err = common.Database.Error; err != nil {
+										logger.Warningf("%+v", err)
+									}
+								}
+							}
+							productsFound ++
+						}
+						output = fmt.Sprintf("products found: %d, dimensions created: %d, dimensions updated: %d", productsFound, dimensionsCreated, dimensionsUpdated)
+					}else{
+						return output, err
+					}
+					return output, err
+				},
+			},
+			{
+				Timestamp: time.Date(2021, time.July, 30, 2, 0, 0, 0, now.Location()).Format(time.RFC3339),
+				Name: "Split Unit from Dimensions in Variations",
+				Description: "Split Unit from Dimensions in Variations",
+				Run: func() (string, error) {
+					var output string
+					var variationsFound, variationsCreated, variationsUpdated int
+					if rows, err := common.Database.Raw("select id, dimensions from variations where dimensions <> ?", "").Rows(); err == nil {
+						defer rows.Close()
+						for rows.Next() {
+							var id uint
+							var dimensions string
+							if err = rows.Scan(&id, &dimensions); err == nil {
+								if res := regexp.MustCompile(`^(.+?)\s*([cm]?m)?$`).FindStringSubmatch(dimensions); len(res) > 2 {
+									var unit string
+									if res[2] != "" {
+										unit = res[2]
+										variationsUpdated++
+									}else if common.Config.DimensionUnit != "" {
+										unit = common.Config.DimensionUnit
+										variationsCreated++
+									}
+									common.Database.Exec("update variations set dimensions = ?, dimension_unit = ? where id = ?", res[1], unit, id)
+									if err = common.Database.Error; err != nil {
+										logger.Warningf("%+v", err)
+									}
+								}
+							}
+							variationsFound++
+						}
+						output = fmt.Sprintf("variations found: %d, variations created: %d, variations updated: %d", variationsFound, variationsCreated, variationsUpdated)
+					}else{
+						return output, err
+					}
+					return output, err
+				},
+			},
 		}
 		var newMigrations []*models.Migration
 		if existingMigrations, err := models.GetMigrations(common.Database); err == nil {
