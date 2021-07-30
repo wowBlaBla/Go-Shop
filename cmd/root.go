@@ -470,6 +470,21 @@ var RootCmd = &cobra.Command{
 					return output, err
 				},
 			},
+			{
+				Timestamp: time.Date(2021, time.July, 30, 0, 0, 0, 0, now.Location()).Format(time.RFC3339),
+				Name: "Set Container",
+				Description: "To set Container = true if any variations exists",
+				Run: func() (string, error) {
+					var output string
+					common.Database.Exec("update products set products.container = true where id in (select products2.id from (select products.id, count(variations.id) as variations from products left join variations on products.id = variations.product_id group by products.id) as products2 where products2.variations > 0)")
+					if err = common.Database.Error; err == nil {
+						output = "products updated"
+					} else {
+						return output, err
+					}
+					return output, err
+				},
+			},
 		}
 		var newMigrations []*models.Migration
 		if existingMigrations, err := models.GetMigrations(common.Database); err == nil {

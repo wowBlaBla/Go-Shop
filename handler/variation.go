@@ -1187,7 +1187,6 @@ func delVariationHandler(c *fiber.Ctx) error {
 	if variation, err := models.GetVariation(common.Database, id); err == nil {
 		if variations, err := models.GetVariationsByProduct(common.Database, variation.ProductId); err == nil {
 			if len(variations) == 1 && id == int(variations[0].ID) {
-				logger.Infof("case1")
 				if product, err := models.GetProduct(common.Database, int(variation.ProductId)); err == nil {
 					product.BasePrice = variation.BasePrice
 					product.ManufacturerPrice = variation.ManufacturerPrice
@@ -1245,7 +1244,6 @@ func delVariationHandler(c *fiber.Ctx) error {
 					}
 				}
 			}else{
-				logger.Infof("case2")
 				for _, property := range variation.Properties {
 					for _, rate := range property.Rates {
 						if err = models.DeleteRate(common.Database, rate); err != nil {
