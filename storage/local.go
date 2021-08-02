@@ -69,6 +69,10 @@ func (local *LocalStorage) copy(src, dst string) error {
 	return os.Chtimes(dst, fi1.ModTime(), fi1.ModTime())
 }
 
+func (local *LocalStorage) Open() error{
+	return nil
+}
+
 // PutFile src - full local path to file, dst - relative path to file
 func (local *LocalStorage) PutFile(src, location string) (string, error) {
 	for _, suffix := range []string{"public", "static"} {
@@ -263,4 +267,8 @@ func (local *LocalStorage) ImageResize(src, sizes string) ([]Image, error) {
 		images = append(images, Image{Filename: filename, Size: fmt.Sprintf("%dw", width)})
 	}
 	return images, nil
+}
+
+func (local *LocalStorage) Close() error{
+	return nil
 }

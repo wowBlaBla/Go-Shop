@@ -158,6 +158,7 @@ var renderCmd = &cobra.Command{
 				if common.STORAGE, err = storage.NewAWSS3Storage(common.Config.Storage.S3.AccessKeyID,common.Config.Storage.S3.SecretAccessKey, common.Config.Storage.S3.Region, common.Config.Storage.S3.Bucket, common.Config.Storage.S3.Prefix, path.Join(dir, "temp", "s3"), common.Config.Resize.Quality, common.Config.Storage.S3.CDN, common.Config.Storage.S3.Rewrite); err != nil {
 					logger.Warningf("%+v", err)
 				}
+				defer common.STORAGE.Close()
 			}
 		}
 		// Files
@@ -535,7 +536,7 @@ var renderCmd = &cobra.Command{
 			logger.Infof("Products found: %v", len(products))
 			for i, product := range products {
 				if product.Enabled {
-					logger.Infof("[%d] Products ID: %+v Name: %v Title: %v", i, product.ID, product.Name, product.Title)
+					logger.Infof("[%d] Product ID: %+v Name: %v Title: %v", i, product.ID, product.Name, product.Title)
 					product, _ = models.GetProductFull(common.Database, int(product.ID))
 					if categories, err := models.GetCategoriesOfProduct(common.Database, product); err == nil {
 						var canonical string
@@ -1246,9 +1247,9 @@ var renderCmd = &cobra.Command{
 									variations2 = append(variations2, variation)
 								}
 								for _, variation2 := range product.Variations {
-									if variation2.Name != "default" {
+									//if variation2.Name != "default" {
 										variations2 = append(variations2, variation2)
-									}
+									//}
 								}
 								product.Variations = variations2
 								//
@@ -1301,8 +1302,8 @@ var renderCmd = &cobra.Command{
 													Availability: price.Availability,
 													Sku:          price.Sku,
 												}
-												if cache, err := models.GetCachePriceByPriceId(common.Database, price.ID); err == nil {
-													pricePF.Thumbnail = cache.Thumbnail
+												if v, found := CACHE_PRICES.Get(pricePF.Thumbnail); found {
+													pricePF.Thumbnail = v.(string)
 												}
 												variationView.Prices = append(variationView.Prices, pricePF)
 											}
@@ -1599,7 +1600,7 @@ var renderCmd = &cobra.Command{
 									}
 								}
 								// Cache
-								if _, err = models.CreateCacheProduct(common.Database, &models.CacheProduct{
+								cacheProduct := &models.CacheProduct{
 									ProductID:   product.ID,
 									Path:        fmt.Sprintf("/%s/", strings.Join(names, "/")),
 									Name:        product.Name,
@@ -1609,14 +1610,17 @@ var renderCmd = &cobra.Command{
 									Images:      strings.Join(images, ";"),
 									Variations:  strings.Join(variations, ";"),
 									CategoryID:  category.ID,
-									Price:       variations2[0].BasePrice,
 									Width:       product.Width,
 									Height:      product.Height,
 									Depth:       product.Depth,
 									Volume:      product.Volume,
 									Weight:      product.Weight,
 									Sku: product.Sku,
-								}); err != nil {
+								}
+								if len(variations2) > 0 {
+									cacheProduct.Price = variations2[0].BasePrice
+								}
+								if _, err = models.CreateCacheProduct(common.Database, cacheProduct); err != nil {
 									logger.Warningf("%v", err)
 								}
 							}

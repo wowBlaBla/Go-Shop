@@ -15,6 +15,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io/ioutil"
+	"math/rand"
 	"net/url"
 	"os"
 	"path"
@@ -57,6 +58,8 @@ func NewAWSS3Storage(accessKeyID, secretAccessKey, region, bucket, prefix string
 	}
 	storage.temp = temp
 	//
+	storage.Open()
+	//
 	return storage, err
 }
 
@@ -66,11 +69,42 @@ type AWSS3Storage struct {
 	SecretAccessKey string
 	Region string
 	Bucket string
+	Database map[string]*AWSS3StorageItem
+	//
 	prefix string
 	temp string // full/path
 	quality int
 	cdn string
 	rewrite string
+}
+
+func (storage *AWSS3Storage) Open() error {
+	database := path.Join(storage.temp, "database.json")
+	storage.Database = make(map[string]*AWSS3StorageItem)
+	if _, err := os.Stat(database); err == nil {
+		if bts, err := ioutil.ReadFile(database); err == nil {
+			if err = json.Unmarshal(bts, &storage.Database); err != nil {
+				storage.Database = make(map[string]*AWSS3StorageItem)
+				return err
+			}
+		}else{
+			return err
+		}
+	}
+	return nil
+}
+
+func (storage *AWSS3Storage) Save() error {
+	database := path.Join(storage.temp, "database.json")
+	if bts, err := json.Marshal(storage.Database); err == nil {
+		return ioutil.WriteFile(database, bts, 0755)
+	} else {
+		return err
+	}
+}
+
+func (storage *AWSS3Storage) Close() error {
+	return storage.Save()
 }
 
 type AWSS3StorageItem struct {
@@ -150,9 +184,8 @@ func (storage *AWSS3Storage) PutFile(src, location string) (string, error) {
 	if err != nil {
 		return location, err
 	}
-	if fi2, err := os.Stat(dst + ".json"); err != nil || !fi1.ModTime().Equal(fi2.ModTime()) {
-		//logger.Infof("case1: %+v", dst + ".json")
-		// Upload original
+	// //
+	if item, found := storage.Database[location]; !found || fi1.ModTime().Sub(item.Modified) > time.Second {
 		if url, err := storage.upload(src, location); err == nil {
 			urls[location] = &AWSS3StorageItem{
 				Created:  time.Now(),
@@ -164,38 +197,19 @@ func (storage *AWSS3Storage) PutFile(src, location string) (string, error) {
 		} else {
 			return location, err
 		}
-	} else {
-		//logger.Infof("case2: %+v", dst + ".json")
-		if bts, err := ioutil.ReadFile(dst + ".json"); err == nil {
-			var item *AWSS3StorageItem
-			if err = json.Unmarshal(bts, &item); err == nil {
-				location = storage.rw(item.Url)
-			} else {
-				logger.Warningf("%v", err)
-			}
-		}else{
-			logger.Warningf("%v", err)
-		}
+	}else{
+		location = storage.rw(item.Url)
 	}
 
 	for key, value := range urls {
-		//logger.Infof("%v: %+v", key, value)
-		if bts, err := json.Marshal(value); err == nil {
-			file := path.Join(storage.temp, key + ".json")
-			if err = ioutil.WriteFile(file, bts, 0755); err == nil {
-				if err = os.Chtimes(file, value.Modified, value.Modified); err != nil {
-					logger.Warningf("%v", err)
-				}
-			}else{
-				logger.Warningf("%v", err)
-			}
-		}
+		storage.Database[key] = value
 	}
 
 	return location, err
 }
 
 func (storage *AWSS3Storage) DeleteFile(location string) (error) {
+	delete(storage.Database, location)
 	return storage.delete(location)
 }
 
@@ -214,9 +228,7 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 	if err != nil {
 		return locations, err
 	}
-	if fi2, err := os.Stat(dst + ".json"); err != nil || !fi1.ModTime().Equal(fi2.ModTime()) {
-		//logger.Infof("case1: %+v", dst + ".json")
-		// Upload original
+	if item, found := storage.Database[location]; !found || fi1.ModTime().Sub(item.Modified) > time.Second {
 		if url, err := storage.upload(src, location); err == nil {
 			urls[location] = &AWSS3StorageItem{
 				Created:  time.Now(),
@@ -228,19 +240,8 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 		} else {
 			return locations, err
 		}
-	} else {
-		//logger.Infof("case2: %+v", dst + ".json")
-		if bts, err := ioutil.ReadFile(dst + ".json"); err == nil {
-			var item *AWSS3StorageItem
-			if err = json.Unmarshal(bts, &item); err == nil {
-				//logger.Infof("item: %+v", item)
-				locations = append(locations, storage.rw(item.Url))
-			} else {
-				logger.Warningf("%v", err)
-			}
-		}else{
-			logger.Warningf("%v", err)
-		}
+	}else{
+		locations = append(locations, storage.rw(item.Url))
 	}
 	if sizes != "" {
 		var img image.Image
@@ -266,7 +267,9 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 			filename = filename[:len(filename) - len(filepath.Ext(filename))]
 			filename = fmt.Sprintf("%s_%d_%dx%d%s", filename, storage.quality, width, height, filepath.Ext(src))
 			dst2 := path.Join(path.Dir(dst), "resize", filename)
-			if fi2, err := os.Stat(dst2 + ".json"); err != nil || !fi1.ModTime().Equal(fi2.ModTime()) {
+			// //
+			key := path.Join(path.Dir(location), "resize", filename)
+			if item, found := storage.Database[key]; !found || fi1.ModTime().Sub(item.Modified) > time.Second {
 				if img == nil {
 					file, err := os.Open(src)
 					if err != nil {
@@ -322,41 +325,24 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 					return locations, err
 				}
 			}else{
-				//logger.Infof("case4: %+v", dst2 + ".json")
-				if bts, err := ioutil.ReadFile(dst2 + ".json"); err == nil {
-					var item *AWSS3StorageItem
-					if err = json.Unmarshal(bts, &item); err == nil {
-						//logger.Infof("item: %+v", item)
-						locations = append(locations, fmt.Sprintf("%s?%s %dw", storage.rw(item.Url), strconv.FormatInt(time.Now().Unix(), 36), width))
-					} else {
-						logger.Warningf("%v", err)
-					}
-				}else{
-					logger.Warningf("%v", err)
-				}
+				locations = append(locations, fmt.Sprintf("%s?%s %dw", storage.rw(item.Url), strconv.FormatInt(time.Now().Unix(), 36), width))
 			}
 		}
 	}
-	//logger.Infof("urls: %+v", len(urls))
 	for key, value := range urls {
-		//logger.Infof("%v: %+v", key, value)
-		if bts, err := json.Marshal(value); err == nil {
-			file := path.Join(storage.temp, key + ".json")
-			if err = ioutil.WriteFile(file, bts, 0755); err == nil {
-				if err = os.Chtimes(file, value.Modified, value.Modified); err != nil {
-					logger.Warningf("%v", err)
-				}
-			}else{
-				logger.Warningf("%v", err)
-			}
+		storage.Database[key] = value
+	}
+	if rand.Intn(10) == 0 {
+		if err = storage.Save(); err != nil {
+			logger.Warningf("%+v", err)
 		}
 	}
-
 	return locations, nil
 }
 
 func (storage *AWSS3Storage) DeleteImage(location, sizes string) error {
 	var err error
+	delete(storage.Database, location)
 	if err = storage.delete(location); err != nil {
 		return err
 	}
@@ -373,6 +359,7 @@ func (storage *AWSS3Storage) DeleteImage(location, sizes string) error {
 		filename := path.Base(location)
 		filename = filename[:len(filename) - len(filepath.Ext(filename))]
 		filename = fmt.Sprintf("%s_%dx%d%s", filename, width, height, filepath.Ext(location))
+		delete(storage.Database, path.Join(path.Dir(location), "resize", filename))
 		if err = storage.delete(path.Join(path.Dir(location), "resize", filename)); err != nil {
 			logger.Warningf("%+v", err)
 		}
