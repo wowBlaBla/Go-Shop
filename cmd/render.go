@@ -538,6 +538,44 @@ var renderCmd = &cobra.Command{
 				if product.Enabled {
 					logger.Infof("[%d] Product ID: %+v Name: %v Title: %v", i, product.ID, product.Name, product.Title)
 					product, _ = models.GetProductFull(common.Database, int(product.ID))
+					// Common actions independent of category
+					var variations []string
+					if !product.Container {
+						variation := &models.Variation{
+							ID:           0,
+							Enabled: true,
+							Name:         "default",
+							Title:        "Default",
+							Thumbnail:    product.Thumbnail,
+							Properties:   product.Properties,
+							BasePrice:    product.BasePrice,
+							ManufacturerPrice: product.ManufacturerPrice,
+							SalePrice:    product.SalePrice,
+							Start:        product.Start,
+							End:          product.End,
+							ItemPrice: product.ItemPrice,
+							MinQuantity: product.MinQuantity,
+							MaxQuantity: product.MaxQuantity,
+							PurchasableMultiply: product.PurchasableMultiply,
+							Prices: product.Prices,
+							Dimensions: product.Dimensions,
+							DimensionUnit: product.DimensionUnit,
+							Width:        product.Width,
+							Height:       product.Height,
+							Depth:        product.Depth,
+							Volume:       product.Volume,
+							Weight:       product.Weight,
+							Packages:     product.Packages,
+							Availability: product.Availability,
+							Time:         product.Time,
+							Sku:          product.Sku,
+							ProductId:    product.ID,
+						}
+						if product.Variation != "" {
+							variation.Title = product.Variation
+						}
+						product.Variations = append([]*models.Variation{variation}, product.Variations...)
+					}
 					if categories, err := models.GetCategoriesOfProduct(common.Database, product); err == nil {
 						var canonical string
 						for i, category := range categories {
@@ -1208,51 +1246,6 @@ var renderCmd = &cobra.Command{
 								}
 								var basePriceMin float64
 								//
-								var variations []string
-								variation := &models.Variation{
-									ID:           0,
-									Enabled: true,
-									Name:         "default",
-									Title:        "Default",
-									Thumbnail:    product.Thumbnail,
-									Properties:   product.Properties,
-									BasePrice:    product.BasePrice,
-									ManufacturerPrice: product.ManufacturerPrice,
-									SalePrice:    product.SalePrice,
-									Start:        product.Start,
-									End:          product.End,
-									ItemPrice: product.ItemPrice,
-									MinQuantity: product.MinQuantity,
-									MaxQuantity: product.MaxQuantity,
-									PurchasableMultiply: product.PurchasableMultiply,
-									Prices: product.Prices,
-									Dimensions: product.Dimensions,
-									DimensionUnit: product.DimensionUnit,
-									Width:        product.Width,
-									Height:       product.Height,
-									Depth:        product.Depth,
-									Volume:       product.Volume,
-									Weight:       product.Weight,
-									Packages:     product.Packages,
-									Availability: product.Availability,
-									Time:         product.Time,
-									Sku:          product.Sku,
-									ProductId:    product.ID,
-								}
-								if product.Variation != "" {
-									variation.Title = product.Variation
-								}
-								var variations2 []*models.Variation
-								if !product.Container {
-									variations2 = append(variations2, variation)
-								}
-								for _, variation2 := range product.Variations {
-									//if variation2.Name != "default" {
-										variations2 = append(variations2, variation2)
-									//}
-								}
-								product.Variations = variations2
-								//
 								if len(product.Variations) > 0 {
 									productFile.BasePrice = fmt.Sprintf("%.2f", product.Variations[0].BasePrice)
 									if product.Variations[0].SalePrice > 0 && product.Variations[0].Start.Before(now) && product.Variations[0].End.After(now){
@@ -1418,42 +1411,42 @@ var renderCmd = &cobra.Command{
 													Name:  property.Name,
 													Title: property.Title,
 												}
-												for h, price := range property.Rates {
+												for h, rate := range property.Rates {
 													valueView := common.ValuePF{
-														Id:          price.Value.ID,
-														Enabled:     price.Enabled,
-														Title:       price.Value.Title,
-														Description: price.Value.Description,
-														Color:       price.Value.Color,
+														Id:          rate.Value.ID,
+														Enabled:     rate.Enabled,
+														Title:       rate.Value.Title,
+														Description: rate.Value.Description,
+														Color:       rate.Value.Color,
 														//Thumbnail: price.Value.Thumbnail,
-														Value:        price.Value.Value,
-														Availability: price.Value.Availability,
+														Value:        rate.Value.Value,
+														Availability: rate.Value.Availability,
 														Price: common.RatePF{
-															Id:           price.ID,
-															Price:        price.Price,
-															Availability: price.Availability,
-															Sku:          price.Sku,
+															Id:           rate.ID,
+															Price:        rate.Price,
+															Availability: rate.Availability,
+															Sku:          rate.Sku,
 														},
 														Selected: h == 0,
 													}
 													// Thumbnail
-													if price.Value.Thumbnail != "" {
+													if rate.Value.Thumbnail != "" {
 														// p1 => thumbnails
-														if v, found := CACHE_VALUES.Get(price.Value.Thumbnail); !found {
-															if p1 := path.Join(dir, "storage", price.Value.Thumbnail); len(p1) > 0 {
+														if v, found := CACHE_VALUES.Get(rate.Value.Thumbnail); !found {
+															if p1 := path.Join(dir, "storage", rate.Value.Thumbnail); len(p1) > 0 {
 																if fi, err := os.Stat(p1); err == nil {
 																	filename := filepath.Base(p1)
 																	filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
 																	logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
 																	if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 																		valueView.Thumbnail = strings.Join(thumbnails, ",")
-																		CACHE_VALUES.Set(price.Value.Thumbnail, valueView.Thumbnail)
+																		CACHE_VALUES.Set(rate.Value.Thumbnail, valueView.Thumbnail)
 																		//
 																		if _, err = models.CreateCacheValue(common.Database, &models.CacheValue{
-																			ValueID:   price.Value.ID,
-																			Title:     price.Value.Title,
+																			ValueID:   rate.Value.ID,
+																			Title:     rate.Value.Title,
 																			Thumbnail: valueView.Thumbnail,
-																			Value:     price.Value.Value,
+																			Value:     rate.Value.Value,
 																		}); err != nil {
 																			logger.Warningf("%v", err)
 																		}
@@ -1617,8 +1610,8 @@ var renderCmd = &cobra.Command{
 									Weight:      product.Weight,
 									Sku: product.Sku,
 								}
-								if len(variations2) > 0 {
-									cacheProduct.Price = variations2[0].BasePrice
+								if len(product.Variations) > 0 {
+									cacheProduct.Price = product.Variations[0].BasePrice
 								}
 								if _, err = models.CreateCacheProduct(common.Database, cacheProduct); err != nil {
 									logger.Warningf("%v", err)
@@ -1650,7 +1643,7 @@ var renderCmd = &cobra.Command{
 			logger.Warningf("%+v", err)
 		}
 		// Options
-		if options, err := models.GetOptions(common.Database); err == nil {
+		/*if options, err := models.GetOptions(common.Database); err == nil {
 			if remove {
 				if err := os.RemoveAll(path.Join(output, "options")); err != nil {
 					logger.Infof("%v", err)
@@ -1715,7 +1708,7 @@ var renderCmd = &cobra.Command{
 					}
 				}
 			}
-		}
+		}*/
 		// Transports
 		if transports, err := models.GetTransports(common.Database); err == nil {
 			for _, transport := range transports {

@@ -559,6 +559,36 @@ var RootCmd = &cobra.Command{
 					return output, err
 				},
 			},
+			{
+				Timestamp: time.Date(2021, time.August, 3, 0, 0, 0, 0, now.Location()).Format(time.RFC3339),
+				Name: "Enable Prices by default",
+				Description: "To set Enabled = true for all prices created earlier",
+				Run: func() (string, error) {
+					var output string
+					common.Database.Exec("update prices set enabled = ?", true)
+					if err = common.Database.Error; err == nil {
+						output = "prices updated"
+					} else {
+						return output, err
+					}
+					return output, err
+				},
+			},
+			{
+				Timestamp: time.Date(2021, time.August, 3, 1, 0, 0, 0, now.Location()).Format(time.RFC3339),
+				Name: "Enable Rates by default",
+				Description: "To set Enabled = true for all rates created earlier",
+				Run: func() (string, error) {
+					var output string
+					common.Database.Exec("update rates set enabled = ?", true)
+					if err = common.Database.Error; err == nil {
+						output = "rates updated"
+					} else {
+						return output, err
+					}
+					return output, err
+				},
+			},
 		}
 		var newMigrations []*models.Migration
 		if existingMigrations, err := models.GetMigrations(common.Database); err == nil {
