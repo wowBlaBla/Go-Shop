@@ -539,6 +539,246 @@ var renderCmd = &cobra.Command{
 					logger.Infof("[%d] Product ID: %+v Name: %v Title: %v", i, product.ID, product.Name, product.Title)
 					product, _ = models.GetProductFull(common.Database, int(product.ID))
 					// Common actions independent of category
+					productFile := &common.ProductFile{
+						ID:         product.ID,
+						Date:       time.Now(),
+						Title:      product.Title,
+						Type:       "products",
+					}
+					productView := common.ProductPF{
+						Id:         product.ID,
+						Name:       product.Name,
+						Title:      product.Title,
+					}
+					if product.Type != "" {
+						productView.Type = product.Type
+					}else {
+						productView.Type = "swatch"
+					}
+					if product.Size != "" {
+						productView.Size = product.Size
+					}else {
+						productView.Size = "medium"
+					}
+					productView.Description = reTags.ReplaceAllString(product.Description, "")
+					productView.Description = reSpace.ReplaceAllString(product.Description, " ")
+					if len(productView.Description) > 160 {
+						productView.Description = productView.Description[:160]
+					}
+					// Process thumbnail
+					//var thumbnails []string
+					if product.Image != nil {
+						if p1 := path.Join(dir, "storage", product.Image.Path); len(p1) > 0 {
+							if fi, err := os.Stat(p1); err == nil {
+								name := product.Name
+								if len(name) > 32 {
+									name = name[:32]
+								}
+								name = reSanitizeFilename.ReplaceAllString(name, "_")
+								filename := fmt.Sprintf("%d-%s-%d%v", product.ID, name, fi.ModTime().Unix(), path.Ext(p1))
+								location := path.Join("images", filename)
+								logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
+								if thumbnails, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Image.Size); err == nil {
+									productFile.Thumbnail = strings.Join(thumbnails, ",")
+									productView.Thumbnail = strings.Join(thumbnails, ",")
+								} else {
+									logger.Warningf("%v", err)
+								}
+							}
+						}
+					}
+					// Parameters
+					if len(product.Parameters) > 0 {
+						for _, parameter := range product.Parameters {
+							parameterView := common.ParameterPF{
+								Id:    parameter.ID,
+								Name:  parameter.Name,
+								Title: parameter.Title,
+							}
+							if parameter.Value != nil {
+								parameterView.Value = &common.ValuePPF{
+									Id:    parameter.Value.ID,
+									Title: parameter.Value.Title,
+									//Thumbnail: "",
+									Value: parameter.Value.Value,
+									Availability: parameter.Value.Availability,
+								}
+							} else {
+								parameterView.CustomValue = parameter.CustomValue
+							}
+							productView.Parameters = append(productView.Parameters, parameterView)
+						}
+					}
+					productFile.BasePrice = fmt.Sprintf("%.2f", product.BasePrice)
+					//productView.BasePrice = product.BasePrice
+					if product.SalePrice > 0 && product.Start.Before(now) && product.End.After(now){
+						productFile.SalePrice = fmt.Sprintf("%.2f", product.SalePrice)
+						//productView.SalePrice = product.SalePrice
+						productFile.Start = &product.Start
+						//productView.Start = &product.Start
+						productFile.End = &product.End
+						//productView.End = &product.End
+					}
+					if product.ItemPrice > 0 {
+						productFile.ItemPrice = fmt.Sprintf("%.2f", product.ItemPrice)
+					}
+					//productView.Dimensions = product.Dimensions
+					//productView.Weight = product.Weight
+					//productView.Availability = product.Availability
+					//productView.Sending = product.Sending
+					productView.CustomParameters = []common.CustomParameterPF{}
+					if product.CustomParameters != "" {
+						for _, line := range strings.Split(strings.TrimSpace(product.CustomParameters), "\n"){
+							if res := reKV.FindAllStringSubmatch(strings.TrimSpace(line), -1); len(res) > 0 && len(res[0]) > 1 {
+								parameter := common.CustomParameterPF{
+									Key:   res[0][1],
+								}
+								if len(res[0]) > 2 {
+									parameter.Value = res[0][2]
+								}
+								productView.CustomParameters = append(productView.CustomParameters, parameter)
+							}
+						}
+					}
+					// Related
+					rows, err := common.Database.Table("products_relations").Select("ProductIdL, ProductIdR").Where("ProductIdL = ? or ProductIdR = ?", product.ID, product.ID).Rows()
+					if err == nil {
+						var ids []uint
+						for rows.Next() {
+							var p struct {
+								ProductIdL uint
+								ProductIdR uint
+							}
+							if err = common.Database.ScanRows(rows, &p); err == nil {
+								if p.ProductIdL == product.ID {
+									var found bool
+									for _, id1 := range ids {
+										if id1 == p.ProductIdR {
+											found = true
+											break
+										}
+									}
+									if !found {
+										ids = append(ids, p.ProductIdR)
+									}
+								} else {
+									var found bool
+									for _, id1 := range ids {
+										if id1 == p.ProductIdL {
+											found = true
+											break
+										}
+									}
+									if !found {
+										ids = append(ids, p.ProductIdL)
+									}
+								}
+							} else {
+								logger.Errorf("%v", err)
+							}
+						}
+						rows.Close()
+						for _, id := range ids {
+							if id < product.ID {
+								productFile.Related = append(productFile.Related, fmt.Sprintf("%d-%d", id, product.ID))
+							}else{
+								productFile.Related = append(productFile.Related, fmt.Sprintf("%d-%d", product.ID, id))
+							}
+						}
+					}
+					// Copy images
+					var images []string
+					if len(product.Images) > 0 {
+						for i, image := range product.Images {
+							if image.Path != "" {
+								if v, found := CACHE_IMAGES.Get(image.Path); !found {
+									if p1 := path.Join(dir, "storage", image.Path); len(p1) > 0 {
+										if fi, err := os.Stat(p1); err == nil {
+											name := product.Name
+											if len(name) > 32 {
+												name = name[:32]
+											}
+											name = reSanitizeFilename.ReplaceAllString(name, "_")
+											filename := fmt.Sprintf("%d-%s-%d%v", image.ID, name, fi.ModTime().Unix(), path.Ext(p1))
+											location := path.Join("images", filename)
+											logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
+											if images2, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Image.Size); err == nil {
+												// Generate thumbnail
+												thumbnail := strings.Join(images2, ",")
+												if i == 0 || product.ImageId == image.ID {
+													productFile.Thumbnail = thumbnail
+													productView.Thumbnail = thumbnail
+													CACHE_IMAGES.Set(image.Path, thumbnail)
+												}
+												//
+												images = append(images, strings.Join(images2, ","))
+												//
+												// Cache
+												if _, err = models.CreateCacheImage(common.Database, &models.CacheImage{
+													ImageId:   image.ID,
+													Name:      image.Name,
+													Thumbnail: strings.Join(images2, ","),
+												}); err != nil {
+													logger.Warningf("%v", err)
+												}
+											} else {
+												logger.Warningf("%v", err)
+											}
+										}
+									}
+								}else{
+									thumbnail := v.(string)
+									if i == 0 || product.ImageId == image.ID {
+										productFile.Thumbnail = thumbnail
+										productView.Thumbnail = thumbnail
+									}
+									//
+									images = append(images, thumbnail)
+								}
+							}
+						}
+						productView.Images = images
+					}
+					// Copy files
+					var files []common.FilePF
+					if len(product.Files) > 0 {
+						for _, file := range product.Files {
+							if file.Path != "" {
+								if p1 := path.Join(dir, "storage", file.Path); len(p1) > 0 {
+									if fi, err := os.Stat(p1); err == nil {
+										name := product.Name + "-" + file.Name
+										if len(name) > 32 {
+											name = name[:32]
+										}
+										filename := fmt.Sprintf("%d-%s-%d%v", file.ID, name, fi.ModTime().Unix(), path.Ext(p1))
+										location := path.Join("files", filename)
+										logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
+										if url, err := common.STORAGE.PutFile(p1, location); err == nil {
+											files = append(files, common.FilePF{
+												Id:   file.ID,
+												Type: file.Type,
+												Name: file.Name,
+												Path: url,
+												Size: file.Size,
+											})
+											// Cache
+											if _, err = models.CreateCacheFile(common.Database, &models.CacheFile{
+												FileId:   file.ID,
+												Name: file.Name,
+												File: url,
+											}); err != nil {
+												logger.Warningf("%v", err)
+											}
+										} else {
+											logger.Warningf("%v", err)
+										}
+									}
+								}
+							}
+						}
+						productView.Files = files
+					}
+					//
 					var variations []string
 					if !product.Container {
 						variation := &models.Variation{
@@ -576,6 +816,314 @@ var renderCmd = &cobra.Command{
 						}
 						product.Variations = append([]*models.Variation{variation}, product.Variations...)
 					}
+					var basePriceMin float64
+					if len(product.Variations) > 0 {
+						productFile.BasePrice = fmt.Sprintf("%.2f", product.Variations[0].BasePrice)
+						if product.Variations[0].SalePrice > 0 && product.Variations[0].Start.Before(now) && product.Variations[0].End.After(now){
+							productFile.SalePrice = fmt.Sprintf("%.2f", product.Variations[0].SalePrice)
+							productFile.Start = &product.Variations[0].Start
+							productFile.End = &product.Variations[0].End
+						}
+						if product.Variations[0].ItemPrice > 0 {
+							productFile.ItemPrice = fmt.Sprintf("%.2f", product.Variations[0].ItemPrice)
+						}
+						for _, variation := range product.Variations {
+							if variation.Enabled {
+								variationView := common.VariationPF{
+									Id:    variation.ID,
+									Name:  variation.Name,
+									Title: variation.Title,
+									//Thumbnail:   variation.Thumbnail,
+									Description: variation.Description,
+									BasePrice:   variation.BasePrice,
+									ItemPrice:   variation.ItemPrice,
+									MinQuantity:   variation.MinQuantity,
+									MaxQuantity:   variation.MaxQuantity,
+									PurchasableMultiply:   variation.PurchasableMultiply,
+									//Dimensions: variation.Dimensions,
+									Pattern:      variation.Pattern,
+									Dimensions:   variation.Dimensions,
+									Width:        variation.Width,
+									Height:       variation.Height,
+									Depth:        variation.Depth,
+									Volume:       variation.Volume,
+									Weight:       variation.Weight,
+									Packages:     variation.Packages,
+									Availability: variation.Availability,
+									Sku:          variation.Sku,
+									Selected:     len(productView.Variations) == 0,
+								}
+								//
+								for _, price := range variation.Prices {
+									var ids []uint
+									for _, rate := range price.Rates {
+										ids = append(ids, rate.ID)
+									}
+									pricePF := common.PricePF{
+										Ids:          ids,
+										Thumbnail:    price.Thumbnail,
+										Price:        price.Price,
+										Availability: price.Availability,
+										Sku:          price.Sku,
+									}
+									if v, found := CACHE_PRICES.Get(pricePF.Thumbnail); found {
+										pricePF.Thumbnail = v.(string)
+									}
+									variationView.Prices = append(variationView.Prices, pricePF)
+								}
+								//
+								if variation.Time != nil {
+									variationView.Time = variation.Time.Title
+								}
+								// Images
+								if variationView.Id == 0 {
+									variationView.Images = images
+								} else if len(variation.Images) > 0 {
+									var images []string
+									for _, image := range variation.Images {
+										if image.Path != "" {
+											if p1 := path.Join(dir, "storage", image.Path); len(p1) > 0 {
+												if fi, err := os.Stat(p1); err == nil {
+													name := product.Name + "-" + variation.Name
+													if len(name) > 32 {
+														name = name[:32]
+													}
+													name = reSanitizeFilename.ReplaceAllString(name, "_")
+													filename := fmt.Sprintf("%d-%s-%d%v", image.ID, name, fi.ModTime().Unix(), path.Ext(p1))
+													logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", filename), fi.Size())
+													if images2, err := common.STORAGE.PutImage(p1, path.Join("images", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+														images = append(images, strings.Join(images2, ","))
+													} else {
+														logger.Warningf("%v", err)
+													}
+												}
+											}
+										}
+									}
+									variationView.Images = images
+									productView.Images = append(productView.Images, images...)
+								}
+								// Files
+								if variationView.Id == 0 {
+									variationView.Files = files
+								} else {
+									// Copy files
+									var files []common.FilePF
+									if len(variation.Files) > 0 {
+										for _, file := range variation.Files {
+											if file.Path != "" {
+												if p1 := path.Join(dir, "storage", file.Path); len(p1) > 0 {
+													if fi, err := os.Stat(p1); err == nil {
+														name := product.Name + "-" + file.Name
+														if len(name) > 32 {
+															name = name[:32]
+														}
+														filename := fmt.Sprintf("%d-%s-%d%v", file.ID, name, fi.ModTime().Unix(), path.Ext(p1))
+														location := path.Join("files", filename)
+														logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
+														if url, err := common.STORAGE.PutFile(p1, location); err == nil {
+															files = append(files, common.FilePF{
+																Id:   file.ID,
+																Type: file.Type,
+																Name: file.Name,
+																Path: url,
+																Size: file.Size,
+															})
+															// Cache
+															if _, err = models.CreateCacheFile(common.Database, &models.CacheFile{
+																FileId: file.ID,
+																Name:   file.Name,
+																File:   url,
+															}); err != nil {
+																logger.Warningf("%v", err)
+															}
+														} else {
+															logger.Warningf("%v", err)
+														}
+													}
+												}
+											}
+										}
+										variationView.Files = files
+										productView.Files = append(productView.Files, files...)
+									}
+								}
+
+								if variation.SalePrice > 0 && variation.Start.Before(now) && variation.End.After(now) {
+									variationView.SalePrice = variation.SalePrice
+									variationView.Start = &variation.Start
+									variationView.End = &variation.End
+								}
+
+								if basePriceMin > variation.BasePrice || basePriceMin < 0.01 {
+									basePriceMin = variation.BasePrice
+								}
+								// Thumbnail
+								if variation.Thumbnail != "" {
+									if p1 := path.Join(dir, "storage", variation.Thumbnail); len(p1) > 0 {
+										if fi, err := os.Stat(p1); err == nil {
+											filename := filepath.Base(p1)
+											filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+											logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "variations", filename), fi.Size())
+											if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "variations", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+												variationView.Thumbnail = strings.Join(thumbnails, ",")
+											} else {
+												logger.Warningf("%v", err)
+											}
+										}
+									}
+								}
+								variations = append(variations, strings.Join([]string{fmt.Sprintf("%d", variation.ID), variation.Title}, ","))
+								for _, property := range variation.Properties {
+									propertyView := common.PropertyPF{
+										Id:    property.ID,
+										Type:  property.Type,
+										Size:  property.Size,
+										Name:  property.Name,
+										Title: property.Title,
+									}
+									for h, rate := range property.Rates {
+										valueView := common.ValuePF{
+											Id:          rate.Value.ID,
+											Enabled:     rate.Enabled,
+											Title:       rate.Value.Title,
+											Description: rate.Value.Description,
+											Color:       rate.Value.Color,
+											//Thumbnail: price.Value.Thumbnail,
+											Value:        rate.Value.Value,
+											Availability: rate.Value.Availability,
+											Price: common.RatePF{
+												Id:           rate.ID,
+												Price:        rate.Price,
+												Availability: rate.Availability,
+												Sku:          rate.Sku,
+											},
+											Selected: h == 0,
+										}
+										// Thumbnail
+										if rate.Value.Thumbnail != "" {
+											// p1 => thumbnails
+											if v, found := CACHE_VALUES.Get(rate.Value.Thumbnail); !found {
+												if p1 := path.Join(dir, "storage", rate.Value.Thumbnail); len(p1) > 0 {
+													if fi, err := os.Stat(p1); err == nil {
+														filename := filepath.Base(p1)
+														filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
+														logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
+														if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+															valueView.Thumbnail = strings.Join(thumbnails, ",")
+															CACHE_VALUES.Set(rate.Value.Thumbnail, valueView.Thumbnail)
+															//
+															if _, err = models.CreateCacheValue(common.Database, &models.CacheValue{
+																ValueID:   rate.Value.ID,
+																Title:     rate.Value.Title,
+																Thumbnail: valueView.Thumbnail,
+																Value:     rate.Value.Value,
+															}); err != nil {
+																logger.Warningf("%v", err)
+															}
+														} else {
+															logger.Warningf("%v", err)
+														}
+													}
+												}
+											} else {
+												valueView.Thumbnail = v.(string)
+											}
+										}
+										propertyView.Values = append(propertyView.Values, valueView)
+									}
+									if len(propertyView.Values) > 0 {
+										variationView.Properties = append(variationView.Properties, propertyView)
+									}
+								}
+								productView.Variations = append(productView.Variations, variationView)
+								//variations = append(variations, strings.Join([]string{fmt.Sprintf("%d", variation.ID), variationView.Thumbnail}, ","))
+								// Cache
+								if _, err = models.CreateCacheVariation(common.Database, &models.CacheVariation{
+									VariationID: variation.ID,
+									Name:        variation.Name,
+									Title:       variation.Title,
+									Description: variation.Description,
+									Thumbnail:   variationView.Thumbnail,
+									BasePrice:   variation.BasePrice,
+								}); err != nil {
+									logger.Warningf("%v", err)
+								}
+							}
+						}
+					}
+					productView.Pattern = product.Pattern
+					productView.Dimensions = product.Dimensions
+					productView.DimensionUnit = product.DimensionUnit
+					productView.Volume = product.Volume
+					productView.Weight = product.Weight
+					productView.Availability = product.Availability
+					if product.Vendor != nil {
+						productView.Vendor = common.VendorPF{
+							Id:          product.Vendor.ID,
+							Name:        product.Vendor.Name,
+							Title:       product.Vendor.Title,
+							Thumbnail:   product.Vendor.Thumbnail,
+							Description: product.Vendor.Description,
+						}
+						if product.Vendor.Thumbnail != "" {
+							if cache, err := models.GetCacheVendorByVendorId(common.Database, product.VendorId); err == nil {
+								productView.Vendor.Thumbnail = cache.Thumbnail
+							}
+						}
+					}
+					if product.Time != nil {
+						productView.Time = product.Time.Title
+					}
+					productFile.Product = productView
+					for _, productTag := range product.Tags {
+						if productTag.Enabled {
+							tag := common.TagPF{Id: productTag.ID, Name: productTag.Name, Title: productTag.Title}
+							if productTag.Thumbnail != "" {
+								if cache, err := models.GetCacheTagByTagId(common.Database, productTag.ID); err == nil {
+									tag.Thumbnail = cache.Thumbnail
+								}
+							}
+							productFile.Tags = append(productFile.Tags, tag)
+						}
+					}
+					//productFile.Max = math.Round(product.Max * 100) / 100
+					//productFile.Votes = product.Votes
+					var max, votes int
+					if comments, err := models.GetCommentsByProduct(common.Database, product.ID); err == nil {
+						for _, comment := range comments {
+							if comment.Enabled {
+								commentPF := common.CommentPF{
+									Id:    comment.ID,
+									Uuid:  comment.Uuid,
+									Title: comment.Title,
+									Body:  comment.Body,
+									Max:   comment.Max,
+								}
+								if cache, err := models.GetCacheCommentByCommentId(common.Database, comment.ID); err == nil {
+									if cache.Images != "" {
+										commentPF.Images = strings.Split(cache.Images, ";")
+									}
+								}
+								if user, err := models.GetUser(common.Database, int(comment.UserId)); err == nil {
+									if user.Name != "" || user.Lastname != "" {
+										commentPF.Author = strings.TrimSpace(fmt.Sprintf("%s %s", user.Name, user.Lastname))
+									}else {
+										commentPF.Author = reTrimEmail.ReplaceAllString(user.Email, "$1")
+									}
+								}
+								productFile.Comments = append(productFile.Comments, commentPF)
+								max += comment.Max
+								votes++
+							}
+						}
+					}
+					if max > 0 && votes > 0 {
+						productFile.Max = math.Round((float64(max) / float64(votes)) * 100) / 100
+					}
+					productFile.Votes = votes
+					productFile.Description = product.Content
+					productFile.Content = product.Content
 					if categories, err := models.GetCategoriesOfProduct(common.Database, product); err == nil {
 						var canonical string
 						for i, category := range categories {
@@ -618,61 +1166,9 @@ var renderCmd = &cobra.Command{
 									}
 								}
 								//
-								productFile := &common.ProductFile{
-									ID:         product.ID,
-									Date:       time.Now(),
-									Title:      product.Title,
-									Type:       "products",
-									CategoryId: category.ID,
-								}
+								productFile.CategoryId = category.ID
 								if i > 0 {
 									productFile.Canonical = canonical
-								}
-								// Related
-								rows, err := common.Database.Table("products_relations").Select("ProductIdL, ProductIdR").Where("ProductIdL = ? or ProductIdR = ?", product.ID, product.ID).Rows()
-								if err == nil {
-									var ids []uint
-									for rows.Next() {
-										var p struct {
-											ProductIdL uint
-											ProductIdR uint
-										}
-										if err = common.Database.ScanRows(rows, &p); err == nil {
-											if p.ProductIdL == product.ID {
-												var found bool
-												for _, id1 := range ids {
-													if id1 == p.ProductIdR {
-														found = true
-														break
-													}
-												}
-												if !found {
-													ids = append(ids, p.ProductIdR)
-												}
-											} else {
-												var found bool
-												for _, id1 := range ids {
-													if id1 == p.ProductIdL {
-														found = true
-														break
-													}
-												}
-												if !found {
-													ids = append(ids, p.ProductIdL)
-												}
-											}
-										} else {
-											logger.Errorf("%v", err)
-										}
-									}
-									rows.Close()
-									for _, id := range ids {
-										if id < product.ID {
-											productFile.Related = append(productFile.Related, fmt.Sprintf("%d-%d", id, product.ID))
-										}else{
-											productFile.Related = append(productFile.Related, fmt.Sprintf("%d-%d", product.ID, id))
-										}
-									}
 								}
 								//
 								var arr = []string{}
@@ -1049,511 +1545,18 @@ var renderCmd = &cobra.Command{
 									}
 									productFile.Categories = append(productFile.Categories, category.Title)
 								}
-								productView := common.ProductPF{
-									Id:         product.ID,
-									CategoryId: category.ID,
-									Name:       product.Name,
-									Title:      product.Title,
-								}
-								if product.Type != "" {
-									productView.Type = product.Type
-								}else {
-									productView.Type = "swatch"
-								}
-								if product.Size != "" {
-									productView.Size = product.Size
-								}else {
-									productView.Size = "medium"
-								}
-								productView.Description = reTags.ReplaceAllString(product.Description, "")
-								productView.Description = reSpace.ReplaceAllString(product.Description, " ")
-								if len(productView.Description) > 160 {
-									productView.Description = productView.Description[:160]
-								}
-								// Process thumbnail
-								//var thumbnails []string
-								if product.Image != nil {
-									if p1 := path.Join(dir, "storage", product.Image.Path); len(p1) > 0 {
-										if fi, err := os.Stat(p1); err == nil {
-											name := product.Name
-											if len(name) > 32 {
-												name = name[:32]
-											}
-											name = reSanitizeFilename.ReplaceAllString(name, "_")
-											filename := fmt.Sprintf("%d-%s-%d%v", product.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-											location := path.Join("images", filename)
-											logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
-											if thumbnails, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Image.Size); err == nil {
-												productFile.Thumbnail = strings.Join(thumbnails, ",")
-												productView.Thumbnail = strings.Join(thumbnails, ",")
-											} else {
-												logger.Warningf("%v", err)
-											}
-										}
-									}
-								}
-								// Copy images
-								var images []string
-								if len(product.Images) > 0 {
-									for i, image := range product.Images {
-										if image.Path != "" {
-											if v, found := CACHE_IMAGES.Get(image.Path); !found {
-												if p1 := path.Join(dir, "storage", image.Path); len(p1) > 0 {
-													if fi, err := os.Stat(p1); err == nil {
-														name := product.Name
-														if len(name) > 32 {
-															name = name[:32]
-														}
-														name = reSanitizeFilename.ReplaceAllString(name, "_")
-														filename := fmt.Sprintf("%d-%s-%d%v", image.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-														location := path.Join("images", filename)
-														logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
-														if images2, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Image.Size); err == nil {
-															// Generate thumbnail
-															thumbnail := strings.Join(images2, ",")
-															if i == 0 || product.ImageId == image.ID {
-																productFile.Thumbnail = thumbnail
-																productView.Thumbnail = thumbnail
-																CACHE_IMAGES.Set(image.Path, thumbnail)
-															}
-															//
-															images = append(images, strings.Join(images2, ","))
-															//
-															// Cache
-															if _, err = models.CreateCacheImage(common.Database, &models.CacheImage{
-																ImageId:   image.ID,
-																Name:      image.Name,
-																Thumbnail: strings.Join(images2, ","),
-															}); err != nil {
-																logger.Warningf("%v", err)
-															}
-														} else {
-															logger.Warningf("%v", err)
-														}
-													}
-												}
-											}else{
-												thumbnail := v.(string)
-												if i == 0 || product.ImageId == image.ID {
-													productFile.Thumbnail = thumbnail
-													productView.Thumbnail = thumbnail
-												}
-												//
-												images = append(images, thumbnail)
-											}
-										}
-									}
-									productView.Images = images
-								}
-								// Copy files
-								var files []common.FilePF
-								if len(product.Files) > 0 {
-									for _, file := range product.Files {
-										if file.Path != "" {
-											if p1 := path.Join(dir, "storage", file.Path); len(p1) > 0 {
-												if fi, err := os.Stat(p1); err == nil {
-													name := product.Name + "-" + file.Name
-													if len(name) > 32 {
-														name = name[:32]
-													}
-													filename := fmt.Sprintf("%d-%s-%d%v", file.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-													location := path.Join("files", filename)
-													logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
-													if url, err := common.STORAGE.PutFile(p1, location); err == nil {
-														files = append(files, common.FilePF{
-															Id:   file.ID,
-															Type: file.Type,
-															Name: file.Name,
-															Path: url,
-															Size: file.Size,
-														})
-														// Cache
-														if _, err = models.CreateCacheFile(common.Database, &models.CacheFile{
-															FileId:   file.ID,
-															Name: file.Name,
-															File: url,
-														}); err != nil {
-															logger.Warningf("%v", err)
-														}
-													} else {
-														logger.Warningf("%v", err)
-													}
-												}
-											}
-										}
-									}
-									productView.Files = files
-								}
-								//
-								if len(product.Parameters) > 0 {
-									for _, parameter := range product.Parameters {
-										parameterView := common.ParameterPF{
-											Id:    parameter.ID,
-											Name:  parameter.Name,
-											Title: parameter.Title,
-										}
-										if parameter.Value != nil {
-											parameterView.Value = &common.ValuePPF{
-												Id:    parameter.Value.ID,
-												Title: parameter.Value.Title,
-												//Thumbnail: "",
-												Value: parameter.Value.Value,
-												Availability: parameter.Value.Availability,
-											}
-										} else {
-											parameterView.CustomValue = parameter.CustomValue
-										}
-										productView.Parameters = append(productView.Parameters, parameterView)
-									}
-								}
-								productFile.BasePrice = fmt.Sprintf("%.2f", product.BasePrice)
-								//productView.BasePrice = product.BasePrice
-								if product.SalePrice > 0 && product.Start.Before(now) && product.End.After(now){
-									productFile.SalePrice = fmt.Sprintf("%.2f", product.SalePrice)
-									//productView.SalePrice = product.SalePrice
-									productFile.Start = &product.Start
-									//productView.Start = &product.Start
-									productFile.End = &product.End
-									//productView.End = &product.End
-								}
-								if product.ItemPrice > 0 {
-									productFile.ItemPrice = fmt.Sprintf("%.2f", product.ItemPrice)
-								}
-								//productView.Dimensions = product.Dimensions
-								//productView.Weight = product.Weight
-								//productView.Availability = product.Availability
-								//productView.Sending = product.Sending
-								productView.CustomParameters = []common.CustomParameterPF{}
-								if product.CustomParameters != "" {
-									for _, line := range strings.Split(strings.TrimSpace(product.CustomParameters), "\n"){
-										if res := reKV.FindAllStringSubmatch(strings.TrimSpace(line), -1); len(res) > 0 && len(res[0]) > 1 {
-											parameter := common.CustomParameterPF{
-												Key:   res[0][1],
-											}
-											if len(res[0]) > 2 {
-												parameter.Value = res[0][2]
-											}
-											productView.CustomParameters = append(productView.CustomParameters, parameter)
-										}
-									}
-								}
-								if p := path.Join(p1, product.Name); p != "" {
+								productView.CategoryId = category.ID
+
+								/*if p := path.Join(p1, product.Name); p != "" {
 									if _, err := os.Stat(p); err != nil {
 										if err = os.MkdirAll(p, 0755); err != nil {
 											logger.Warningf("%v", err)
 										}
 									}
-								}
-								var basePriceMin float64
-								//
-								if len(product.Variations) > 0 {
-									productFile.BasePrice = fmt.Sprintf("%.2f", product.Variations[0].BasePrice)
-									if product.Variations[0].SalePrice > 0 && product.Variations[0].Start.Before(now) && product.Variations[0].End.After(now){
-										productFile.SalePrice = fmt.Sprintf("%.2f", product.Variations[0].SalePrice)
-										productFile.Start = &product.Variations[0].Start
-										productFile.End = &product.Variations[0].End
-									}
-									if product.Variations[0].ItemPrice > 0 {
-										productFile.ItemPrice = fmt.Sprintf("%.2f", product.Variations[0].ItemPrice)
-									}
-									for _, variation := range product.Variations {
-										if variation.Enabled {
-											variationView := common.VariationPF{
-												Id:    variation.ID,
-												Name:  variation.Name,
-												Title: variation.Title,
-												//Thumbnail:   variation.Thumbnail,
-												Description: variation.Description,
-												BasePrice:   variation.BasePrice,
-												ItemPrice:   variation.ItemPrice,
-												MinQuantity:   variation.MinQuantity,
-												MaxQuantity:   variation.MaxQuantity,
-												PurchasableMultiply:   variation.PurchasableMultiply,
-												//Dimensions: variation.Dimensions,
-												Pattern:      variation.Pattern,
-												Dimensions:   variation.Dimensions,
-												Width:        variation.Width,
-												Height:       variation.Height,
-												Depth:        variation.Depth,
-												Volume:       variation.Volume,
-												Weight:       variation.Weight,
-												Packages:     variation.Packages,
-												Availability: variation.Availability,
-												Sku:          variation.Sku,
-												Selected:     len(productView.Variations) == 0,
-											}
-											//
-											for _, price := range variation.Prices {
-												var ids []uint
-												for _, rate := range price.Rates {
-													ids = append(ids, rate.ID)
-												}
-												pricePF := common.PricePF{
-													Ids:          ids,
-													Thumbnail:    price.Thumbnail,
-													Price:        price.Price,
-													Availability: price.Availability,
-													Sku:          price.Sku,
-												}
-												if v, found := CACHE_PRICES.Get(pricePF.Thumbnail); found {
-													pricePF.Thumbnail = v.(string)
-												}
-												variationView.Prices = append(variationView.Prices, pricePF)
-											}
-											//
-											if variation.Time != nil {
-												variationView.Time = variation.Time.Title
-											}
-											// Images
-											if variationView.Id == 0 {
-												variationView.Images = images
-											} else if len(variation.Images) > 0 {
-												var images []string
-												for _, image := range variation.Images {
-													if image.Path != "" {
-														if p1 := path.Join(dir, "storage", image.Path); len(p1) > 0 {
-															if fi, err := os.Stat(p1); err == nil {
-																name := product.Name + "-" + variation.Name
-																if len(name) > 32 {
-																	name = name[:32]
-																}
-																name = reSanitizeFilename.ReplaceAllString(name, "_")
-																filename := fmt.Sprintf("%d-%s-%d%v", image.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-																logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", filename), fi.Size())
-																if images2, err := common.STORAGE.PutImage(p1, path.Join("images", filename), common.Config.Resize.Thumbnail.Size); err == nil {
-																	images = append(images, strings.Join(images2, ","))
-																} else {
-																	logger.Warningf("%v", err)
-																}
-															}
-														}
-													}
-												}
-												variationView.Images = images
-												productView.Images = append(productView.Images, images...)
-											}
-											// Files
-											if variationView.Id == 0 {
-												variationView.Files = files
-											} else {
-												// Copy files
-												var files []common.FilePF
-												if len(variation.Files) > 0 {
-													for _, file := range variation.Files {
-														if file.Path != "" {
-															if p1 := path.Join(dir, "storage", file.Path); len(p1) > 0 {
-																if fi, err := os.Stat(p1); err == nil {
-																	name := product.Name + "-" + file.Name
-																	if len(name) > 32 {
-																		name = name[:32]
-																	}
-																	filename := fmt.Sprintf("%d-%s-%d%v", file.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-																	location := path.Join("files", filename)
-																	logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
-																	if url, err := common.STORAGE.PutFile(p1, location); err == nil {
-																		files = append(files, common.FilePF{
-																			Id:   file.ID,
-																			Type: file.Type,
-																			Name: file.Name,
-																			Path: url,
-																			Size: file.Size,
-																		})
-																		// Cache
-																		if _, err = models.CreateCacheFile(common.Database, &models.CacheFile{
-																			FileId: file.ID,
-																			Name:   file.Name,
-																			File:   url,
-																		}); err != nil {
-																			logger.Warningf("%v", err)
-																		}
-																	} else {
-																		logger.Warningf("%v", err)
-																	}
-																}
-															}
-														}
-													}
-													variationView.Files = files
-													productView.Files = append(productView.Files, files...)
-												}
-											}
+								}*/
 
-											if variation.SalePrice > 0 && variation.Start.Before(now) && variation.End.After(now) {
-												variationView.SalePrice = variation.SalePrice
-												variationView.Start = &variation.Start
-												variationView.End = &variation.End
-											}
-
-											if basePriceMin > variation.BasePrice || basePriceMin < 0.01 {
-												basePriceMin = variation.BasePrice
-											}
-											// Thumbnail
-											if variation.Thumbnail != "" {
-												if p1 := path.Join(dir, "storage", variation.Thumbnail); len(p1) > 0 {
-													if fi, err := os.Stat(p1); err == nil {
-														filename := filepath.Base(p1)
-														filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-														logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "variations", filename), fi.Size())
-														if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "variations", filename), common.Config.Resize.Thumbnail.Size); err == nil {
-															variationView.Thumbnail = strings.Join(thumbnails, ",")
-														} else {
-															logger.Warningf("%v", err)
-														}
-													}
-												}
-											}
-											variations = append(variations, strings.Join([]string{fmt.Sprintf("%d", variation.ID), variation.Title}, ","))
-											for _, property := range variation.Properties {
-												propertyView := common.PropertyPF{
-													Id:    property.ID,
-													Type:  property.Type,
-													Size:  property.Size,
-													Name:  property.Name,
-													Title: property.Title,
-												}
-												for h, rate := range property.Rates {
-													valueView := common.ValuePF{
-														Id:          rate.Value.ID,
-														Enabled:     rate.Enabled,
-														Title:       rate.Value.Title,
-														Description: rate.Value.Description,
-														Color:       rate.Value.Color,
-														//Thumbnail: price.Value.Thumbnail,
-														Value:        rate.Value.Value,
-														Availability: rate.Value.Availability,
-														Price: common.RatePF{
-															Id:           rate.ID,
-															Price:        rate.Price,
-															Availability: rate.Availability,
-															Sku:          rate.Sku,
-														},
-														Selected: h == 0,
-													}
-													// Thumbnail
-													if rate.Value.Thumbnail != "" {
-														// p1 => thumbnails
-														if v, found := CACHE_VALUES.Get(rate.Value.Thumbnail); !found {
-															if p1 := path.Join(dir, "storage", rate.Value.Thumbnail); len(p1) > 0 {
-																if fi, err := os.Stat(p1); err == nil {
-																	filename := filepath.Base(p1)
-																	filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																	logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-																	if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
-																		valueView.Thumbnail = strings.Join(thumbnails, ",")
-																		CACHE_VALUES.Set(rate.Value.Thumbnail, valueView.Thumbnail)
-																		//
-																		if _, err = models.CreateCacheValue(common.Database, &models.CacheValue{
-																			ValueID:   rate.Value.ID,
-																			Title:     rate.Value.Title,
-																			Thumbnail: valueView.Thumbnail,
-																			Value:     rate.Value.Value,
-																		}); err != nil {
-																			logger.Warningf("%v", err)
-																		}
-																	} else {
-																		logger.Warningf("%v", err)
-																	}
-																}
-															}
-														} else {
-															valueView.Thumbnail = v.(string)
-														}
-													}
-													propertyView.Values = append(propertyView.Values, valueView)
-												}
-												if len(propertyView.Values) > 0 {
-													variationView.Properties = append(variationView.Properties, propertyView)
-												}
-											}
-											productView.Variations = append(productView.Variations, variationView)
-											//variations = append(variations, strings.Join([]string{fmt.Sprintf("%d", variation.ID), variationView.Thumbnail}, ","))
-											// Cache
-											if _, err = models.CreateCacheVariation(common.Database, &models.CacheVariation{
-												VariationID: variation.ID,
-												Name:        variation.Name,
-												Title:       variation.Title,
-												Description: variation.Description,
-												Thumbnail:   variationView.Thumbnail,
-												BasePrice:   variation.BasePrice,
-											}); err != nil {
-												logger.Warningf("%v", err)
-											}
-										}
-									}
-								}
 								productView.Path = "/" + path.Join(append(names, product.Name)...) + "/"
-								productView.Pattern = product.Pattern
-								productView.Dimensions = product.Dimensions
-								productView.DimensionUnit = product.DimensionUnit
-								productView.Volume = product.Volume
-								productView.Weight = product.Weight
-								productView.Availability = product.Availability
-								if product.Vendor != nil {
-									productView.Vendor = common.VendorPF{
-										Id:          product.Vendor.ID,
-										Name:        product.Vendor.Name,
-										Title:       product.Vendor.Title,
-										Thumbnail:   product.Vendor.Thumbnail,
-										Description: product.Vendor.Description,
-									}
-									if product.Vendor.Thumbnail != "" {
-										if cache, err := models.GetCacheVendorByVendorId(common.Database, product.VendorId); err == nil {
-											productView.Vendor.Thumbnail = cache.Thumbnail
-										}
-									}
-								}
-								if product.Time != nil {
-									productView.Time = product.Time.Title
-								}
-								productFile.Product = productView
-								for _, productTag := range product.Tags {
-									if productTag.Enabled {
-										tag := common.TagPF{Id: productTag.ID, Name: productTag.Name, Title: productTag.Title}
-										if productTag.Thumbnail != "" {
-											if cache, err := models.GetCacheTagByTagId(common.Database, productTag.ID); err == nil {
-												tag.Thumbnail = cache.Thumbnail
-											}
-										}
-										productFile.Tags = append(productFile.Tags, tag)
-									}
-								}
-								//productFile.Max = math.Round(product.Max * 100) / 100
-								//productFile.Votes = product.Votes
-								var max, votes int
-								if comments, err := models.GetCommentsByProduct(common.Database, product.ID); err == nil {
-									for _, comment := range comments {
-										if comment.Enabled {
-											commentPF := common.CommentPF{
-												Id:    comment.ID,
-												Uuid:  comment.Uuid,
-												Title: comment.Title,
-												Body:  comment.Body,
-												Max:   comment.Max,
-											}
-											if cache, err := models.GetCacheCommentByCommentId(common.Database, comment.ID); err == nil {
-												if cache.Images != "" {
-													commentPF.Images = strings.Split(cache.Images, ";")
-												}
-											}
-											if user, err := models.GetUser(common.Database, int(comment.UserId)); err == nil {
-												if user.Name != "" || user.Lastname != "" {
-													commentPF.Author = strings.TrimSpace(fmt.Sprintf("%s %s", user.Name, user.Lastname))
-												}else {
-													commentPF.Author = reTrimEmail.ReplaceAllString(user.Email, "$1")
-												}
-											}
-											productFile.Comments = append(productFile.Comments, commentPF)
-											max += comment.Max
-											votes++
-										}
-									}
-								}
-								if max > 0 && votes > 0 {
-									productFile.Max = math.Round((float64(max) / float64(votes)) * 100) / 100
-								}
-								productFile.Votes = votes
-								productFile.Description = product.Content
-								productFile.Content = product.Content
+
 								//
 								for _, language := range languages {
 									file := path.Join(p1, product.Name, fmt.Sprintf("index%s.html", language.Suffix))
