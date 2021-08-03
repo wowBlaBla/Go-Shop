@@ -576,11 +576,11 @@ var RootCmd = &cobra.Command{
 			},
 			{
 				Timestamp: time.Date(2021, time.August, 3, 1, 0, 0, 0, now.Location()).Format(time.RFC3339),
-				Name: "Enable Rates by default",
-				Description: "To set Enabled = true for all rates created earlier",
+				Name: "Enable and Availability for Rates by default",
+				Description: "To set Enabled = true and Availability to available for all rates created earlier",
 				Run: func() (string, error) {
 					var output string
-					common.Database.Exec("update rates set enabled = ?", true)
+					common.Database.Exec("update rates set enabled = ?, availability = ?", true, "available")
 					if err = common.Database.Error; err == nil {
 						output = "rates updated"
 					} else {
