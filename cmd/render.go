@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	//CACHE = cmap.New()
+	CACHE = cmap.New()
 	//VALUES = cmap.New()
 	CACHE_IMAGES = cmap.New()
 	CACHE_VALUES = cmap.New()
@@ -52,6 +52,11 @@ var renderCmd = &cobra.Command{
 			output = flagOutput
 		}
 		logger.Infof("output: %v", output)
+		clear := true
+		if flagClear := cmd.Flag("clear").Value.String(); flagClear == "false" {
+			clear = false
+		}
+		logger.Infof("clear: %v", clear)
 		remove := false
 		if flagRemove := cmd.Flag("remove").Value.String(); flagRemove == "true" {
 			remove = true
@@ -140,9 +145,11 @@ var renderCmd = &cobra.Command{
 		// Cache
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheCategory{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheProduct{})
-		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheFile{})
-		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheImage{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheVariation{})
+		if clear {
+			common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheImage{})
+			common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheFile{})
+		}
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheValue{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CachePrice{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheTag{})
@@ -714,15 +721,15 @@ var renderCmd = &cobra.Command{
 												images = append(images, strings.Join(images2, ","))
 												//
 												// Cache
-												if _, err = models.CreateCacheImage(common.Database, &models.CacheImage{
-													ImageId:   image.ID,
-													Name:      image.Name,
-													Thumbnail: strings.Join(images2, ","),
-												}); err != nil {
-													logger.Warningf("%v", err)
+												if found := models.HasCacheImageByImageId(common.Database, image.ID); !found {
+													if _, err = models.CreateCacheImage(common.Database, &models.CacheImage{
+														ImageId:   image.ID,
+														Name:      image.Name,
+														Thumbnail: strings.Join(images2, ","),
+													}); err != nil {
+														logger.Warningf("%v", err)
+													}
 												}
-											} else {
-												logger.Warningf("%v", err)
 											}
 										}
 									}
@@ -762,12 +769,14 @@ var renderCmd = &cobra.Command{
 												Size: file.Size,
 											})
 											// Cache
-											if _, err = models.CreateCacheFile(common.Database, &models.CacheFile{
-												FileId:   file.ID,
-												Name: file.Name,
-												File: url,
-											}); err != nil {
-												logger.Warningf("%v", err)
+											if found := models.HasCacheFileByFileId(common.Database, file.ID); !found {
+												if _, err = models.CreateCacheFile(common.Database, &models.CacheFile{
+													FileId: file.ID,
+													Name:   file.Name,
+													File:   url,
+												}); err != nil {
+													logger.Warningf("%v", err)
+												}
 											}
 										} else {
 											logger.Warningf("%v", err)
@@ -893,6 +902,16 @@ var renderCmd = &cobra.Command{
 													logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", filename), fi.Size())
 													if images2, err := common.STORAGE.PutImage(p1, path.Join("images", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 														images = append(images, strings.Join(images2, ","))
+														// Cache
+														if found := models.HasCacheImageByImageId(common.Database, image.ID); !found {
+															if _, err = models.CreateCacheImage(common.Database, &models.CacheImage{
+																ImageId:   image.ID,
+																Name:      image.Name,
+																Thumbnail: strings.Join(images2, ","),
+															}); err != nil {
+																logger.Warningf("%v", err)
+															}
+														}
 													} else {
 														logger.Warningf("%v", err)
 													}
@@ -930,12 +949,14 @@ var renderCmd = &cobra.Command{
 																Size: file.Size,
 															})
 															// Cache
-															if _, err = models.CreateCacheFile(common.Database, &models.CacheFile{
-																FileId: file.ID,
-																Name:   file.Name,
-																File:   url,
-															}); err != nil {
-																logger.Warningf("%v", err)
+															if found := models.HasCacheFileByFileId(common.Database, file.ID); !found {
+																if _, err = models.CreateCacheFile(common.Database, &models.CacheFile{
+																	FileId: file.ID,
+																	Name:   file.Name,
+																	File:   url,
+																}); err != nil {
+																	logger.Warningf("%v", err)
+																}
 															}
 														} else {
 															logger.Warningf("%v", err)
@@ -2015,5 +2036,6 @@ func createWidgetCF(widget *models.Widget) common.WidgetCF {
 func init() {
 	RootCmd.AddCommand(renderCmd)
 	renderCmd.Flags().StringP("products", "p", "products", "products output folder")
+	renderCmd.Flags().BoolP("clear", "c", false, "clear cache")
 	renderCmd.Flags().BoolP("remove", "r", false, "remove all files during rendering")
 }

@@ -13,6 +13,13 @@ func (CacheFile) TableName() string {
 	return "cache_files"
 }
 
+func HasCacheFileByFileId(connector *gorm.DB, fileId uint) bool {
+	db := connector
+	var count int64
+	db.Model(&CacheFile{}).Where("file_id = ?", fileId).Count(&count)
+	return count > 0
+}
+
 func GetCacheFileByFileId(connector *gorm.DB, fileId uint) (*CacheFile, error){
 	db := connector
 	var cacheFile CacheFile

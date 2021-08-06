@@ -1326,6 +1326,9 @@ func getVariationHandler(c *fiber.Ctx) error {
 			var view VariationView
 			if bts, err := json.Marshal(variation); err == nil {
 				if err = json.Unmarshal(bts, &view); err == nil {
+					if cache, err := models.GetCacheVariationByVariationId(common.Database, variation.ID); err == nil {
+						view.Rendered = &cache.UpdatedAt
+					}
 					view.New = variation.UpdatedAt.Sub(variation.CreatedAt).Seconds() < 1.0
 					for i, property := range view.Properties {
 						for j, rate := range property.Rates{
@@ -1337,6 +1340,23 @@ func getVariationHandler(c *fiber.Ctx) error {
 									view.Properties[i].Rates[j].Value.Thumbnail = arr[0]
 								}
 							}
+						}
+					}
+					for i, price := range view.Prices {
+						if price.Thumbnail != "" {
+							if cache, err := models.GetCachePriceByPriceId(common.Database, price.ID); err == nil {
+								arr := strings.Split(cache.Thumbnail, ",")
+								if len(arr) > 1 {
+									view.Prices[i].Thumbnail = strings.Split(arr[1], " ")[0]
+								}else{
+									view.Prices[i].Thumbnail = strings.Split(arr[0], " ")[0]
+								}
+							}
+						}
+					}
+					for i := 0; i < len(view.Images); i++ {
+						if cache, err := models.GetCacheImageByImageId(common.Database, view.Images[i].ID); err == nil {
+							view.Images[i].Thumbnail = cache.Thumbnail
 						}
 					}
 					if variations, err := models.GetVariationsByProduct(common.Database, variation.ProductId); err == nil {

@@ -448,10 +448,20 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	var keys2 []string
 	var values2 []interface{}
 	if request.Search != "" {
-		term := strings.TrimSpace(request.Search)
-		term2 := "%" + term + "%"
-		keys1 = append(keys1, "(products.ID = ? OR products.Title like ? OR products.Description like ? OR variations.Title like ? OR products.Sku like ?)")
-		values1 = append(values1, term, term2, term2, term2, term2)
+		var term, term2 string
+		if res := regexp.MustCompile(`^(['"]?)(.+?)(['"]?)$`).FindStringSubmatch(strings.TrimSpace(request.Search)); len(res) > 1 {
+			if res[1] == "" {
+				// no quote
+				term = res[2]
+				term2 = "%" + res[2] + "%"
+			}else{
+				// quoted
+				term = res[2]
+				term2 = res[2]
+			}
+		}
+		keys1 = append(keys1, "(products.ID = ? OR products.Title like ? OR products.Description like ? OR variations.Title like ? OR products.Sku like ? OR variations.ID = ? OR variations.Title like ? OR variations.Description like ? OR variations.Title like ? OR variations.Sku like ?)")
+		values1 = append(values1, term, term2, term2, term2, term2, term, term2, term2, term2, term2)
 	}
 	if len(request.Filter) > 0 {
 		for key, value := range request.Filter {
@@ -530,7 +540,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 	}
 	//logger.Infof("order: %+v", order)
 	//
-	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_images.Thumbnail as Thumbnail, products.Description, products.base_price as BasePrice, products.Sku, products.Stock, group_concat(variations.Id, '') as VariationIds, group_concat(variations.Title, '') as Variations, categories_products_sort.Value as Sort")/*.Joins("left join categories_products on categories_products.product_id = products.id")*/.Joins("left join categories_products_sort on categories_products_sort.productId = products.id")/*.Joins("left join cache_products on products.id = cache_products.product_id")*/.Joins("left join cache_images on products.image_id = cache_images.image_id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_images.Thumbnail as Thumbnail, products.Description, products.base_price as BasePrice, products.Sku, products.Stock, group_concat(variations.Id, '') as VariationIds, group_concat(variations.Title, '') as Variations, group_concat(variations.Sku, '') as VariationSkus, categories_products_sort.Value as Sort")/*.Joins("left join categories_products on categories_products.product_id = products.id")*/.Joins("left join categories_products_sort on categories_products_sort.productId = products.id")/*.Joins("left join cache_products on products.id = cache_products.product_id")*/.Joins("left join cache_images on products.image_id = cache_images.image_id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -546,7 +556,7 @@ func postProductsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_images.Thumbnail as Thumbnail, products.Description, products.base_price as BasePrice, products.Sku, products.Stock, group_concat(variations.Id, '') as VariationIds, group_concat(variations.Title, '') as Variations")/*.Joins("left join categories_products on categories_products.product_id = products.id")*/.Joins("left join cache_images on products.image_id = cache_images.image_id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
+	rows, err = common.Database.Debug().Model(&models.Product{}).Select("products.ID, products.Enabled, products.Name, products.Title, cache_images.Thumbnail as Thumbnail, products.Description, products.base_price as BasePrice, products.Sku, products.Stock, group_concat(variations.Id, '') as VariationIds, group_concat(variations.Title, '') as Variations, group_concat(variations.Sku, '') as VariationSkus")/*.Joins("left join categories_products on categories_products.product_id = products.id")*/.Joins("left join cache_images on products.image_id = cache_images.image_id").Joins("left join variations on variations.product_id = products.id").Group("products.id").Where(strings.Join(keys1, " and "), values1...).Having(strings.Join(keys2, " and "), values2...).Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -584,6 +594,9 @@ func getProductHandler(c *fiber.Ctx) error {
 		var view ProductView
 		if bts, err := json.MarshalIndent(product, "", "   "); err == nil {
 			if err = json.Unmarshal(bts, &view); err == nil {
+				if cache, err := models.GetCacheProductByProductId(common.Database, product.ID); err == nil {
+					view.Rendered = &cache.UpdatedAt
+				}
 				view.New = product.UpdatedAt.Sub(product.CreatedAt).Seconds() < 1.0
 				for i, property := range view.Properties {
 					for j, rate := range property.Rates{

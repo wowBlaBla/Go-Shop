@@ -1,6 +1,8 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"gorm.io/gorm"
+)
 
 type CacheImage struct {
 	gorm.Model
@@ -15,6 +17,13 @@ type CacheImage struct {
 
 func (CacheImage) TableName() string {
 	return "cache_images"
+}
+
+func HasCacheImageByImageId(connector *gorm.DB, imageId uint) bool {
+	db := connector
+	var count int64
+	db.Model(&CacheImage{}).Where("image_id = ?", imageId).Count(&count)
+	return count > 0
 }
 
 func GetCacheImageByImageId(connector *gorm.DB, imageId uint) (*CacheImage, error){

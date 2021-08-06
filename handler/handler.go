@@ -651,7 +651,15 @@ func getPreviewHandler (c *fiber.Ctx) error {
 						if res := regexp.MustCompile(`/products/(\d+)`).FindAllStringSubmatch(referer, 1); len(res) > 0 && len(res[0]) > 1 {
 							if v, err := strconv.Atoi(res[0][1]); err == nil {
 								if c, err := models.GetCacheProductByProductId(common.Database, uint(v)); err == nil {
-									query.Set("referer", path.Join(c.Path, c.Name))
+									if res2 := regexp.MustCompile(`/variations/(\d+)`).FindAllStringSubmatch(referer, 1); len(res2) > 0 && len(res2[0]) > 1 {
+										arr := strings.Split(c.Path, "/")
+										if len(arr) > 2 && common.Config.FlatUrl {
+											arr = append(arr[:1], arr[1+1:]...)
+										}
+										query.Set("referer", path.Join(strings.Join(arr, "/"), fmt.Sprintf("%s?uuid=%d.%v", c.Name, c.ProductID, res2[0][1])))
+									}else{
+										query.Set("referer", path.Join(c.Path, c.Name))
+									}
 								}
 							}
 						}else if res := regexp.MustCompile(`/categories/(\d+)`).FindAllStringSubmatch(referer, 1); len(res) > 0 && len(res[0]) > 1 {
@@ -5034,198 +5042,6 @@ func delUserHandler(c *fiber.Ctx) error {
 	}
 }
 
-type NewCommand struct {
-
-}
-
-type CommandView struct {
-	Output string
-	Error string `json:"ERROR,omitempty"`
-	Status string
-}
-
-// @security BasicAuth
-// MakePrepare godoc
-// @Summary Make prepare
-// @Accept json
-// @Produce json
-// @Param request body NewCommand true "body"
-// @Success 200 {object} CommandView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/prepare [post]
-func postPrepareHandler(c *fiber.Ctx) error {
-	var view CommandView
-	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
-			var request NewCommand
-			if err := c.BodyParser(&request); err != nil {
-				return err
-			}
-			//
-			cmd := exec.Command(os.Args[0], "render", "-p", path.Join(dir, "hugo", "content"))
-			buff := &bytes.Buffer{}
-			cmd.Stderr = buff
-			cmd.Stdout = buff
-			err := cmd.Run()
-			if err != nil {
-				view.Output = buff.String()
-				view.Error = err.Error()
-				logger.Errorf("%v\n%v", view.Output, view.Error)
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(view)
-			}
-			view.Output = buff.String()
-			view.Status = "OK"
-			//
-			if _, err := os.Stat(path.Join(dir, HAS_CHANGES)); err == nil {
-				if err := os.Remove(path.Join(dir, HAS_CHANGES)); err != nil {
-					logger.Errorf("%v", err)
-				}
-			}
-			//
-			return c.JSON(view)
-		} else {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Unsupported Content-Type"})
-		}
-	}
-	return c.JSON(view)
-}
-
-// @security BasicAuth
-// MakeRender godoc
-// @Summary Make render
-// @Accept json
-// @Produce json
-// @Param request body NewCommand true "body"
-// @Success 200 {object} CommandView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/render [post]
-func postRenderHandler(c *fiber.Ctx) error {
-	var view CommandView
-	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
-			var request NewCommand
-			if err := c.BodyParser(&request); err != nil {
-				return err
-			}
-			//
-			bin := strings.Split(common.Config.Hugo.Bin, " ")
-			//
-			var arguments []string
-			if len(bin) > 1 {
-				for _, x := range bin[1:]{
-					x = strings.Replace(x, "%DIR%", dir, -1)
-					arguments = append(arguments, x)
-				}
-			}
-			arguments = append(arguments, "--cleanDestinationDir")
-			if common.Config.Hugo.Minify {
-				arguments = append(arguments, "--minify")
-			}
-			if len(bin) == 1 {
-				arguments = append(arguments, []string{"-s", path.Join(dir, "hugo")}...)
-			}
-			cmd := exec.Command(bin[0], arguments...)
-			buff := &bytes.Buffer{}
-			cmd.Stderr = buff
-			cmd.Stdout = buff
-			err := cmd.Run()
-			if err != nil {
-				view.Output = buff.String()
-				view.Error = err.Error()
-				logger.Errorf("%v\n%v", view.Output, view.Error)
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(view)
-			}
-			view.Output = buff.String()
-			view.Status = "OK"
-			//
-			return c.JSON(view)
-		} else {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Unsupported Content-Type"})
-		}
-	}
-	return c.JSON(view)
-}
-
-type NewPublish struct {
-
-}
-
-type PublishView struct {
-	Output string
-	Status string
-}
-
-// @security BasicAuth
-// MakePublish godoc
-// @Summary Make publish
-// @Accept json
-// @Produce json
-// @Param request body NewCommand true "body"
-// @Success 200 {object} CommandView
-// @Failure 404 {object} HTTPError
-// @Failure 500 {object} HTTPError
-// @Router /api/v1/publish [post]
-func postPublishHandler(c *fiber.Ctx) error {
-	var view CommandView
-	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
-		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON) {
-			var request NewCommand
-			if err := c.BodyParser(&request); err != nil {
-				return err
-			}
-			//
-			if !common.Config.Publisher.Enabled{
-				err := fmt.Errorf("wrangler disabled")
-				logger.Errorf("%v", err.Error())
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			//
-			bin := strings.Split(common.Config.Publisher.Bin, " ")
-			//
-			var arguments []string
-			if len(bin) > 1 {
-				for _, x := range bin[1:]{
-					x = strings.Replace(x, "%DIR%", dir, -1)
-					arguments = append(arguments, x)
-				}
-				if common.Config.Publisher.ApiToken == "" {
-					err := fmt.Errorf("api_token is not specified")
-					logger.Errorf("%v", err.Error())
-					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{err.Error()})
-				}
-				arguments = append(arguments, common.Config.Publisher.ApiToken)
-			}
-			//
-			logger.Infof("Run: %v %+v", bin[0], strings.Join(arguments, " "))
-			cmd := exec.Command(bin[0], arguments...)
-			buff := &bytes.Buffer{}
-			cmd.Stdout = buff
-			cmd.Stderr = buff
-			err := cmd.Run()
-			if err != nil {
-				logger.Infof("Output: %+v", buff.String())
-				logger.Errorf("%v", err.Error())
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(HTTPError{err.Error()})
-			}
-			view.Output = buff.String()
-			view.Status = "OK"
-			return c.JSON(view)
-		} else {
-			c.Status(http.StatusInternalServerError)
-			return c.JSON(HTTPError{"Unsupported Content-Type"})
-		}
-	}
-	return c.JSON(view)
-}
 
 type EmailRequest struct {
 	Email string
@@ -5938,6 +5754,7 @@ type ProductView struct {
 	//
 	Customization string `json:",omitempty"`
 	New bool `json:",omitempty"`
+	Rendered *time.Time `json:",omitempty"`
 }
 
 type ProductPropertyView struct {
@@ -6059,6 +5876,7 @@ type VariationView struct {
 	ProductId uint
 	Customization string
 	New bool `json:",omitempty"`
+	Rendered *time.Time `json:",omitempty"`
 }
 
 type HTTPMessage struct {

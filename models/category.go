@@ -4,14 +4,10 @@ import (
 	"fmt"
 	"github.com/yonnic/goshop/common"
 	"gorm.io/gorm"
+	"math/rand"
 	"path"
 	"strings"
 	"time"
-)
-
-var (
-	CATEGORIES = make(map[uint]string)
-	PRODUCTS = make(map[uint]string)
 )
 
 type Category struct {
@@ -230,18 +226,17 @@ func (c *CatalogItemView) SetCount() {
 }
 
 func GetCategoriesView(connector *gorm.DB, id int, depth int, noProducts bool, count bool, stat bool) (*CatalogItemView, error) {
-	CATEGORIES = make(map[uint]string)
-	PRODUCTS = make(map[uint]string)
+	productsCache := make(map[uint]string)
 	//
 	if id == 0 {
-		return getChildrenCategoriesView(connector, &CatalogItemView{Path: "/", Name: strings.ToLower(common.Config.Products), Title: common.Config.Products, Type: "category"}, depth, noProducts, count, stat), nil
+		return getChildrenCategoriesView(productsCache, connector, &CatalogItemView{Path: "/", Name: strings.ToLower(common.Config.Products), Title: common.Config.Products, Type: "category"}, depth, noProducts, count, stat), nil
 	} else {
 		if category, err := GetCategory(connector, id); err == nil {
 			chunks := &[]string{}
 			if err := getCategoryPath(connector, int(category.ParentId), chunks); err != nil {
 				return nil, err
 			}
-			view := getChildrenCategoriesView(connector, &CatalogItemView{ID: category.ID, Path: fmt.Sprintf("/%s", strings.Join(*chunks, "/")), Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category", Sort: category.Sort}, depth, noProducts, count, stat)
+			view := getChildrenCategoriesView(productsCache, connector, &CatalogItemView{ID: category.ID, Path: fmt.Sprintf("/%s", strings.Join(*chunks, "/")), Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category", Sort: category.Sort}, depth, noProducts, count, stat)
 			if view != nil {
 				if err = getParentCategoriesView(connector, view, category.ParentId); err != nil {
 					return nil, err
@@ -267,20 +262,22 @@ func getCategoryPath(connector *gorm.DB, pid int, chunks *[]string) error {
 	}
 }
 
-func getChildrenCategoriesView(connector *gorm.DB, root *CatalogItemView, depth int, noProducts bool, count bool, stat bool) *CatalogItemView {
+func getChildrenCategoriesView(productsCache map[uint]string, connector *gorm.DB, root *CatalogItemView, depth int, noProducts bool, count bool, stat bool) *CatalogItemView {
 	for _, category := range GetChildrenOfCategoryById(connector, root.ID) {
-		if v, found := CATEGORIES[category.ID]; !found {
-			if cache, err := GetCacheCategoryByCategoryId(common.Database, category.ID); err == nil {
-				category.Thumbnail = cache.Thumbnail
-				CATEGORIES[category.ID] = cache.Thumbnail
-			}else{
-				CATEGORIES[category.ID] = ""
+		if category.Thumbnail != "" {
+			if v, found := common.THUMBNAILS.Get(category.Thumbnail); !found {
+				if cache, err := GetCacheCategoryByCategoryId(common.Database, category.ID); err == nil {
+					common.THUMBNAILS.Set(category.Thumbnail, cache.Thumbnail, time.Duration(60 + rand.Intn(60)) * time.Second)
+					category.Thumbnail = cache.Thumbnail
+				}else{
+					common.THUMBNAILS.Set(category.Thumbnail, "", 3 * time.Second)
+				}
+			}else if thumbnail := v.(string); thumbnail != "" {
+				category.Thumbnail = thumbnail
 			}
-		}else if v != "" {
-			category.Thumbnail = v
 		}
 		if depth > 0 {
-			child := getChildrenCategoriesView(connector, &CatalogItemView{ID: category.ID, Path: path.Join(root.Path, root.Name), Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category", Sort: category.Sort}, depth - 1, noProducts, count, stat)
+			child := getChildrenCategoriesView(productsCache, connector, &CatalogItemView{ID: category.ID, Path: path.Join(root.Path, root.Name), Name: category.Name, Title: category.Title, Thumbnail: category.Thumbnail, Description: category.Description, Type: "category", Sort: category.Sort}, depth - 1, noProducts, count, stat)
 			root.Children = append(root.Children, child)
 			if count {
 				root.Count += child.Count
@@ -290,15 +287,17 @@ func getChildrenCategoriesView(connector *gorm.DB, root *CatalogItemView, depth 
 	if count || !noProducts {
 		if products, err := GetProductsByCategoryId(connector, root.ID); err == nil {
 			for _, product := range products {
-				if v, found := PRODUCTS[product.ID]; !found {
-					if cache, err := GetCacheProductByProductId(common.Database, product.ID); err == nil {
-						product.Thumbnail = cache.Thumbnail
-						PRODUCTS[product.ID] = cache.Thumbnail
-					}else{
-						PRODUCTS[product.ID] = ""
+				if product.Thumbnail != "" {
+					if v, found := common.THUMBNAILS.Get(product.Thumbnail); !found {
+						if cache, err := GetCacheProductByProductId(common.Database, product.ID); err == nil {
+							common.THUMBNAILS.Set(product.Thumbnail, cache.Thumbnail, time.Duration(60 + rand.Intn(60)) * time.Second)
+							product.Thumbnail = cache.Thumbnail
+						}else{
+							common.THUMBNAILS.Set(product.Thumbnail, "", 3 * time.Second)
+						}
+					}else if thumbnail := v.(string); thumbnail != "" {
+						product.Thumbnail = thumbnail
 					}
-				}else if v != "" {
-					product.Thumbnail = v
 				}
 				if !noProducts {
 					item := &CatalogItemView{ID: product.ID, Path: path.Join(root.Path, root.Name), Name: product.Name, Title: product.Title, Thumbnail: product.Thumbnail, Description: product.Description, BasePrice: product.BasePrice, Type: "product"}

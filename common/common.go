@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/logger"
 	"github.com/nfnt/resize"
+	"github.com/patrickmn/go-cache"
 	"github.com/yonnic/goshop/config"
 	"github.com/yonnic/goshop/storage"
 	"gorm.io/gorm"
@@ -35,7 +36,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210803171912"
+	COMPILED = "20210806144241"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -47,6 +48,8 @@ var (
 	//
 	NOTIFICATION *Notification
 	SALT = "goshop"
+	//
+	THUMBNAILS = cache.New(time.Minute, time.Minute)
 )
 
 //
