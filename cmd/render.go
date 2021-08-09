@@ -17,6 +17,7 @@ import (
 	"gorm.io/gorm"
 	"io/ioutil"
 	"math"
+	"math/rand"
 	"net/url"
 	"os"
 	"path"
@@ -1650,6 +1651,7 @@ var renderCmd = &cobra.Command{
 			return
 		}
 		//
+		common.THUMBNAILS.Flush()
 		// Catalog
 		if tree, err := models.GetCategoriesView(common.Database, 0, 999, false, true, true); err == nil {
 			if bts, err := json.MarshalIndent(tree, " ", "   "); err == nil {
@@ -1899,7 +1901,16 @@ func createMenu(root *common.MenuItemView, bts []byte) {
 				root.Name = categoriesView.Name
 				root.Title = categoriesView.Title
 				root.Path = categoriesView.Path
-				root.Thumbnail = categoriesView.Thumbnail
+				if v, found := common.THUMBNAILS.Get(categoriesView.Thumbnail); !found {
+					if cache, err := models.GetCacheCategoryByCategoryId(common.Database, categoriesView.ID); err == nil {
+						common.THUMBNAILS.Set(categoriesView.Thumbnail, cache.Thumbnail, time.Duration(60 + rand.Intn(60)) * time.Second)
+						root.Thumbnail = cache.Thumbnail
+					}else{
+						common.THUMBNAILS.Set(categoriesView.Thumbnail, "", 3 * time.Second)
+					}
+				}else if thumbnail := v.(string); thumbnail != "" {
+					root.Thumbnail = thumbnail
+				}
 				for _, child := range categoriesView.Children {
 					root.Children = append(root.Children, child)
 				}
