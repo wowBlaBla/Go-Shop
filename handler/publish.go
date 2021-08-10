@@ -133,6 +133,13 @@ func postPrepareHandler(c *fiber.Ctx) error {
 				return c.JSON(view)
 			}else if process.Status == PROCESS_STATUS_FINISHED {
 				view.Output = process.Buff.String()
+				if process.Return == 0 {
+					if _, err := os.Stat(path.Join(dir, HAS_CHANGES)); err == nil {
+						if err := os.Remove(path.Join(dir, HAS_CHANGES)); err != nil {
+							logger.Errorf("%v", err)
+						}
+					}
+				}
 				view.Return = process.Return
 				view.Status = "Finished"
 				return c.JSON(view)

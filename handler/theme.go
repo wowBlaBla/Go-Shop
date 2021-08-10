@@ -278,26 +278,19 @@ func getThemeLayoutHandler(c *fiber.Ctx) error {
 					}
 					if v, err := s.Html(); err == nil {
 						fragment := html.UnescapeString(v)
-						logger.Infof("fragment: %+v", fragment)
 						for _, line := range strings.Split(strings.TrimSpace(fragment), "\n") {
-							logger.Infof("line: %+v", line)
 							reader := csv.NewReader(strings.NewReader(strings.TrimSpace(line)))
 							reader.Comma = ' ' // space
 							if cells, err := reader.Read(); err == nil {
-								logger.Infof("cells: %+v, %+v", cells, len(cells))
 								if len(cells) > 6 {
-									logger.Infof("yes")
 									if res := regexp.MustCompile(`plugins/([^/]+)/index.html`).FindStringSubmatch(cells[2]); len(res) > 1 {
-										logger.Infof("res: %+v", res)
 										name := res[1]
 										instance := ThemeLayoutPluginInstanceView{
 											Name: name,
 										}
 										pairs := cells[7: len(cells) - 2]
-										logger.Infof("pairs: %+v", pairs)
 										var left string
 										for i, pair := range pairs {
-											logger.Infof("%d: %+v", i, pair)
 											if i % 2 == 0 {
 												left = pair
 											}else{
@@ -327,7 +320,6 @@ func getThemeLayoutHandler(c *fiber.Ctx) error {
 												}
 
 												instance.Params = append(instance.Params, param)
-												logger.Infof("instance: %+v", instance)
 											}
 										}
 										location.Plugins = append(location.Plugins, instance)
