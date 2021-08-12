@@ -1567,7 +1567,7 @@ var renderCmd = &cobra.Command{
 									}
 									productFile.Categories = append(productFile.Categories, category.Title)
 								}
-								productView.CategoryId = category.ID
+								productFile.Product.CategoryId = category.ID
 
 								/*if p := path.Join(p1, product.Name); p != "" {
 									if _, err := os.Stat(p); err != nil {
@@ -1576,8 +1576,7 @@ var renderCmd = &cobra.Command{
 										}
 									}
 								}*/
-
-								productView.Path = "/" + path.Join(append(names, product.Name)...) + "/"
+								productFile.Product.Path = "/" + path.Join(append(names, product.Name)...) + "/"
 
 								//
 								for _, language := range languages {

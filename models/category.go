@@ -310,6 +310,7 @@ func getChildrenCategoriesView(productsCache map[uint]string, connector *gorm.DB
 				}
 			}
 			if count {
+				root.Products = int64(len(products))
 				root.Count += len(products)
 			}
 		}
