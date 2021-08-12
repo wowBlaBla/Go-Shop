@@ -30,9 +30,10 @@ var (
 	reUrl = regexp.MustCompile(`https?://([^\/]+)(/.+)`)
 )
 
-func NewAWSS3Storage(accessKeyID, secretAccessKey, region, bucket, prefix string, temp string, quality int, cdn string, rewrite string) (*AWSS3Storage, error){
+func NewAWSS3Storage(accessKeyID, secretAccessKey, region, bucket, prefix string, temp string, resize bool, quality int, cdn string, rewrite string) (*AWSS3Storage, error){
 	storage := &AWSS3Storage{
 		prefix: prefix,
+		resize: resize,
 		quality: quality,
 		rewrite: rewrite,
 		cdn: cdn,
@@ -73,6 +74,7 @@ type AWSS3Storage struct {
 	//
 	prefix string
 	temp string // full/path
+	resize bool
 	quality int
 	cdn string
 	rewrite string
@@ -244,88 +246,102 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 		locations = append(locations, storage.rw(item.Url))
 	}
 	if sizes != "" {
-		var img image.Image
-		ext := strings.ToLower(filepath.Ext(src))
-		if p := path.Join(path.Dir(dst), "resize"); len(p) > 0 {
-			if _, err := os.Stat(p); err != nil {
-				if err = os.MkdirAll(p, 0755); err != nil {
-					logger.Warningf("%v", err)
+		if storage.resize {
+			var img image.Image
+			ext := strings.ToLower(filepath.Ext(src))
+			if p := path.Join(path.Dir(dst), "resize"); len(p) > 0 {
+				if _, err := os.Stat(p); err != nil {
+					if err = os.MkdirAll(p, 0755); err != nil {
+						logger.Warningf("%v", err)
+					}
 				}
 			}
-		}
-		for _, size := range strings.Split(sizes, ",") {
-			pair := strings.Split(size, "x")
-			var width int
-			if width, err = strconv.Atoi(pair[0]); err != nil {
-				return locations, err
-			}
-			var height int
-			if height, err = strconv.Atoi(pair[1]); err != nil {
-				return locations, err
-			}
-			filename := path.Base(location)
-			filename = filename[:len(filename) - len(filepath.Ext(filename))]
-			filename = fmt.Sprintf("%s_%d_%dx%d%s", filename, storage.quality, width, height, filepath.Ext(src))
-			dst2 := path.Join(path.Dir(dst), "resize", filename)
-			// //
-			key := path.Join(path.Dir(location), "resize", filename)
-			if item, found := storage.Database[key]; !found || fi1.ModTime().Sub(item.Modified) > time.Second {
-				if img == nil {
-					file, err := os.Open(src)
+			for _, size := range strings.Split(sizes, ",") {
+				pair := strings.Split(size, "x")
+				var width int
+				if width, err = strconv.Atoi(pair[0]); err != nil {
+					return locations, err
+				}
+				var height int
+				if height, err = strconv.Atoi(pair[1]); err != nil {
+					return locations, err
+				}
+				filename := path.Base(location)
+				filename = filename[:len(filename) - len(filepath.Ext(filename))]
+				filename = fmt.Sprintf("%s_%d_%dx%d%s", filename, storage.quality, width, height, filepath.Ext(src))
+				dst2 := path.Join(path.Dir(dst), "resize", filename)
+				// //
+				key := path.Join(path.Dir(location), "resize", filename)
+				if item, found := storage.Database[key]; !found || fi1.ModTime().Sub(item.Modified) > time.Second {
+					if img == nil {
+						file, err := os.Open(src)
+						if err != nil {
+							return locations, err
+						}
+						if ext == ".jpg" || ext == ".jpeg" {
+							img, err = jpeg.Decode(file)
+							if err != nil {
+								return locations, err
+							}
+						}else if ext == ".png" {
+							img, err = png.Decode(file)
+							if err != nil {
+								return locations, err
+							}
+						}
+						file.Close()
+					}
+					//logger.Infof("case3: %+v", dst2 + ".json")
+					m := resize.Resize(uint(width), uint(height), img, resize.Lanczos3)
+					out, err := os.Create(dst2)
 					if err != nil {
 						return locations, err
 					}
 					if ext == ".jpg" || ext == ".jpeg" {
-						img, err = jpeg.Decode(file)
-						if err != nil {
+						if err = jpeg.Encode(out, m, &jpeg.Options{Quality: storage.quality}); err != nil {
 							return locations, err
 						}
+						out.Close()
 					}else if ext == ".png" {
-						img, err = png.Decode(file)
-						if err != nil {
+						if err = png.Encode(out, m); err != nil {
 							return locations, err
 						}
+						out.Close()
 					}
-					file.Close()
-				}
-				//logger.Infof("case3: %+v", dst2 + ".json")
-				m := resize.Resize(uint(width), uint(height), img, resize.Lanczos3)
-				out, err := os.Create(dst2)
-				if err != nil {
-					return locations, err
-				}
-				if ext == ".jpg" || ext == ".jpeg" {
-					if err = jpeg.Encode(out, m, &jpeg.Options{Quality: storage.quality}); err != nil {
-						return locations, err
-					}
-					out.Close()
-				}else if ext == ".png" {
-					if err = png.Encode(out, m); err != nil {
-						return locations, err
-					}
-					out.Close()
-				}
 
-				if err = os.Chtimes(dst2, fi1.ModTime(), fi1.ModTime()); err != nil {
-					logger.Warningf("%v", err)
-				}
-				//
-				if url, err := storage.upload(dst2, path.Join(path.Dir(location), "resize", filename)); err == nil {
-					urls[path.Join(path.Dir(location), "resize", filename)] = &AWSS3StorageItem{
-						Created: time.Now(),
-						Url: url,
-						Size: fi1.Size(),
-						Modified: fi1.ModTime(),
-					}
-					locations = append(locations, fmt.Sprintf("%s?%s %dw", storage.rw(url), strconv.FormatInt(time.Now().Unix(), 36), width))
-					if err = os.Remove(dst2); err != nil {
+					if err = os.Chtimes(dst2, fi1.ModTime(), fi1.ModTime()); err != nil {
 						logger.Warningf("%v", err)
 					}
-				} else {
-					return locations, err
+					//
+					if url, err := storage.upload(dst2, path.Join(path.Dir(location), "resize", filename)); err == nil {
+						urls[path.Join(path.Dir(location), "resize", filename)] = &AWSS3StorageItem{
+							Created: time.Now(),
+							Url: url,
+							Size: fi1.Size(),
+							Modified: fi1.ModTime(),
+						}
+						locations = append(locations, fmt.Sprintf("%s?%s %dw", storage.rw(url), strconv.FormatInt(time.Now().Unix(), 36), width))
+						if err = os.Remove(dst2); err != nil {
+							logger.Warningf("%v", err)
+						}
+					} else {
+						return locations, err
+					}
+				}else{
+					locations = append(locations, fmt.Sprintf("%s?%s %dw", storage.rw(item.Url), strconv.FormatInt(time.Now().Unix(), 36), width))
 				}
-			}else{
-				locations = append(locations, fmt.Sprintf("%s?%s %dw", storage.rw(item.Url), strconv.FormatInt(time.Now().Unix(), 36), width))
+			}
+		}else{
+			if len(locations) > 0 {
+				origin := locations[0]
+				for _, size := range strings.Split(sizes, ",") {
+					pair := strings.Split(size, "x")
+					var width int
+					if width, err = strconv.Atoi(pair[0]); err != nil {
+						return locations, err
+					}
+					locations = append(locations, fmt.Sprintf("%v?w=%v", origin, width))
+				}
 			}
 		}
 	}

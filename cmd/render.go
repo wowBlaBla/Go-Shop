@@ -157,13 +157,13 @@ var renderCmd = &cobra.Command{
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheTransport{})
 		common.Database.Unscoped().Where("ID > ?", 0).Delete(&models.CacheVendor{})
 		//
-		common.STORAGE, err = storage.NewLocalStorage(path.Join(dir, "hugo"), common.Config.Resize.Quality)
+		common.STORAGE, err = storage.NewLocalStorage(path.Join(dir, "hugo"), common.Config.Resize.Enabled, common.Config.Resize.Quality)
 		if err != nil {
 			logger.Warningf("%+v", err)
 		}
 		if common.Config.Storage.Enabled {
 			if common.Config.Storage.S3.Enabled {
-				if common.STORAGE, err = storage.NewAWSS3Storage(common.Config.Storage.S3.AccessKeyID,common.Config.Storage.S3.SecretAccessKey, common.Config.Storage.S3.Region, common.Config.Storage.S3.Bucket, common.Config.Storage.S3.Prefix, path.Join(dir, "temp", "s3"), common.Config.Resize.Quality, common.Config.Storage.S3.CDN, common.Config.Storage.S3.Rewrite); err != nil {
+				if common.STORAGE, err = storage.NewAWSS3Storage(common.Config.Storage.S3.AccessKeyID,common.Config.Storage.S3.SecretAccessKey, common.Config.Storage.S3.Region, common.Config.Storage.S3.Bucket, common.Config.Storage.S3.Prefix, path.Join(dir, "temp", "s3"), common.Config.Resize.Enabled, common.Config.Resize.Quality, common.Config.Storage.S3.CDN, common.Config.Storage.S3.Rewrite); err != nil {
 					logger.Warningf("%+v", err)
 				}
 				defer common.STORAGE.Close()
@@ -619,13 +619,17 @@ var renderCmd = &cobra.Command{
 					}
 					productFile.BasePrice = fmt.Sprintf("%.2f", product.BasePrice)
 					//productView.BasePrice = product.BasePrice
-					if product.SalePrice > 0 && product.Start.Before(now) && product.End.After(now){
+					if product.SalePrice > 0 && (product.End.IsZero() || (product.Start.Before(now) && product.End.After(now))) {
 						productFile.SalePrice = fmt.Sprintf("%.2f", product.SalePrice)
 						//productView.SalePrice = product.SalePrice
 						productFile.Start = &product.Start
 						//productView.Start = &product.Start
 						productFile.End = &product.End
 						//productView.End = &product.End
+						if productFile.End.IsZero() {
+							end := now.AddDate(99, 0, 0)
+							productFile.End = &end
+						}
 					}
 					if product.ItemPrice > 0 {
 						productFile.ItemPrice = fmt.Sprintf("%.2f", product.ItemPrice)
@@ -829,10 +833,14 @@ var renderCmd = &cobra.Command{
 					var basePriceMin float64
 					if len(product.Variations) > 0 {
 						productFile.BasePrice = fmt.Sprintf("%.2f", product.Variations[0].BasePrice)
-						if product.Variations[0].SalePrice > 0 && product.Variations[0].Start.Before(now) && product.Variations[0].End.After(now){
+						if product.Variations[0].SalePrice > 0 && (product.Variations[0].End.IsZero() || (product.Variations[0].Start.Before(now) && product.Variations[0].End.After(now))){
 							productFile.SalePrice = fmt.Sprintf("%.2f", product.Variations[0].SalePrice)
 							productFile.Start = &product.Variations[0].Start
 							productFile.End = &product.Variations[0].End
+							if productFile.End.IsZero() {
+								end := now.AddDate(99, 0, 0)
+								productFile.End = &end
+							}
 						}
 						if product.Variations[0].ItemPrice > 0 {
 							productFile.ItemPrice = fmt.Sprintf("%.2f", product.Variations[0].ItemPrice)
@@ -971,10 +979,14 @@ var renderCmd = &cobra.Command{
 									}
 								}
 
-								if variation.SalePrice > 0 && variation.Start.Before(now) && variation.End.After(now) {
+								if variation.SalePrice > 0 && (variation.End.IsZero() || (variation.Start.Before(now) && variation.End.After(now))) {
 									variationView.SalePrice = variation.SalePrice
 									variationView.Start = &variation.Start
 									variationView.End = &variation.End
+									if variationView.End.IsZero() {
+										end := now.AddDate(99, 0, 0)
+										variationView.End = &end
+									}
 								}
 
 								if basePriceMin > variation.BasePrice || basePriceMin < 0.01 {

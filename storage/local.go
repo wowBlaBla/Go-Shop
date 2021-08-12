@@ -15,9 +15,10 @@ import (
 	"strings"
 )
 
-func NewLocalStorage(root string, quality int) (*LocalStorage, error){
+func NewLocalStorage(root string, resize bool, quality int) (*LocalStorage, error){
 	local := &LocalStorage{
 		root: root,
+		resize: resize,
 		quality: quality,
 	}
 	var err error
@@ -26,6 +27,7 @@ func NewLocalStorage(root string, quality int) (*LocalStorage, error){
 
 type LocalStorage struct {
 	root string
+	resize bool
 	quality int
 }
 
@@ -103,81 +105,96 @@ func (local *LocalStorage) PutImage(src, location, sizes string) ([]string, erro
 	locations = append(locations, "/" + location)
 	//
 	if sizes != "" {
-		fi1, err := os.Stat(src)
-		if err != nil {
-			return locations, err
-		}
-		var img image.Image
-		ext := strings.ToLower(filepath.Ext(src))
-		for _, suffix := range []string{"public", "static"} {
-			if p := path.Join(local.root, suffix, path.Join(path.Dir(location), "resize")); len(p) > 0 {
-				if _, err := os.Stat(p); err != nil {
-					if err = os.MkdirAll(p, 0755); err != nil {
-						logger.Warningf("%v", err)
+		if local.resize {
+			fi1, err := os.Stat(src)
+			if err != nil {
+				return locations, err
+			}
+			var img image.Image
+			ext := strings.ToLower(filepath.Ext(src))
+			for _, suffix := range []string{"public", "static"} {
+				if p := path.Join(local.root, suffix, path.Join(path.Dir(location), "resize")); len(p) > 0 {
+					if _, err := os.Stat(p); err != nil {
+						if err = os.MkdirAll(p, 0755); err != nil {
+							logger.Warningf("%v", err)
+						}
 					}
 				}
 			}
-		}
-		for _, size := range strings.Split(sizes, ",") {
-			pair := strings.Split(size, "x")
-			var width int
-			if width, err = strconv.Atoi(pair[0]); err != nil {
-				return locations, err
-			}
-			var height int
-			if height, err = strconv.Atoi(pair[1]); err != nil {
-				return locations, err
-			}
-			filename := path.Base(src)
-			filename = filename[:len(filename) - len(filepath.Ext(filename))]
-			filename = fmt.Sprintf("%s_%dx%d%s", filename, width, height, filepath.Ext(src))
-			//
-			dst := path.Join(local.root, "static", path.Join(path.Dir(location), "resize", filename))
-			//
-			//dst := path.Join(path.Dir(src), "resize", filename)
-			if fi2, err := os.Stat(dst); err != nil || !fi1.ModTime().Equal(fi2.ModTime()) {
-				if img == nil {
-					file, err := os.Open(src)
+			for _, size := range strings.Split(sizes, ",") {
+				pair := strings.Split(size, "x")
+				var width int
+				if width, err = strconv.Atoi(pair[0]); err != nil {
+					return locations, err
+				}
+				var height int
+				if height, err = strconv.Atoi(pair[1]); err != nil {
+					return locations, err
+				}
+				filename := path.Base(src)
+				filename = filename[:len(filename) - len(filepath.Ext(filename))]
+				filename = fmt.Sprintf("%s_%dx%d%s", filename, width, height, filepath.Ext(src))
+				//
+				dst := path.Join(local.root, "static", path.Join(path.Dir(location), "resize", filename))
+				//
+				//dst := path.Join(path.Dir(src), "resize", filename)
+				if fi2, err := os.Stat(dst); err != nil || !fi1.ModTime().Equal(fi2.ModTime()) {
+					if img == nil {
+						file, err := os.Open(src)
+						if err != nil {
+							return locations, err
+						}
+						if ext == ".jpg" || ext == ".jpeg" {
+							img, err = jpeg.Decode(file)
+							if err != nil {
+								return locations, err
+							}
+						}else if ext == ".png" {
+							img, err = png.Decode(file)
+							if err != nil {
+								return locations, err
+							}
+						}
+						file.Close()
+					}
+					m := resize.Resize(uint(width), uint(height), img, resize.Lanczos3)
+					out, err := os.Create(dst)
 					if err != nil {
 						return locations, err
 					}
 					if ext == ".jpg" || ext == ".jpeg" {
-						img, err = jpeg.Decode(file)
-						if err != nil {
+						if err = jpeg.Encode(out, m, &jpeg.Options{Quality: local.quality}); err != nil {
 							return locations, err
 						}
+						out.Close()
 					}else if ext == ".png" {
-						img, err = png.Decode(file)
-						if err != nil {
+						if err = png.Encode(out, m); err != nil {
 							return locations, err
 						}
+						out.Close()
 					}
-					file.Close()
-				}
-				m := resize.Resize(uint(width), uint(height), img, resize.Lanczos3)
-				out, err := os.Create(dst)
-				if err != nil {
-					return locations, err
-				}
-				if ext == ".jpg" || ext == ".jpeg" {
-					if err = jpeg.Encode(out, m, &jpeg.Options{Quality: local.quality}); err != nil {
+					if err = os.Chtimes(dst, fi1.ModTime(), fi1.ModTime()); err != nil {
 						return locations, err
 					}
-					out.Close()
-				}else if ext == ".png" {
-					if err = png.Encode(out, m); err != nil {
+					if err := local.copy(dst, path.Join(local.root, "public", path.Join(path.Dir(location), "resize", filename))); err != nil {
+						logger.Warningf("%+v", err)
+					}
+				}
+				locations = append(locations, fmt.Sprintf("/%s %dw", path.Join(path.Dir(location), "resize", filename), width))
+			}
+		}else{
+			if len(locations) > 0 {
+				origin := locations[0]
+				for _, size := range strings.Split(sizes, ",") {
+					pair := strings.Split(size, "x")
+					var width int
+					var err error
+					if width, err = strconv.Atoi(pair[0]); err != nil {
 						return locations, err
 					}
-					out.Close()
-				}
-				if err = os.Chtimes(dst, fi1.ModTime(), fi1.ModTime()); err != nil {
-					return locations, err
-				}
-				if err := local.copy(dst, path.Join(local.root, "public", path.Join(path.Dir(location), "resize", filename))); err != nil {
-					logger.Warningf("%+v", err)
+					locations = append(locations, fmt.Sprintf("%v?w=%v", origin, width))
 				}
 			}
-			locations = append(locations, fmt.Sprintf("/%s %dw", path.Join(path.Dir(location), "resize", filename), width))
 		}
 	}
 	return locations, nil
