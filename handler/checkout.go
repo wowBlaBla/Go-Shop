@@ -167,6 +167,8 @@ type ItemShortView struct {
 	Properties []PropertyShortView `json:",omitempty"`
 	Prices []PriceShortView `json:",omitempty"`
 	Coupons []*CouponOrderView     `json:",omitempty"`
+	BasePrice float64                  `json:",omitempty"`
+	SalePrice float64                  `json:",omitempty"`
 	Price float64                  `json:",omitempty"`
 	Discount float64                  `json:",omitempty"`
 	Quantity int                   `json:",omitempty"`
@@ -331,6 +333,10 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 					continue
 				}
 			}
+			if rItem.Quantity <= 0 {
+				logger.Warningf("Invalid quantity: %+v", rItem.Quantity)
+				continue
+			}
 			categoryId := rItem.CategoryId
 			item := &models.Item{
 				Uuid:     rItem.UUID,
@@ -341,7 +347,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 				BasePrice: basePrice,
 				Quantity: rItem.Quantity,
 			}
-			if salePrice > 0 && start.Before(now) && end.After(now) {
+			if salePrice > 0 && (end.IsZero() || (start.Before(now) && end.After(now))) {
 				item.Price = salePrice * tax
 				item.SalePrice = salePrice * tax
 			}else{
