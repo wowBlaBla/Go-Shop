@@ -62,6 +62,7 @@ var (
 	reNotAbc = regexp.MustCompile("(?i)[^a-z0-9]+")
 	rePercent = regexp.MustCompile(`^(\d+(:?\.\d{1,3})?)%$`)
 	reName = regexp.MustCompile(`(.+?)-(\d+)$`)
+	reDotHtml = regexp.MustCompile(`\.html$`)
 )
 
 
@@ -1844,6 +1845,32 @@ func patchContentHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusOK)
 		return c.JSON(HTTPMessage{"OK"})
 	case "remove":
+		if menus, err := models.GetMenus(common.Database); err == nil {
+			for _, menu := range menus {
+				if menu.Enabled && menu.Description != "" {
+					in := []byte(menu.Description)
+					out := in
+					updated := false
+					for _, p := range []string{thefilepath, reDotHtml.ReplaceAllString(thefilepath, "/")} {
+						var count int
+						if out, count, err = RemoveLink(out, p); err == nil {
+							if count > 0 {
+								updated = true
+							}
+						} else {
+							logger.Warningf("%+v", err)
+						}
+					}
+					if updated {
+						menu.Description = string(out)
+						if err = models.UpdateMenu(common.Database, menu); err != nil {
+							c.Status(http.StatusInternalServerError)
+							return c.JSON(HTTPError{err.Error()})
+						}
+					}
+				}
+			}
+		}
 		if err := os.RemoveAll(p); err != nil {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
@@ -6242,4 +6269,81 @@ func ParseArguments(str string) []string {
 		}
 	}
 	return words
+}
+
+func RemoveLink(in []byte, path string) ([]byte, int, error) {
+	var count int
+	var out = in
+	var err error
+	var container struct {
+		Children []interface{} `json:"children"`
+	}
+	var bts []byte
+	if err = json.Unmarshal(in, &container.Children); err == nil {
+		if bts, err = json.Marshal(container); err == nil {
+			var m map[string]interface{}
+			if err = json.Unmarshal(bts, &m); err == nil {
+				if inc, err := removeLink(m, path); err == nil {
+					count += inc
+				}else{
+					return out, count, err
+				}
+			}
+			if out, err = json.Marshal(m["children"]); err != nil {
+				return out, count, err
+			}
+		}else{
+			return out, count, err
+		}
+	}else{
+		return out, count, err
+	}
+	return out, count, err
+}
+
+func removeLink(m map[string]interface{}, path string) (int, error) {
+	var count int
+	if v, found := m["children"]; found {
+		if arr, ok := v.([]interface{}); ok {
+			for i := 0; i < len(arr); i++ {
+				if m2, ok := arr[i].(map[string]interface{}); ok {
+					allowed := true
+					if vv, found := m2["data"]; found {
+						if m3, ok := vv.(map[string]interface{}); ok {
+							var score int
+							if vvv, found := m3["path"]; found {
+								if vvv == path {
+									score ++
+								}
+							}
+							allowed = score < 1
+						}else{
+							return count, fmt.Errorf("data is not valid map")
+						}
+					}else{
+						return count, fmt.Errorf("data not found")
+					}
+					if allowed {
+						if inc, err := removeLink(m2, path); err == nil {
+							count += inc
+						}else{
+							return count, err
+						}
+					}else{
+						count++
+						arr = append(arr[:i], arr[i+1:]...)
+						i--
+					}
+				}else{
+					return count, fmt.Errorf("child is not valid map")
+				}
+			}
+			m["children"] = arr
+		}else{
+			return count, fmt.Errorf("children is not array")
+		}
+	}else{
+		return count, fmt.Errorf("children not found")
+	}
+	return count, nil
 }

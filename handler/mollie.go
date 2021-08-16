@@ -240,68 +240,73 @@ func getAccountOrderMollieSuccessHandler(c *fiber.Ctx) error {
 			for _, transaction := range transactions {
 				var payment models.TransactionPayment
 				if err = json.Unmarshal([]byte(transaction.Payment), &payment); err == nil {
-					if payment.Mollie != nil && payment.Mollie.Id != "" {
-						if o, err := common.MOLLIE.GetOrder(payment.Mollie.Id); err == nil {
-							if o.Status == "paid" {
-								transaction.Status = models.TRANSACTION_STATUS_COMPLETE
-								if err = models.UpdateTransaction(common.Database, transaction); err != nil {
-									c.Status(http.StatusInternalServerError)
-									return c.JSON(HTTPError{err.Error()})
-								}
-								order.Status = models.ORDER_STATUS_PAID
-								if err = models.UpdateOrder(common.Database, order); err != nil {
-									c.Status(http.StatusInternalServerError)
-									return c.JSON(HTTPError{err.Error()})
-								}
-								// Notifications
-								if common.Config.Notification.Enabled {
-									if common.Config.Notification.Email.Enabled {
-										// to admin
-										//logger.Infof("Time to send admin email")
-										if users, err := models.GetUsersByRoleLessOrEqualsAndNotification(common.Database, models.ROLE_ADMIN, true); err == nil {
-											//logger.Infof("users found: %v", len(users))
-											template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_ADMIN_ORDER_PAID)
-											if err == nil {
-												//logger.Infof("Template: %+v", template)
-												for _, user := range users {
-													logger.Infof("Send email admin user: %+v", user.Email)
-													if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
-														logger.Errorf("%+v", err)
+					switch transaction.Status {
+					case models.TRANSACTION_STATUS_COMPLETE:
+						return sendString(c, http.StatusOK, map[string]interface{}{"MESSAGE": "OK", "Status": "paid"})
+					default:
+						if payment.Mollie != nil && payment.Mollie.Id != "" {
+							if o, err := common.MOLLIE.GetOrder(payment.Mollie.Id); err == nil {
+								if o.Status == "paid" {
+									transaction.Status = models.TRANSACTION_STATUS_COMPLETE
+									if err = models.UpdateTransaction(common.Database, transaction); err != nil {
+										c.Status(http.StatusInternalServerError)
+										return c.JSON(HTTPError{err.Error()})
+									}
+									order.Status = models.ORDER_STATUS_PAID
+									if err = models.UpdateOrder(common.Database, order); err != nil {
+										c.Status(http.StatusInternalServerError)
+										return c.JSON(HTTPError{err.Error()})
+									}
+									// Notifications
+									if common.Config.Notification.Enabled {
+										if common.Config.Notification.Email.Enabled {
+											// to admin
+											//logger.Infof("Time to send admin email")
+											if users, err := models.GetUsersByRoleLessOrEqualsAndNotification(common.Database, models.ROLE_ADMIN, true); err == nil {
+												//logger.Infof("users found: %v", len(users))
+												template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_ADMIN_ORDER_PAID)
+												if err == nil {
+													//logger.Infof("Template: %+v", template)
+													for _, user := range users {
+														logger.Infof("Send email admin user: %+v", user.Email)
+														if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
+															logger.Errorf("%+v", err)
+														}
 													}
+												}else{
+													logger.Warningf("%+v", err)
 												}
 											}else{
 												logger.Warningf("%+v", err)
 											}
-										}else{
-											logger.Warningf("%+v", err)
-										}
-										// to user
-										//logger.Infof("Time to send user email")
-										template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_USER_ORDER_PAID)
-										if err == nil {
-											//logger.Infof("Template: %+v", template)
-											if user, err := models.GetUser(common.Database, int(order.UserId)); err == nil {
-												if user.EmailConfirmed {
-													logger.Infof("Send email to user: %+v", user.Email)
-													if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
-														logger.Errorf("%+v", err)
+											// to user
+											//logger.Infof("Time to send user email")
+											template, err := models.GetEmailTemplateByType(common.Database, common.NOTIFICATION_TYPE_USER_ORDER_PAID)
+											if err == nil {
+												//logger.Infof("Template: %+v", template)
+												if user, err := models.GetUser(common.Database, int(order.UserId)); err == nil {
+													if user.EmailConfirmed {
+														logger.Infof("Send email to user: %+v", user.Email)
+														if err = SendOrderPaidEmail(mail.NewEmail(user.Login, user.Email), int(order.ID), template); err != nil {
+															logger.Errorf("%+v", err)
+														}
+													}else{
+														logger.Warningf("User's %v email %v is not confirmed", user.Login, user.Email)
 													}
-												}else{
-													logger.Warningf("User's %v email %v is not confirmed", user.Login, user.Email)
+												} else {
+													logger.Warningf("%+v", err)
 												}
-											} else {
-												logger.Warningf("%+v", err)
 											}
 										}
 									}
+									return sendString(c, http.StatusOK, map[string]interface{}{"MESSAGE": "OK", "Status": o.Status})
+								}else{
+									return sendString(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": "Unknown status: " + o.Status, "Status": o.Status})
 								}
-								return sendString(c, http.StatusOK, map[string]interface{}{"MESSAGE": "OK", "Status": o.Status})
 							}else{
-								return sendString(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": "Unknown status: " + o.Status, "Status": o.Status})
+								logger.Errorf("%+v", err)
+								return sendString(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": err.Error()})
 							}
-						}else{
-							logger.Errorf("%+v", err)
-							return sendString(c, http.StatusInternalServerError, map[string]interface{}{"ERROR": err.Error()})
 						}
 					}
 				}else{
