@@ -36,7 +36,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210816121425"
+	COMPILED = "20210818171241"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -266,6 +266,7 @@ type ProductPF struct {
 	DimensionUnit string `json:",omitempty"`
 	Volume float64 `json:",omitempty"`
 	Weight float64 `json:",omitempty"`
+	WeightUnit string `json:",omitempty"`
 	Availability string `json:",omitempty"`
 	Vendor VendorPF `json:",omitempty"`
 	Time string `json:",omitempty"`
@@ -322,11 +323,13 @@ type VariationPF struct {
 	Prices []PricePF     `json:",omitempty"`
 	Pattern string      `json:",omitempty"`
 	Dimensions string   `json:",omitempty"`
+	DimensionUnit string `json:",omitempty"`
 	Width float64       `json:",omitempty"`
 	Height float64      `json:",omitempty"`
 	Depth float64       `json:",omitempty"`
 	Volume float64 `json:",omitempty"`
 	Weight float64      `json:",omitempty"`
+	WeightUnit string `json:",omitempty"`
 	Packages int      `json:",omitempty"`
 	Availability string `json:",omitempty"`
 	//Sending string `json:",omitempty"`

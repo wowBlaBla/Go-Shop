@@ -396,7 +396,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 						if price.Price > 0 {
 							propertyShortView.Price = price.Price * tax
 						}
-						item.Price += price.Price * tax
+						//item.Price += price.Price * tax
 						propertiesShortView = append(propertiesShortView, propertyShortView)
 					} else {
 						return nil, nil, err
@@ -430,7 +430,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 				})
 				//
 				if len(prices2) > 0 && prices2[0].Price > 0 {
-					item.Price += prices2[0].Price * tax
+					item.Price = prices2[0].Price * tax
 					pricesShortView = append(pricesShortView, PriceShortView{Price: prices2[0].Price * tax, Availability: prices2[0].Availability})
 				}
 			}

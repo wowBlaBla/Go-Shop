@@ -2,8 +2,10 @@ package common
 
 import (
 	"bytes"
+	"encoding/json"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	"html/template"
+	"reflect"
 	"regexp"
 	"strings"
 )
@@ -21,7 +23,9 @@ var (
 		"absolute": absolute,
 		"add": add,
 		"even": even,
+		"exists": exists,
 		"index": index,
+		"jsonify": jsonify,
 		"odd": odd,
 		"split": split,
 		"toUuid":  toUuid,
@@ -44,11 +48,34 @@ func even(i int) bool {
 	return i % 2 == 0
 }
 
+func exists(name string, data interface{}) bool {
+	v := reflect.ValueOf(data)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return false
+	}
+	return v.FieldByName(name).IsValid()
+}
+
 func index(arr []string, i int) string{
 	if len(arr) > i {
 		return arr[i]
 	}
 	return ""
+}
+
+func jsonify(inp interface{}) string {
+	if bts, err := json.Marshal(inp); err == nil {
+		return string(bts)
+	}else{
+		if bts, err := json.Marshal(err.Error()); err == nil {
+			return string(bts)
+		}else{
+			return "\"ERROR\""
+		}
+	}
 }
 
 func odd(i int) bool {
@@ -83,7 +110,7 @@ type NotificationTemplateVariables struct {
 	Samples interface{}
 }
 
-func (n *Notification) SendEmail(from, to *mail.Email, topic, message string, vars *NotificationTemplateVariables) error {
+func (n *Notification) SendEmail(from, to *mail.Email, topic, message string, vars map[string]interface{}) error {
 	if tmpl, err := template.New("topic").Funcs(funcMap).Parse(topic); err == nil {
 		var tpl bytes.Buffer
 		if err := tmpl.Execute(&tpl, vars); err == nil {

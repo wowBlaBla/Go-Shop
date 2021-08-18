@@ -819,11 +819,18 @@ var renderCmd = &cobra.Command{
 							Depth:        product.Depth,
 							Volume:       product.Volume,
 							Weight:       product.Weight,
+							WeightUnit: product.WeightUnit,
 							Packages:     product.Packages,
 							Availability: product.Availability,
 							Time:         product.Time,
 							Sku:          product.Sku,
 							ProductId:    product.ID,
+						}
+						if variation.DimensionUnit == "" && common.Config.DimensionUnit != "" {
+							variation.DimensionUnit = common.Config.DimensionUnit
+						}
+						if variation.WeightUnit == "" && common.Config.WeightUnit != "" {
+							variation.WeightUnit = common.Config.WeightUnit
 						}
 						if product.Variation != "" {
 							variation.Title = product.Variation
@@ -861,15 +868,23 @@ var renderCmd = &cobra.Command{
 									//Dimensions: variation.Dimensions,
 									Pattern:      variation.Pattern,
 									Dimensions:   variation.Dimensions,
+									DimensionUnit:   variation.DimensionUnit,
 									Width:        variation.Width,
 									Height:       variation.Height,
 									Depth:        variation.Depth,
 									Volume:       variation.Volume,
 									Weight:       variation.Weight,
+									WeightUnit:   variation.WeightUnit,
 									Packages:     variation.Packages,
 									Availability: variation.Availability,
 									Sku:          variation.Sku,
 									Selected:     len(productView.Variations) == 0,
+								}
+								if variationView.DimensionUnit == "" && common.Config.DimensionUnit != "" {
+									variationView.DimensionUnit = common.Config.DimensionUnit
+								}
+								if variationView.WeightUnit == "" && common.Config.WeightUnit != "" {
+									variationView.WeightUnit = common.Config.WeightUnit
 								}
 								//
 								for _, price := range variation.Prices {
@@ -1091,6 +1106,7 @@ var renderCmd = &cobra.Command{
 					productView.DimensionUnit = product.DimensionUnit
 					productView.Volume = product.Volume
 					productView.Weight = product.Weight
+					productView.WeightUnit = product.WeightUnit
 					productView.Availability = product.Availability
 					if product.Vendor != nil {
 						productView.Vendor = common.VendorPF{
@@ -1217,6 +1233,7 @@ var renderCmd = &cobra.Command{
 													Dimensions: product.Dimensions,
 													DimensionUnit: product.DimensionUnit,
 													Width: product.Width,
+													WeightUnit: product.WeightUnit,
 													Height: product.Height,
 													Depth: product.Depth,
 													Volume: product.Volume,

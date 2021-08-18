@@ -450,9 +450,8 @@ func postFormMessageHandler(c *fiber.Ctx) error {
 						//logger.Infof("Template: %+v", template)
 						for _, user := range users {
 							logger.Infof("Send email admin user: %+v", user.Email)
-							vars := &common.NotificationTemplateVariables{
-								Url: common.Config.Url,
-							}
+							vars := make(map[string]interface{})
+							vars["Url"] = common.Config.Url
 							var payload struct {
 								Address struct {
 									Name string
@@ -471,9 +470,7 @@ func postFormMessageHandler(c *fiber.Ctx) error {
 									Value string
 								}
 							}
-							logger.Infof("body: %+v", body)
 							if err = json.Unmarshal([]byte(body), &payload); err == nil {
-								logger.Infof("payload1: %+v", payload)
 								for i := 0; i < len(payload.Samples); i++ {
 									if cache, err := models.GetCacheValueByValueId(common.Database, payload.Samples[i].ID); err == nil {
 										payload.Samples[i].Title = cache.Title
@@ -481,9 +478,8 @@ func postFormMessageHandler(c *fiber.Ctx) error {
 										payload.Samples[i].Value = cache.Value
 									}
 								}
-								logger.Infof("payload2: %+v", payload)
-								vars.Address = payload.Address
-								vars.Samples = payload.Samples
+								vars["Address"] = payload.Address
+								vars["Samples"] = payload.Samples
 								if err := common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), mail.NewEmail(user.Login, user.Email), template.Topic, template.Message, vars); err != nil {
 									logger.Warningf("%+v", err)
 								}

@@ -264,9 +264,9 @@ func postAccountCommentHandler(c *fiber.Ctx) error {
 		var resizes []string
 		if images, found := data.File["Images"]; found && len(images) > 0 {
 			for i, image := range images {
-				if image.Size > 1024 * 1024 * 3 {
+				if image.Size > 1024 * 1024 * 10 {
 					c.Status(http.StatusInternalServerError)
-					return c.JSON(HTTPError{"Maximum image size 3Mb"})
+					return c.JSON(HTTPError{"Maximum image size 10Mb"})
 				}
 				p := path.Join(dir, "storage", "comments")
 				if _, err := os.Stat(p); err != nil {
@@ -356,6 +356,7 @@ type CommentsListItem struct {
 	Enabled bool
 	CreatedAt time.Time
 	Title string
+	Body string
 	Max float64
 	Images string
 	ProductId uint
@@ -398,6 +399,10 @@ func postCommentsListHandler(c *fiber.Ctx) error {
 		for key, value := range request.Filter {
 			if key != "" && len(strings.TrimSpace(value)) > 0 {
 				switch key {
+				case "Title":
+					keys1 = append(keys1, "(comments.Title like ? or comments.Body like ?)")
+					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
+					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
 				case "ProductTitle":
 					keys1 = append(keys1, fmt.Sprintf("products.%v like ?", "Title"))
 					values1 = append(values1, "%" + strings.TrimSpace(value) + "%")
@@ -470,7 +475,7 @@ func postCommentsListHandler(c *fiber.Ctx) error {
 	//logger.Infof("order: %+v", order)
 	//
 	response.Data = []CommentsListItem{}
-	rows, err := common.Database.Debug().Model(&models.Comment{}).Select("comments.ID, comments.created_at as CreatedAt, comments.Enabled, comments.Title, comments.Max, cache_comments.Images as Images, comments.product_id as ProductId, products.Title as ProductTitle, cache_products.Thumbnail as ProductThumbnail, users.Name as UserName, users.Lastname as UserLastname, comments.user_id as UserId").Joins("left join cache_comments on comments.id = cache_comments.comment_id").Joins("left join products on comments.product_id = products.id").Joins("left join cache_products on comments.product_id = cache_products.product_id").Joins("left join users on comments.user_id = users.id").Where(strings.Join(keys1, " and "), values1...).Group("comments.id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
+	rows, err := common.Database.Debug().Model(&models.Comment{}).Select("comments.ID, comments.created_at as CreatedAt, comments.Enabled, comments.Title, comments.Body, comments.Max, cache_comments.Images as Images, comments.product_id as ProductId, products.Title as ProductTitle, cache_products.Thumbnail as ProductThumbnail, users.Name as UserName, users.Lastname as UserLastname, comments.user_id as UserId").Joins("left join cache_comments on comments.id = cache_comments.comment_id").Joins("left join products on comments.product_id = products.id").Joins("left join cache_products on comments.product_id = cache_products.product_id").Joins("left join users on comments.user_id = users.id").Where(strings.Join(keys1, " and "), values1...).Group("comments.id").Order(order).Limit(request.Length).Offset(request.Start).Rows()
 	if err == nil {
 		if err == nil {
 			for rows.Next() {
@@ -487,7 +492,7 @@ func postCommentsListHandler(c *fiber.Ctx) error {
 		}
 		rows.Close()
 	}
-	rows, err = common.Database.Debug().Model(&models.Comment{}).Select("comments.ID, comments.Enabled, comments.Title, comments.Max, comments.product_id as ProductId, comments.user_id as UserId").Joins("left join products on comments.product_id = products.id").Joins("left join cache_products on comments.product_id = cache_products.product_id").Joins("left join users on comments.user_id = users.id").Where(strings.Join(keys1, " and "), values1...).Group("comments.id").Rows()
+	rows, err = common.Database.Debug().Model(&models.Comment{}).Select("comments.ID, comments.Enabled, comments.Title, comments.Body, comments.Max, cache_comments.Images as Images, comments.product_id as ProductId, comments.user_id as UserId").Joins("left join products on comments.product_id = products.id").Joins("left join cache_products on comments.product_id = cache_products.product_id").Joins("left join cache_comments on comments.id = cache_comments.comment_id").Joins("left join users on comments.user_id = users.id").Where(strings.Join(keys1, " and "), values1...).Group("comments.id").Rows()
 	if err == nil {
 		for rows.Next() {
 			response.Filtered ++
@@ -520,10 +525,6 @@ type CommentPatchRequest struct {
 // @Router /api/v1/comments/{id} [patch]
 // @Tags comment
 func patchCommentHandler(c *fiber.Ctx) error {
-	var request CommentPatchRequest
-	if err := c.BodyParser(&request); err != nil {
-		return err
-	}
 	var id int
 	if v := c.Params("id"); v != "" {
 		id, _ = strconv.Atoi(v)
@@ -533,19 +534,40 @@ func patchCommentHandler(c *fiber.Ctx) error {
 	}
 	var comment *models.Comment
 	var err error
-	if comment, err = models.GetComment(common.Database, int(id)); err != nil {
+	if comment, err = models.GetComment(common.Database, id); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
-	if request.Enabled == "true" {
-		comment.Enabled = true
-	}else if request.Enabled == "false" {
-		comment.Enabled = false
+	if contentType := string(c.Request().Header.ContentType()); contentType != "" {
+		if strings.HasPrefix(contentType, fiber.MIMEApplicationJSON){
+			if action := c.Query("action", ""); action != "" {
+				switch action {
+				case "setEnable":
+					var request struct {
+						Enabled bool
+					}
+					if err := c.BodyParser(&request); err != nil {
+						return err
+					}
+					comment.Enabled = request.Enabled
+					if err = models.UpdateComment(common.Database, comment); err != nil {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{err.Error()})
+					}
+					c.Status(http.StatusOK)
+					return c.JSON(HTTPMessage{"OK"})
+				default:
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{"Unknown action"})
+				}
+			}else{
+				c.Status(http.StatusInternalServerError)
+				return c.JSON(HTTPError{"No action defined"})
+			}
+		}
 	}
-	if err = models.UpdateComment(common.Database, comment); err != nil {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(HTTPError{err.Error()})
-	}
+
+	c.Status(http.StatusOK)
 	return c.JSON(HTTPMessage{"OK"})
 }
 

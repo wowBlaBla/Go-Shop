@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/BurntSushi/toml"
+	"github.com/PuerkitoBio/goquery"
 	swagger "github.com/arsmn/fiber-swagger/v2"
 	"github.com/dannyvankooten/vat"
 	"github.com/dgrijalva/jwt-go"
@@ -317,6 +318,7 @@ func GetFiber() *fiber.App {
 	v1.Post("/notification/email", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), postEmailTemplateHandler)
 	v1.Post("/notification/email/list", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("email template created"), postEmailTemplatesListHandler)
 	v1.Get("/notification/email/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), getEmailTemplateHandler)
+	v1.Patch("/notification/email/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), patchEmailTemplateHandler)
 	v1.Put("/notification/email/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("email template updated"), putEmailTemplateHandler)
 	v1.Delete("/notification/email/:id", authRequired, hasRole(models.ROLE_ROOT, models.ROLE_ADMIN, models.ROLE_MANAGER), changed("email template deleted"), delEmailTemplateHandler)
 	//
@@ -593,10 +595,9 @@ func postResetHandler(c *fiber.Ctx) error {
 			if user, err := models.GetUser(common.Database, int(user.ID)); err == nil {
 				if user.EmailConfirmed {
 					logger.Infof("Send email to user: %+v", user.Email)
-					vars := &common.NotificationTemplateVariables{
-						Url: common.Config.Url,
-						Code: code,
-					}
+					vars := make(map[string]interface{})
+					vars["Url"] = common.Config.Url
+					vars["Code"] = code
 					if err := common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), mail.NewEmail(user.Login, user.Email), template.Topic, template.Message, vars); err != nil {
 						logger.Warningf("%+v", err)
 					}
@@ -3434,6 +3435,7 @@ type EmailTemplateView struct{
 	Enabled bool
 	Type string
 	Topic string
+	Body string
 	Message string
 }
 
@@ -3463,7 +3465,6 @@ func postEmailTemplateHandler(c *fiber.Ctx) error {
 			if err := c.BodyParser(&request); err != nil {
 				return err
 			}
-			//logger.Infof("request: %+v", request)
 			request.Type = strings.TrimSpace(request.Type)
 			if request.Type == "" {
 				c.Status(http.StatusInternalServerError)
@@ -3474,11 +3475,6 @@ func postEmailTemplateHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(fiber.Map{"ERROR": "Topic is not defined"})
 			}
-			request.Message = strings.TrimSpace(request.Message)
-			if request.Message == "" {
-				c.Status(http.StatusInternalServerError)
-				return c.JSON(fiber.Map{"ERROR": "Message is not defined"})
-			}
 			if template, err := models.GetEmailTemplateByType(common.Database, request.Type); err == nil && template != nil {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{"Template exists"})
@@ -3487,7 +3483,6 @@ func postEmailTemplateHandler(c *fiber.Ctx) error {
 				Enabled: request.Enabled,
 				Type: request.Type,
 				Topic: request.Topic,
-				Message: request.Message,
 			}
 			var err error
 			if _, err = models.CreateEmailTemplate(common.Database, template); err != nil {
@@ -3629,6 +3624,21 @@ func getEmailTemplateHandler(c *fiber.Ctx) error {
 		var view EmailTemplateView
 		if bts, err := json.MarshalIndent(template, "", "   "); err == nil {
 			if err = json.Unmarshal(bts, &view); err == nil {
+
+				doc, err := goquery.NewDocumentFromReader(bytes.NewReader([]byte(view.Message)))
+				if err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+				doc.Find("body").Each(func(i int, s *goquery.Selection) {
+					view.Body, err = s.Html()
+				})
+
+				if err != nil {
+					c.Status(http.StatusInternalServerError)
+					return c.JSON(HTTPError{err.Error()})
+				}
+
 				return c.JSON(view)
 			}else{
 				c.Status(http.StatusInternalServerError)
@@ -3642,6 +3652,93 @@ func getEmailTemplateHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(HTTPError{err.Error()})
 	}
+}
+
+// @security BasicAuth
+// TestEmailTemplate godoc
+// @Summary Test email template
+// @Accept json
+// @Produce json
+// @Param transport body EmailTemplateView true "body"
+// @Param id path int true "Email Template ID"
+// @Success 200 {object} EmailTemplateView
+// @Failure 404 {object} HTTPError
+// @Failure 500 {object} HTTPError
+// @Router /api/v1/notification/email/{id} [patch]
+// @Tags notification
+func patchEmailTemplateHandler(c *fiber.Ctx) error {
+	var request struct {
+		EmailTemplateView
+		Name string
+		Email string
+		Data string
+	}
+	if err := c.BodyParser(&request); err != nil {
+		return err
+	}
+	var id int
+	if v := c.Params("id"); v != "" {
+		id, _ = strconv.Atoi(v)
+	}else{
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(fiber.Map{"ERROR": "ID is not defined"})
+	}
+	var err error
+	if _, err = models.GetEmailTemplate(common.Database, int(id)); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	var message string
+	if request.Body == "" {
+		message = strings.TrimSpace(request.Message)
+	}else{
+		doc, err := goquery.NewDocumentFromReader(bytes.NewReader([]byte(request.Message)))
+		if err != nil {
+			c.Status(http.StatusInternalServerError)
+			return c.JSON(HTTPError{err.Error()})
+		}
+		doc.Find("body").Each(func(i int, s *goquery.Selection) {
+			s.SetHtml(request.Body)
+		})
+
+		if html, err := doc.Html(); err == nil {
+			message = strings.TrimSpace(html)
+		}else{
+			message = strings.TrimSpace(request.Message)
+		}
+	}
+
+	if request.Email == "" {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{"Email is not set"})
+	}
+
+	if common.NOTIFICATION.SendGrid == nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{"SendGrid is not configures"})
+	}
+
+	vars := make(map[string]interface{})
+	vars["Url"] = common.Config.Url
+	vars["Symbol"] = "$"
+	if common.Config.Symbol != "" {
+		vars["Symbol"] = common.Config.Symbol
+	}
+	var vars2 map[string]interface{}
+	if err = json.Unmarshal([]byte(request.Data), &vars2); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	for key, value := range vars2 {
+		vars[key] = value
+	}
+	if err = common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), mail.NewEmail(request.Name, request.Email), request.Topic, message, vars); err != nil {
+		logger.Warningf("%+v", err)
+		c.Status(http.StatusInternalServerError)
+		return c.JSON(HTTPError{err.Error()})
+	}
+	c.Status(http.StatusOK)
+	return c.JSON(HTTPMessage{"OK"})
 }
 
 // @security BasicAuth
@@ -3661,6 +3758,7 @@ func putEmailTemplateHandler(c *fiber.Ctx) error {
 		EmailTemplateView
 		Name string
 		Email string
+		Data string
 	}
 	if err := c.BodyParser(&request); err != nil {
 		return err
@@ -3689,120 +3787,21 @@ func putEmailTemplateHandler(c *fiber.Ctx) error {
 		c.Status(http.StatusInternalServerError)
 		return c.JSON(fiber.Map{"ERROR": "Topic is not defined"})
 	}
-	emailTemplate.Message = strings.TrimSpace(request.Message)
-	if emailTemplate.Message == "" {
-		c.Status(http.StatusInternalServerError)
-		return c.JSON(fiber.Map{"ERROR": "Message is not defined"})
-	}
-	if common.NOTIFICATION != nil && common.NOTIFICATION.SendGrid != nil && request.Email != "" {
-		//
-		vars := &common.NotificationTemplateVariables{
-			Url: common.Config.Url,
-			Symbol: "$",
-		}
-		if common.Config.Symbol != "" {
-			vars.Symbol = common.Config.Symbol
-		}
-		var orderView struct {
-			ID uint
-			CreatedAt time.Time
-			OrderShortView
-			Status string
-		}
-		if err = json.Unmarshal([]byte(`
-{
-  "Billing": {
-    "ID": 2,
-    "Name": "mollie",
-    "Title": "Mollie",
-    "Profile": {
-      "ID": 25,
-      "Email": "john0035@mail.com",
-      "Name": "John",
-      "Lastname": "Smith",
-      "Phone": "+49123456789",
-      "Address": "First 1/23",
-      "Zip": "12345",
-      "City": "Berlin",
-      "Country": "de"
-    },
-    "Method": "creditcard"
-  },
-  "Items": [
-    {
-      "Uuid": "[21,23,84]",
-      "Title": "Product With Variation",
-      "Path": "/products/bedroom/bed/product-with-variation",
-      "Thumbnail": "/images/products/59-image-1613727567.jpg,/images/products/resize/59-image-1613727567_324x0.jpg 324w,/images/products/resize/59-image-1613727567_512x0.jpg 512w,/images/products/resize/59-image-1613727567_1024x0.jpg 1024w",
-      "Variation": {
-        "Title": "With Boxes"
-      },
-      "Properties": [
-        {
-          "Title": "Boxes count",
-          "Value": "4",
-          "Rate": 100
-        }
-      ],
-      "Rate": 1300,
-      "Quantity": 1,
-      "VAT": 19,
-      "Total": 1300,
-      "Volume": 0.06,
-      "Weight": 32
-    }
-  ],
-  "Quantity": 1,
-  "Sum": 1300,
-  "Delivery": 104.4,
-  "VAT": 19,
-  "Total": 1404.4,
-  "Volume": 0.06,
-  "Weight": 32,
-  "Shipping": {
-    "ID": 3,
-    "Name": "fedex",
-    "Title": "FedEx",
-    "Thumbnail": "/transports/3-fedex-thumbnail.png",
-    "Services": [
-      {
-        "Name": "service1",
-        "Title": "Service1",
-        "Rate": 1,
-        "Selected": true
-      }
-    ],
-    "Profile": {
-      "ID": 26,
-      "Email": "john0035@mail.com",
-      "Name": "John",
-      "Lastname": "Smith",
-      "Phone": "+49123456789",
-      "Address": "First 1/23",
-      "Zip": "12345",
-      "City": "Berlin",
-      "Country": "de"
-    },
-    "Volume": 0.06,
-    "Weight": 32,
-    "Value": 104.4,
-    "Total": 104.4
-  }
-}
-`), &orderView); err == nil {
-			orderView.ID = 0
-			orderView.CreatedAt = time.Now()
-			orderView.Status = "new"
-			vars.Order = orderView
-		}
-		if bts, err := json.Marshal(vars); err == nil {
-			logger.Infof("Bts: %+v", string(bts))
-		}
-		//
-		if err = common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), mail.NewEmail(request.Name, request.Email), emailTemplate.Topic, emailTemplate.Message, vars); err != nil {
-			logger.Warningf("%+v", err)
+	if request.Body == "" {
+		emailTemplate.Message = strings.TrimSpace(request.Message)
+	} else {
+		doc, err := goquery.NewDocumentFromReader(bytes.NewReader([]byte(request.Message)))
+		if err != nil {
 			c.Status(http.StatusInternalServerError)
 			return c.JSON(HTTPError{err.Error()})
+		}
+		doc.Find("body").Each(func(i int, s *goquery.Selection) {
+			s.SetHtml(request.Body)
+		})
+		if html, err := doc.Html(); err == nil {
+			emailTemplate.Message = strings.TrimSpace(html)
+		} else {
+			emailTemplate.Message = strings.TrimSpace(request.Message)
 		}
 	}
 	if err := models.UpdateEmailTemplate(common.Database, emailTemplate); err == nil {
@@ -6136,14 +6135,12 @@ type DiscountCost struct {
 }
 
 func SendOrderPaidEmail(to *mail.Email, orderId int, template *models.EmailTemplate) error {
-	vars := &common.NotificationTemplateVariables{ }
+	vars := make(map[string]interface{})
 	if order, err := models.GetOrderFull(common.Database, orderId); err == nil {
-		vars = &common.NotificationTemplateVariables{
-			Url: common.Config.Url,
-			Symbol: "$",
-		}
+		vars["Url"] = common.Config.Url
+		vars["Symbol"] = "$"
 		if common.Config.Symbol != "" {
-			vars.Symbol = common.Config.Symbol
+			vars["Symbol"] = common.Config.Symbol
 		}
 		var orderView struct {
 			ID uint
@@ -6155,9 +6152,13 @@ func SendOrderPaidEmail(to *mail.Email, orderId int, template *models.EmailTempl
 			orderView.ID = order.ID
 			orderView.CreatedAt = order.CreatedAt
 			orderView.Status = order.Status
-			vars.Order = orderView
+			vars["Order"] = orderView
 		}
-		logger.Infof("View: %+v", orderView)
+		if bts, err := json.Marshal(vars); err == nil {
+			logger.Infof("vars: %+v", string(bts))
+		}else{
+			logger.Warningf("%+v", err)
+		}
 	}
 	//
 	return common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), to, template.Topic, template.Message, vars)

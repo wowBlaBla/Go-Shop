@@ -211,11 +211,10 @@ func postAccountHandler(c *fiber.Ctx) error {
 		if user, err := models.GetUser(common.Database, int(user.ID)); err == nil {
 			if user.EmailConfirmed {
 				logger.Infof("Send email to user: %+v", user.Email)
-				vars := &common.NotificationTemplateVariables{
-					Url: common.Config.Url,
-					Email: user.Email,
-					Password: password,
-				}
+				vars := make(map[string]interface{})
+				vars["Url"] = common.Config.Url
+				vars["Email"] = user.Enabled
+				vars["Password"] = password
 				if err := common.NOTIFICATION.SendEmail(mail.NewEmail(common.Config.Notification.Email.Name, common.Config.Notification.Email.Email), mail.NewEmail(user.Login, user.Email), template.Topic, template.Message, vars); err != nil {
 					logger.Warningf("%+v", err)
 				}
