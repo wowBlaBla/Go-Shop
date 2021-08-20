@@ -545,6 +545,7 @@ var renderCmd = &cobra.Command{
 			for i, product := range products {
 				if product.Enabled {
 					logger.Infof("[%d] Product ID: %+v Name: %v Title: %v", i, product.ID, product.Name, product.Title)
+					t2 := time.Now()
 					product, _ = models.GetProductFull(common.Database, int(product.ID))
 					// Common actions independent of category
 					productFile := &common.ProductFile{
@@ -726,7 +727,7 @@ var renderCmd = &cobra.Command{
 											name = reSanitizeFilename.ReplaceAllString(name, "_")
 											filename := fmt.Sprintf("%d-%s-%d%v", image.ID, name, fi.ModTime().Unix(), path.Ext(p1))
 											location := path.Join("images", filename)
-											logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
+											t2 := time.Now()
 											if images2, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Image.Size); err == nil {
 												// Generate thumbnail
 												thumbnail := strings.Join(images2, ",")
@@ -749,6 +750,7 @@ var renderCmd = &cobra.Command{
 													}
 												}
 											}
+											logger.Infof("Copy %v => %v %v bytes in ~ %.3f ms", p1, location, fi.Size(), float64(time.Since(t2).Nanoseconds())/1000000)
 										}
 									}
 								}else{
@@ -956,7 +958,7 @@ var renderCmd = &cobra.Command{
 													}
 													name = reSanitizeFilename.ReplaceAllString(name, "_")
 													filename := fmt.Sprintf("%d-%s-%d%v", image.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-													logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", filename), fi.Size())
+													t2 := time.Now()
 													if images2, err := common.STORAGE.PutImage(p1, path.Join("images", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 														images = append(images, strings.Join(images2, ","))
 														// Cache
@@ -972,6 +974,7 @@ var renderCmd = &cobra.Command{
 													} else {
 														logger.Warningf("%v", err)
 													}
+													logger.Infof("Copy %v => %v %v bytes in ~ %.3f ms", p1, path.Join("images", filename), fi.Size(), float64(time.Since(t2).Nanoseconds())/1000000)
 												}
 											}
 										}
@@ -1046,12 +1049,13 @@ var renderCmd = &cobra.Command{
 										if fi, err := os.Stat(p1); err == nil {
 											filename := filepath.Base(p1)
 											filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-											logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "variations", filename), fi.Size())
+											t2 := time.Now()
 											if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "variations", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 												variationView.Thumbnail = strings.Join(thumbnails, ",")
 											} else {
 												logger.Warningf("%v", err)
 											}
+											logger.Infof("Copy %v => %v %v bytes in ~ %.3f ms", p1, path.Join("images", "variations", filename), fi.Size(), float64(time.Since(t2).Nanoseconds())/1000000)
 										}
 									}
 								}
@@ -1746,6 +1750,7 @@ var renderCmd = &cobra.Command{
 							}
 						}
 					}
+					logger.Infof("[%d] Product ID: %+v Name: %v Title: %v ~ %.3f ms", i, product.ID, product.Name, product.Title, float64(time.Since(t2).Nanoseconds())/1000000)
 				}
 			}
 		}else{
