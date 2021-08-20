@@ -25,7 +25,8 @@ type NewPrice struct {
 	VariationId uint
 	//RateIds string
 	Rates []*models.Rate // ID matter
-	Price float64
+	BasePrice float64
+	SalePrice float64
 	Availability string
 	Sending string
 	Sku string
@@ -40,7 +41,8 @@ type PriceView struct {
 	//RateIds string
 	Rates []*RateView
 	Thumbnail string `json:",omitempty"`
-	Price float64
+	BasePrice float64
+	SalePrice float64
 	Prices []*PriceView
 	Availability string
 	Sending string
@@ -70,7 +72,8 @@ func postPriceHandler(c *fiber.Ctx) error {
 	//
 	price := &models.Price{
 		Enabled: request.Enabled,
-		Price: request.Price,
+		BasePrice: request.BasePrice,
+		SalePrice: request.SalePrice,
 		Availability: request.Availability,
 		Sending: request.Sending,
 		Sku: request.Sku,
@@ -122,7 +125,8 @@ func postPriceAllHandler(c *fiber.Ctx) error {
 	for _, request := range requests {
 		price := &models.Price{
 			Enabled: request.Enabled,
-			Price: request.Price,
+			BasePrice: request.BasePrice,
+			SalePrice: request.SalePrice,
 			Availability: request.Availability,
 			Sending: request.Sending,
 			Sku: request.Sku,
@@ -150,7 +154,8 @@ func postPriceAllHandler(c *fiber.Ctx) error {
 
 type ExistingPrice struct {
 	ID uint
-	Price float64
+	BasePrice float64
+	SalePrice float64
 	Availability string
 	Sending string
 	Sku string
@@ -178,7 +183,8 @@ func putPriceAllHandler(c *fiber.Ctx) error {
 	//
 	for _, request := range requests {
 		if price, err := models.GetPrice(common.Database, int(request.ID)); err == nil {
-			price.Price = request.Price
+			price.BasePrice = request.BasePrice
+			price.SalePrice = request.SalePrice
 			price.Availability = request.Availability
 			price.Sending = request.Sending
 			price.Sku = request.Sku
@@ -318,7 +324,8 @@ func putPriceHandler(c *fiber.Ctx) error {
 			if err := c.BodyParser(&request); err != nil {
 				return err
 			}
-			price.Price = request.Price
+			price.BasePrice = request.BasePrice
+			price.SalePrice = request.SalePrice
 			price.Availability = request.Availability
 			price.Sending = request.Sending
 			price.Sku = request.Sku
@@ -339,9 +346,14 @@ func putPriceHandler(c *fiber.Ctx) error {
 				c.Status(http.StatusInternalServerError)
 				return c.JSON(HTTPError{err.Error()})
 			}
-			if v, found := data.Value["Price"]; found && len(v) > 0 {
+			if v, found := data.Value["BasePrice"]; found && len(v) > 0 {
 				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
-					price.Price = vv
+					price.BasePrice = vv
+				}
+			}
+			if v, found := data.Value["SalePrice"]; found && len(v) > 0 {
+				if vv, _ := strconv.ParseFloat(v[0], 10); err == nil {
+					price.SalePrice = vv
 				}
 			}
 			if v, found := data.Value["Availability"]; found && len(v) > 0 {

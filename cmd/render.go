@@ -617,19 +617,32 @@ var renderCmd = &cobra.Command{
 							productView.Parameters = append(productView.Parameters, parameterView)
 						}
 					}
-					productFile.BasePrice = fmt.Sprintf("%.2f", product.BasePrice)
+					var minPrice float64
+					for _, variation := range product.Variations {
+						if variation.BasePrice != 0 && (minPrice == 0 || variation.BasePrice < minPrice) {
+							minPrice = variation.BasePrice
+						}
+						for _, price := range variation.Prices {
+							if price.BasePrice != 0 && (minPrice == 0 || price.BasePrice < minPrice) {
+								minPrice = price.BasePrice
+							}
+						}
+					}
+					productFile.BasePrice = fmt.Sprintf("%.2f", minPrice)
 					//productView.BasePrice = product.BasePrice
 					if product.SalePrice > 0 && (product.End.IsZero() || (product.Start.Before(now) && product.End.After(now))) {
-						productFile.SalePrice = fmt.Sprintf("%.2f", product.SalePrice)
-						//productView.SalePrice = product.SalePrice
-						productFile.Start = &product.Start
-						//productView.Start = &product.Start
-						productFile.End = &product.End
-						//productView.End = &product.End
-						if productFile.End.IsZero() {
-							end := now.AddDate(99, 0, 0)
-							productFile.End = &end
+						var minPrice float64
+						for _, variation := range product.Variations {
+							if variation.SalePrice != 0 && (minPrice == 0 || variation.SalePrice < minPrice) {
+								minPrice = variation.SalePrice
+							}
+							for _, price := range variation.Prices {
+								if price.SalePrice != 0 && (minPrice == 0 || price.SalePrice < minPrice) {
+									minPrice = price.SalePrice
+								}
+							}
 						}
+						productFile.SalePrice = fmt.Sprintf("%.2f", minPrice)
 					}
 					if product.ItemPrice > 0 {
 						productFile.ItemPrice = fmt.Sprintf("%.2f", product.ItemPrice)
@@ -812,6 +825,7 @@ var renderCmd = &cobra.Command{
 							MaxQuantity: product.MaxQuantity,
 							PurchasableMultiply: product.PurchasableMultiply,
 							Prices: product.Prices,
+							Pattern: product.Pattern,
 							Dimensions: product.Dimensions,
 							DimensionUnit: product.DimensionUnit,
 							Width:        product.Width,
@@ -839,15 +853,31 @@ var renderCmd = &cobra.Command{
 					}
 					var basePriceMin float64
 					if len(product.Variations) > 0 {
-						productFile.BasePrice = fmt.Sprintf("%.2f", product.Variations[0].BasePrice)
-						if product.Variations[0].SalePrice > 0 && (product.Variations[0].End.IsZero() || (product.Variations[0].Start.Before(now) && product.Variations[0].End.After(now))){
-							productFile.SalePrice = fmt.Sprintf("%.2f", product.Variations[0].SalePrice)
-							productFile.Start = &product.Variations[0].Start
-							productFile.End = &product.Variations[0].End
-							if productFile.End.IsZero() {
-								end := now.AddDate(99, 0, 0)
-								productFile.End = &end
+						var minPrice float64
+						for _, variation := range product.Variations {
+							if variation.BasePrice != 0 && (minPrice == 0 || variation.BasePrice < minPrice) {
+								minPrice = variation.BasePrice
 							}
+							for _, price := range variation.Prices {
+								if price.BasePrice != 0 && (minPrice == 0 || price.BasePrice < minPrice) {
+									minPrice = price.BasePrice
+								}
+							}
+						}
+						productFile.BasePrice = fmt.Sprintf("%.2f", minPrice)
+						if product.Variations[0].SalePrice > 0 && (product.Variations[0].End.IsZero() || (product.Variations[0].Start.Before(now) && product.Variations[0].End.After(now))){
+							var minPrice float64
+							for _, variation := range product.Variations {
+								if variation.SalePrice != 0 && (minPrice == 0 || variation.SalePrice < minPrice) {
+									minPrice = variation.SalePrice
+								}
+								for _, price := range variation.Prices {
+									if price.SalePrice != 0 && (minPrice == 0 || price.SalePrice < minPrice) {
+										minPrice = price.SalePrice
+									}
+								}
+							}
+							productFile.SalePrice = fmt.Sprintf("%.2f", minPrice)
 						}
 						if product.Variations[0].ItemPrice > 0 {
 							productFile.ItemPrice = fmt.Sprintf("%.2f", product.Variations[0].ItemPrice)
@@ -895,9 +925,12 @@ var renderCmd = &cobra.Command{
 									pricePF := common.PricePF{
 										Ids:          ids,
 										Thumbnail:    price.Thumbnail,
-										Price:        price.Price,
+										BasePrice:        price.BasePrice,
 										Availability: price.Availability,
 										Sku:          price.Sku,
+									}
+									if price.SalePrice > 0 {
+										pricePF.SalePrice = price.SalePrice
 									}
 									if v, found := CACHE_PRICES.Get(pricePF.Thumbnail); found {
 										pricePF.Thumbnail = v.(string)
@@ -996,16 +1029,16 @@ var renderCmd = &cobra.Command{
 
 								if variation.SalePrice > 0 && (variation.End.IsZero() || (variation.Start.Before(now) && variation.End.After(now))) {
 									variationView.SalePrice = variation.SalePrice
-									variationView.Start = &variation.Start
-									variationView.End = &variation.End
-									if variationView.End.IsZero() {
-										end := now.AddDate(99, 0, 0)
-										variationView.End = &end
-									}
 								}
 
 								if basePriceMin > variation.BasePrice || basePriceMin < 0.01 {
 									basePriceMin = variation.BasePrice
+								}
+
+								for _, price := range variation.Prices {
+									if price.BasePrice != 0 && (basePriceMin == 0 || price.BasePrice < basePriceMin) {
+										basePriceMin = price.BasePrice
+									}
 								}
 								// Thumbnail
 								if variation.Thumbnail != "" {
@@ -1095,6 +1128,7 @@ var renderCmd = &cobra.Command{
 									Description: variation.Description,
 									Thumbnail:   variationView.Thumbnail,
 									BasePrice:   variation.BasePrice,
+									SalePrice:   variation.SalePrice,
 								}); err != nil {
 									logger.Warningf("%v", err)
 								}
@@ -1664,7 +1698,47 @@ var renderCmd = &cobra.Command{
 									Sku: product.Sku,
 								}
 								if len(product.Variations) > 0 {
-									cacheProduct.Price = product.Variations[0].BasePrice
+									// BasePrice
+									var minPrice float64
+									for _, variation := range product.Variations {
+										if variation.BasePrice != 0 && (minPrice == 0 || variation.BasePrice < minPrice) {
+											minPrice = variation.BasePrice
+										}
+										for _, price := range variation.Prices {
+											if price.BasePrice != 0 && (minPrice == 0 || price.BasePrice < minPrice) {
+												minPrice = price.BasePrice
+											}
+										}
+									}
+									cacheProduct.BasePrice = minPrice
+									//
+									minPrice = 0
+									for _, variation := range product.Variations {
+										if variation.SalePrice != 0 && (minPrice == 0 || variation.SalePrice < minPrice) {
+											minPrice = variation.SalePrice
+										}
+										for _, price := range variation.Prices {
+											if price.SalePrice != 0 && (minPrice == 0 || price.SalePrice < minPrice) {
+												minPrice = price.SalePrice
+											}
+										}
+									}
+									cacheProduct.SalePrice = minPrice
+								}else{
+									var minPrice = product.BasePrice
+									for _, price := range product.Prices {
+										if price.BasePrice != 0 && (minPrice == 0 || price.BasePrice < minPrice) {
+											minPrice = price.BasePrice
+										}
+									}
+									cacheProduct.BasePrice = minPrice
+									minPrice = product.SalePrice
+									for _, price := range product.Prices {
+										if price.SalePrice != 0 && (minPrice == 0 || price.SalePrice < minPrice) {
+											minPrice = price.SalePrice
+										}
+									}
+									cacheProduct.SalePrice = minPrice
 								}
 								if _, err = models.CreateCacheProduct(common.Database, cacheProduct); err != nil {
 									logger.Warningf("%v", err)

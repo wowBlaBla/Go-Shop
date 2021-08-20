@@ -320,25 +320,25 @@ func CreateFiberAppWithAuthMultiple(config AuthMultipleConfig, middleware ...int
 								auth = true
 							} else {
 								logger.Errorf("%v", err)
-								c.JSON(fiber.Map{"ERROR": err.Error()})
-								c.Status(http.StatusInternalServerError)
+								c.Status(http.StatusForbidden)
+								return c.JSON(fiber.Map{"ERROR": err.Error()})
 							}
 						}else{
 							err = fmt.Errorf("expired token")
 							logger.Errorf("%v", err)
-							c.JSON(fiber.Map{"ERROR": err.Error()})
-							c.Status(http.StatusInternalServerError)
+							c.Status(http.StatusForbidden)
+							return c.JSON(fiber.Map{"ERROR": err.Error()})
 						}
 					}else{
 						err = fmt.Errorf("invalid token")
 						logger.Errorf("%v", err)
-						c.JSON(fiber.Map{"ERROR": err.Error()})
-						c.Status(http.StatusInternalServerError)
+						c.Status(http.StatusForbidden)
+						return c.JSON(fiber.Map{"ERROR": err.Error()})
 					}
 				}else{
 					logger.Errorf("%v", err)
-					c.JSON(fiber.Map{"ERROR": err.Error()})
-					c.Status(http.StatusInternalServerError)
+					c.Status(http.StatusForbidden)
+					return c.JSON(fiber.Map{"ERROR": err.Error()})
 				}
 			}else{
 				err = fmt.Errorf("unsupported Authorization type")

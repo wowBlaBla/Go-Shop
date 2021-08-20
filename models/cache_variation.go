@@ -13,6 +13,7 @@ type CacheVariation struct {
 	Thumbnail   string
 	Images string
 	BasePrice   float64 // min value
+	SalePrice   float64 // min value
 }
 
 func (CacheVariation) TableName() string {

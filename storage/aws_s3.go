@@ -340,7 +340,7 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 					if width, err = strconv.Atoi(pair[0]); err != nil {
 						return locations, err
 					}
-					locations = append(locations, fmt.Sprintf("%v?w=%v", origin, width))
+					locations = append(locations, fmt.Sprintf("%v?w=%v&q=%v", origin, width, 85))
 				}
 			}
 		}

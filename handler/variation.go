@@ -971,7 +971,8 @@ func putVariationHandler(c *fiber.Ctx) error {
 						var found bool
 						for i, newPrice := range newPrices {
 							if existingPrice.ID == newPrice.ID {
-								existingPrice.Price = newPrice.Price
+								existingPrice.BasePrice = newPrice.BasePrice
+								existingPrice.SalePrice = newPrice.SalePrice
 								existingPrice.Availability =  newPrice.Availability
 								existingPrice.Sku =  newPrice.Sku
 								existingPrice.Stock = newPrice.Stock
@@ -998,7 +999,8 @@ func putVariationHandler(c *fiber.Ctx) error {
 					}
 					for _, newPrice := range newPrices {
 						price := &models.Price{
-							Price: newPrice.Price,
+							BasePrice: newPrice.BasePrice,
+							SalePrice: newPrice.SalePrice,
 							Availability: newPrice.Availability,
 							Sku: newPrice.Sku,
 							Stock:  newPrice.Stock,

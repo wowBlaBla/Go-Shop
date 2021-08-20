@@ -589,6 +589,21 @@ var RootCmd = &cobra.Command{
 					return output, err
 				},
 			},
+			{
+				Timestamp: time.Date(2021, time.August, 18, 0, 0, 0, 0, now.Location()).Format(time.RFC3339),
+				Name: "Convert Price to BasePrice in prices",
+				Description: "Convert data because of structure changes",
+				Run: func() (string, error) {
+					var output string
+					common.Database.Exec("update prices set base_price = price")
+					if err = common.Database.Error; err == nil {
+						output = "prices updated"
+					} else {
+						return output, err
+					}
+					return output, err
+				},
+			},
 		}
 		var newMigrations []*models.Migration
 		if existingMigrations, err := models.GetMigrations(common.Database); err == nil {

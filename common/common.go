@@ -36,7 +36,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210818171241"
+	COMPILED = "20210819152145"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -221,8 +221,6 @@ type ProductFile struct {
 	Thumbnail  string
 	BasePrice  string
 	SalePrice  string `json:",omitempty"`
-	Start      *time.Time `json:",omitempty"`
-	End        *time.Time `json:",omitempty"`
 	ItemPrice  string `json:",omitempty"`
 	MinQuantity int `json:",omitempty"`
 	MaxQuantity int `json:",omitempty"`
@@ -314,8 +312,6 @@ type VariationPF struct {
 	Files     []FilePF `json:",omitempty"`
 	BasePrice float64
 	SalePrice  float64  `json:",omitempty"`
-	Start *time.Time    `json:",omitempty"`
-	End *time.Time      `json:",omitempty"`
 	ItemPrice  float64 `json:",omitempty"`
 	MinQuantity int `json:",omitempty"`
 	MaxQuantity int `json:",omitempty"`
@@ -342,7 +338,8 @@ type VariationPF struct {
 type PricePF struct {
 	Ids []uint
 	Thumbnail string `json:",omitempty"`
-	Price float64
+	BasePrice float64
+	SalePrice float64 `json:",omitempty"`
 	Availability string `json:",omitempty"`
 	Sku string `json:",omitempty"`
 }
@@ -412,8 +409,6 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Thumbnail  string
 		BasePrice  string
 		SalePrice  string `json:",omitempty"`
-		Start       *time.Time `json:",omitempty"`
-		End       *time.Time `json:",omitempty"`
 		ItemPrice  string `json:",omitempty"`
 		MinQuantity int `json:",omitempty"`
 		MaxQuantity int `json:",omitempty"`
@@ -442,8 +437,6 @@ func (p *ProductFile) MarshalJSON() ([]byte, error) {
 		Thumbnail: p.Thumbnail,
 		BasePrice: p.BasePrice,
 		SalePrice: p.SalePrice,
-		Start: p.Start,
-		End: p.End,
 		ItemPrice: p.ItemPrice,
 		MinQuantity: p.MinQuantity,
 		MaxQuantity: p.MaxQuantity,

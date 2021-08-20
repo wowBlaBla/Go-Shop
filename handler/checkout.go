@@ -299,7 +299,7 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 			var prices []*models.Price
 			if variationId == 0 {
 				name = "default"
-				title = "default"
+				title = "Default"
 				basePrice = product.BasePrice
 				salePrice = product.SalePrice
 				start = product.Start
@@ -429,9 +429,16 @@ func Checkout(request CheckoutRequest) (*models.Order, *OrderShortView, error){
 					return len(prices2[i].Rates) > len(prices2[j].Rates)
 				})
 				//
-				if len(prices2) > 0 && prices2[0].Price > 0 {
-					item.Price = prices2[0].Price * tax
-					pricesShortView = append(pricesShortView, PriceShortView{Price: prices2[0].Price * tax, Availability: prices2[0].Availability})
+				if len(prices2) > 0 {
+					item.BasePrice = prices2[0].BasePrice * tax
+					item.SalePrice = prices2[0].SalePrice * tax
+					if prices2[0].SalePrice > 0 {
+						item.Price = prices2[0].SalePrice * tax
+						pricesShortView = append(pricesShortView, PriceShortView{Price: prices2[0].SalePrice * tax, Availability: prices2[0].Availability})
+					} else if prices2[0].BasePrice > 0 {
+						item.Price = prices2[0].BasePrice * tax
+						pricesShortView = append(pricesShortView, PriceShortView{Price: prices2[0].BasePrice * tax, Availability: prices2[0].Availability})
+					}
 				}
 			}
 			// Coupons

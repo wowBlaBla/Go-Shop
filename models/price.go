@@ -17,7 +17,8 @@ type Price struct {
 	//
 	Enabled bool
 	Thumbnail string `gorm:"many2many:prices_rates;"`
-	Price float64
+	BasePrice float64
+	SalePrice float64
 	Availability string
 	Sending string
 	Sku string
