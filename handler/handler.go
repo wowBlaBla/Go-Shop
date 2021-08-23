@@ -51,6 +51,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	go_cache "github.com/patrickmn/go-cache"
 )
 
 const (
@@ -64,6 +65,9 @@ var (
 	rePercent = regexp.MustCompile(`^(\d+(:?\.\d{1,3})?)%$`)
 	reName = regexp.MustCompile(`(.+?)-(\d+)$`)
 	reDotHtml = regexp.MustCompile(`\.html$`)
+	reMain = regexp.MustCompile(`^main(\..*)\.js$`)
+	reBuild = regexp.MustCompile(`build:([0-9]{14}),`)
+	CACHE = go_cache.New(time.Minute, time.Minute)
 )
 
 
@@ -760,6 +764,7 @@ type InfoView struct {
 	Version string `json:",omitempty"`
 	Compiled string `json:",omitempty"`
 	Started string
+	Ui string
 	AbsolutePrice bool `json:",omitempty"`
 	Debug bool `json:",omitempty"`
 	Decimal string `json:",omitempty"`
@@ -839,6 +844,35 @@ func getInfoHandler(c *fiber.Ctx) error {
 			}
 		}
 	}
+	//
+	if v, found := CACHE.Get("goshop-admin-build"); !found {
+		var files[]string
+		if err := filepath.Walk(path.Join(dir, "admin"), func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				fmt.Println(err)
+				return nil
+			}
+			if !info.IsDir() && reMain.MatchString(info.Name()) {
+				files = append(files, path)
+			}
+			return nil
+		}); err != nil {
+			logger.Warningf("%+v", err)
+		}
+		for _, file := range files {
+			if _, err := os.Stat(file); err == nil {
+				if bts, err := ioutil.ReadFile(file); err == nil {
+					if res := reBuild.FindStringSubmatch(string(bts)); len(res) > 1 {
+						CACHE.Set("goshop-admin-build", res[1], 5 * time.Minute)
+						view.Ui = res[1]
+					}
+				}
+			}
+		}
+	}else{
+		view.Ui = v.(string)
+	}
+	//
 	return c.JSON(view)
 }
 
