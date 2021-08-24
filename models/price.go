@@ -8,9 +8,9 @@ type Price struct {
 	gorm.Model // ID is here
 	//
 	Product *Product `gorm:"foreignKey:ProductId"`
-	ProductId uint
+	ProductId uint `gorm:"index:product_id"`
 	Variation *Variation `gorm:"foreignKey:VariationId"`
-	VariationId uint
+	VariationId uint `gorm:"index:variation_id"`
 	//
 	//RateIds string
 	Rates      []*Rate `gorm:"many2many:prices_rates;"`
@@ -25,9 +25,9 @@ type Price struct {
 	Stock uint
 }
 
-func (p *Price) AfterDelete(tx *gorm.DB) error {
+/*func (p *Price) AfterDelete(tx *gorm.DB) error {
 	return tx.Debug().Exec("delete from prices_rates where price_id = ?", p.ID).Error
-}
+}*/
 
 func GetPrices(connector *gorm.DB) ([]*Price, error) {
 	db := connector

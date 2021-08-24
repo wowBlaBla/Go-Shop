@@ -1264,6 +1264,14 @@ func putProductHandler(c *fiber.Ctx) error {
 			var newProperties PropertiesView
 			if v, found := data.Value["Properties"]; found {
 				if err = json.Unmarshal([]byte(v[0]), &newProperties); err == nil {
+					var count = 1
+					for _, property := range newProperties {
+						count *= len(property.Rates)
+					}
+					if count > common.MAX_PRICES {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{fmt.Sprintf("Too many prices: %d, limit %d", count, common.MAX_PRICES)})
+					}
 					var existingProperties, updatedProperties []*models.Property
 					if existingProperties, err = models.GetPropertiesByProductId(common.Database, int(product.ID)); err != nil {
 						c.Status(http.StatusInternalServerError)
@@ -1542,7 +1550,6 @@ func putProductHandler(c *fiber.Ctx) error {
 
 					// Prices
 					if resized {
-						logger.Infof("Resize %v", resized)
 						if prices, err := models.GetPricesByProductId(common.Database, product.ID); err == nil {
 							for _, price := range prices {
 								if err = models.DeletePrice(common.Database, price); err != nil {
@@ -1587,9 +1594,9 @@ func putProductHandler(c *fiber.Ctx) error {
 							break
 						}
 					}
-					if len(matrix) > 250 {
+					if len(matrix) > common.MAX_PRICES {
 						c.Status(http.StatusInternalServerError)
-						return c.JSON(HTTPError{"Too many properties combinations, please reduce property values count"})
+						return c.JSON(HTTPError{fmt.Sprintf("Too many prices: %d, limit %d", len(matrix), common.MAX_PRICES)})
 					}
 					var existingPrices []*models.Price
 					if existingPrices, err = models.GetPricesByProductId(common.Database, product.ID); err != nil {
@@ -2018,16 +2025,18 @@ func putProductHandler(c *fiber.Ctx) error {
 			}
 			if v, found := data.Value["Tags"]; found && len(v) > 0 {
 				for _, vv := range strings.Split(strings.TrimSpace(v[0]), ",") {
-					if tagId, err := strconv.Atoi(strings.TrimSpace(vv)); err == nil {
-						if tag, err := models.GetTag(common.Database, tagId); err == nil {
-							if err = models.AddProductToTag(common.Database, tag, product); err != nil {
+					if vv != "" {
+						if tagId, err := strconv.Atoi(strings.TrimSpace(vv)); err == nil {
+							if tag, err := models.GetTag(common.Database, tagId); err == nil {
+								if err = models.AddProductToTag(common.Database, tag, product); err != nil {
+									logger.Errorf("%v", err)
+								}
+							} else {
 								logger.Errorf("%v", err)
 							}
-						}else{
+						} else {
 							logger.Errorf("%v", err)
 						}
-					}else{
-						logger.Errorf("%v", err)
 					}
 				}
 			}
@@ -2037,16 +2046,18 @@ func putProductHandler(c *fiber.Ctx) error {
 			}
 			if v, found := data.Value["RelatedProducts"]; found && len(v) > 0 {
 				for _, vv := range strings.Split(strings.TrimSpace(v[0]), ",") {
-					if productId, err := strconv.Atoi(strings.TrimSpace(vv)); err == nil {
-						if p, err := models.GetProduct(common.Database, productId); err == nil {
-							if err = models.AddProductToProduct(common.Database, product, p); err != nil {
+					if vv != "" {
+						if productId, err := strconv.Atoi(strings.TrimSpace(vv)); err == nil {
+							if p, err := models.GetProduct(common.Database, productId); err == nil {
+								if err = models.AddProductToProduct(common.Database, product, p); err != nil {
+									logger.Errorf("%v", err)
+								}
+							} else {
 								logger.Errorf("%v", err)
 							}
-						}else{
+						} else {
 							logger.Errorf("%v", err)
 						}
-					}else{
-						logger.Errorf("%v", err)
 					}
 				}
 			}
@@ -2056,10 +2067,12 @@ func putProductHandler(c *fiber.Ctx) error {
 			}
 			if v, found := data.Value["RelatedProducts"]; found && len(v) > 0 {
 				for _, vv := range strings.Split(strings.TrimSpace(v[0]), ",") {
-					if productId, err := strconv.Atoi(strings.TrimSpace(vv)); err == nil {
-						if p, err := models.GetProduct(common.Database, productId); err == nil {
-							if err := common.Database.Exec("insert into products_relations (ProductIdL, ProductIdR) values (?, ?)", product.ID, p.ID).Error; err != nil {
-								logger.Errorf("%+v", err)
+					if vv != "" {
+						if productId, err := strconv.Atoi(strings.TrimSpace(vv)); err == nil {
+							if p, err := models.GetProduct(common.Database, productId); err == nil {
+								if err := common.Database.Exec("insert into products_relations (ProductIdL, ProductIdR) values (?, ?)", product.ID, p.ID).Error; err != nil {
+									logger.Errorf("%+v", err)
+								}
 							}
 						}
 					}

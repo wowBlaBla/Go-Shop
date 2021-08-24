@@ -15,16 +15,16 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	gorm_logger "gorm.io/gorm/logger"
 	"io/ioutil"
+	"log"
 	"math"
 	"math/rand"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -78,7 +78,18 @@ var renderCmd = &cobra.Command{
 			}
 			dialer = sqlite.Open(uri)
 		}
-		common.Database, err = gorm.Open(dialer, &gorm.Config{})
+
+		common.Database, err = gorm.Open(dialer, &gorm.Config{
+			Logger: gorm_logger.New(
+				log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
+				gorm_logger.Config{
+					SlowThreshold:             100 * time.Millisecond,
+					LogLevel:                  gorm_logger.Silent,
+					IgnoreRecordNotFoundError: true,
+					Colorful:                  true,
+				},
+			),
+		})
 		if err != nil {
 			logger.Errorf("%v", err)
 			os.Exit(1)
@@ -361,17 +372,6 @@ var renderCmd = &cobra.Command{
 				}
 			}
 		}
-		// Widgets
-		var allWidgets []common.WidgetCF
-		if widgets, err := models.GetWidgetsByApplyTo(common.Database, "all"); err == nil {
-			for _, widget := range widgets {
-				if widget.Enabled {
-					allWidgets = append(allWidgets, createWidgetCF(widget))
-				}
-			}
-		} else {
-			logger.Warningf("%+v", err)
-		}
 		if categories, err := models.GetCategories(common.Database); err == nil {
 			// Clear existing "products" folder
 			if common.Config.Products != "" {
@@ -403,17 +403,6 @@ var renderCmd = &cobra.Command{
 				}
 			}
 			logger.Infof("Categories found: %v", len(categories))
-			// Widgets
-			var allCategoriesWidgets []common.WidgetCF
-			if widgets, err := models.GetWidgetsByApplyTo(common.Database, "all-categories"); err == nil {
-				for _, widget := range widgets {
-					if widget.Enabled {
-						allCategoriesWidgets = append(allCategoriesWidgets, createWidgetCF(widget))
-					}
-				}
-			} else {
-				logger.Warningf("%+v", err)
-			}
 			//
 			for i, category := range categories {
 				logger.Infof("Category %d: %v %v", i, category.Name, category.Title)
@@ -489,18 +478,7 @@ var renderCmd = &cobra.Command{
 										categoryFile.Aliases = append(categoryFile.Aliases,"/" + path.Join(names...) + "/")
 									}
 								}
-								//
 								categoryFile.Thumbnail = strings.Join(thumbnails, ",")
-								//
-								categoryFile.Widgets = append(allWidgets, allCategoriesWidgets...)
-								if widgets, err := models.GetWidgetsByCategory(common.Database, category.ID); err == nil {
-									for _, widget := range widgets {
-										if widget.Enabled {
-											categoryFile.Widgets = append(categoryFile.Widgets, createWidgetCF(widget))
-										}
-									}
-								}
-								//
 								if tree, err := models.GetCategoriesView(common.Database, int(category.ID), 999, true, true, false); err == nil {
 									categoryFile.Count = tree.Count
 								}else{
@@ -528,24 +506,12 @@ var renderCmd = &cobra.Command{
 			}
 		}
 		// Products
+		t2 := time.Now()
 		if products, err := models.GetProducts(common.Database); err == nil {
-			// Widgets
-			var allProductsWidgets []common.WidgetCF
-			if widgets, err := models.GetWidgetsByApplyTo(common.Database, "all-products"); err == nil {
-				for _, widget := range widgets {
-					if widget.Enabled {
-						allProductsWidgets = append(allProductsWidgets, createWidgetCF(widget))
-					}
-				}
-			} else {
-				logger.Warningf("%+v", err)
-			}
-			//
 			logger.Infof("Products found: %v", len(products))
 			for i, product := range products {
 				if product.Enabled {
 					logger.Infof("[%d] Product ID: %+v Name: %v Title: %v", i, product.ID, product.Name, product.Title)
-					t2 := time.Now()
 					product, _ = models.GetProductFull(common.Database, int(product.ID))
 					// Common actions independent of category
 					productFile := &common.ProductFile{
@@ -1658,14 +1624,6 @@ var renderCmd = &cobra.Command{
 										productFile.Url = "/" + path.Join(append(names[1:], product.Name)...) + "/"
 										productFile.Aliases = append(productFile.Aliases, "/" + path.Join(append(names, product.Name)...) + "/")
 									}
-									productFile.Widgets = append(allWidgets, allProductsWidgets...)
-									if widgets, err := models.GetWidgetsByProduct(common.Database, product.ID); err == nil {
-										for _, widget := range widgets {
-											if widget.Enabled {
-												productFile.Widgets = append(productFile.Widgets, createWidgetCF(widget))
-											}
-										}
-									}
 									productFile.Sku = product.Sku
 									// Sort
 									if rows, err := common.Database.Table("categories_products_sort").Select("Value").Where("CategoryId = ? and ProductId = ?", category.ID, product.ID).Rows(); err == nil {
@@ -1757,11 +1715,12 @@ var renderCmd = &cobra.Command{
 			logger.Errorf("%v", err)
 			return
 		}
+		logger.Infof("Products ~ %.3f ms", float64(time.Since(t2).Nanoseconds())/1000000)
 		//
 		common.THUMBNAILS.Flush()
 		// Catalog
 		if tree, err := models.GetCategoriesView(common.Database, 0, 999, false, true, true); err == nil {
-			if bts, err := json.MarshalIndent(tree, " ", "   "); err == nil {
+			if bts, err := json.Marshal(tree); err == nil {
 				p := path.Join(dir, "hugo", "data")
 				if _, err = os.Stat(p); err != nil {
 					if err = os.MkdirAll(p, 0755); err != nil {
@@ -1896,7 +1855,7 @@ var renderCmd = &cobra.Command{
 					views = append(views, view)
 				}
 			}
-			if bts, err := json.MarshalIndent(views, " ", "   "); err == nil {
+			if bts, err := json.Marshal(views); err == nil {
 				p := path.Join(dir, "hugo", "data")
 				if _, err = os.Stat(p); err != nil {
 					if err = os.MkdirAll(p, 0755); err != nil {
@@ -1926,7 +1885,7 @@ var renderCmd = &cobra.Command{
 					logger.Warningf("%+v", err)
 				}
 			}
-			if bts, err := json.MarshalIndent(data, " ", "   "); err == nil {
+			if bts, err := json.Marshal(data); err == nil {
 				p := path.Join(dir, "hugo", "data")
 				if _, err = os.Stat(p); err != nil {
 					if err = os.MkdirAll(p, 0755); err != nil {
@@ -1963,7 +1922,7 @@ var renderCmd = &cobra.Command{
 		data.Plugins = make(map[string]interface{})
 		data.Plugins["instagram"] = instagram
 
-		if bts, err := json.MarshalIndent(data, " ", "   "); err == nil {
+		if bts, err := json.Marshal(data); err == nil {
 			p := path.Join(dir, "hugo", "data")
 			if _, err = os.Stat(p); err != nil {
 				if err = os.MkdirAll(p, 0755); err != nil {
@@ -2047,107 +2006,6 @@ func createMenu(root *common.MenuItemView, bts []byte) {
 			}
 			root.Children = append(root.Children, item)
 		}
-	}
-}
-
-func createWidgetCF(widget *models.Widget) common.WidgetCF {
-	if wildcards := regexp.MustCompile(`<img(.*?data-type="(.*?)".*)?>`).FindAllStringSubmatch(widget.Content, -1); len(wildcards) > 0 && len(wildcards[0]) > 1 {
-		for _, wildcard := range wildcards {
-			var content string
-			switch wildcard[2] {
-			case "colors":
-				var title string
-				if res := regexp.MustCompile(`data-title="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
-					if v, err := url.QueryUnescape(res[0][1]); err == nil {
-						var vv string
-						if err = json.Unmarshal([]byte(v), &vv); err == nil {
-							title = vv
-						}
-					}
-				}
-				var description string
-				if res := regexp.MustCompile(`data-description="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
-					if v, err := url.QueryUnescape(res[0][1]); err == nil {
-						var vv string
-						if err = json.Unmarshal([]byte(v), &vv); err == nil {
-							description = vv
-						}
-					}
-				}
-				var option int
-				if res := regexp.MustCompile(`data-option="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
-					if v, err := url.QueryUnescape(res[0][1]); err == nil {
-						var vv string
-						if err = json.Unmarshal([]byte(v), &vv); err == nil {
-							if vvv, err := strconv.Atoi(vv); err == nil {
-								option = vvv
-							}
-						}
-					}
-				}
-				var form int
-				if res := regexp.MustCompile(`data-form="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
-					if v, err := url.QueryUnescape(res[0][1]); err == nil {
-						var vv string
-						if err = json.Unmarshal([]byte(v), &vv); err == nil {
-							if vvv, err := strconv.Atoi(vv); err == nil {
-								form = vvv
-							}
-						}
-					}
-				}
-				var limit int
-				if res := regexp.MustCompile(`data-limit="(.*?)"`).FindAllStringSubmatch(wildcard[1], 1); len(res) > 0 && len(res[0]) > 1 {
-					if v, err := url.QueryUnescape(res[0][1]); err == nil {
-						var vv string
-						if err = json.Unmarshal([]byte(v), &vv); err == nil {
-							if vvv, err := strconv.Atoi(vv); err == nil {
-								limit = vvv
-							}
-						}
-					}
-				}
-				if option, err := models.GetOption(common.Database, option); err == nil {
-					var data struct {
-						Description string
-						Option *handler.OptionView
-						Form int
-						Limit int
-					}
-					data.Description = description
-					data.Form = form
-					data.Limit = limit
-					if bts, err := json.Marshal(option); err == nil {
-						if err = json.Unmarshal(bts, &data.Option); err != nil {
-							logger.Warningf("%+v", err)
-						}
-					}
-					for i, value := range data.Option.Values {
-						if cache, err := models.GetCacheValueByValueId(common.Database, value.ID); err == nil {
-							data.Option.Values[i].Thumbnail = cache.Thumbnail
-						}else{
-							logger.Warningf("%+v", err)
-						}
-					}
-					data.Limit = limit
-					if bts, err := json.Marshal(data); err == nil {
-						content = fmt.Sprintf(`<script type="application/json" data-goshop="samples">%v</script><button id="btnSamples" class="v-button">%v</button>`, string(bts), title)
-					}
-				}else{
-					content = fmt.Sprintf(`[ERROR: %+v]`, err)
-				}
-				break
-			}
-			widget.Content = strings.Replace(widget.Content, wildcard[0], content, 1)
-		}
-	}
-
-	return common.WidgetCF{
-		Name:     widget.Name,
-		Title:    widget.Title,
-		Content:  widget.Content,
-		Location: widget.Location,
-		ApplyTo:  widget.ApplyTo,
 	}
 }
 

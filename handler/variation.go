@@ -554,6 +554,14 @@ func putVariationHandler(c *fiber.Ctx) error {
 			if v, found := data.Value["Properties"]; found {
 				var newProperties PropertiesView
 				if err = json.Unmarshal([]byte(v[0]), &newProperties); err == nil {
+					var count = 1
+					for _, property := range newProperties {
+						count *= len(property.Rates)
+					}
+					if count > common.MAX_PRICES {
+						c.Status(http.StatusInternalServerError)
+						return c.JSON(HTTPError{fmt.Sprintf("Too many prices: %d, limit %d", count, common.MAX_PRICES)})
+					}
 					variation.Properties = []*models.Property{}
 					variation.Prices = []*models.Price{}
 					var existingProperties, updatedProperties []*models.Property
@@ -834,7 +842,6 @@ func putVariationHandler(c *fiber.Ctx) error {
 
 					// Prices
 					if resized {
-						logger.Infof("Resize %v", resized)
 						variation.Prices = []*models.Price{}
 						if prices, err := models.GetPricesByVariationId(common.Database, variation.ID); err == nil {
 							for _, price := range prices {
@@ -848,19 +855,15 @@ func putVariationHandler(c *fiber.Ctx) error {
 							return c.JSON(HTTPError{err.Error()})
 						}
 					}
-					logger.Infof("updatedProperties: %+v", updatedProperties)
 					//
 					var table [][]uint
 					for i := 0; i < len(updatedProperties); i++ {
-						logger.Infof("i: %d", i)
 						var row []uint
 						for j := 0; j < len(updatedProperties[i].Rates); j++ {
-							logger.Infof("j: %d", j)
 							row = append(row, updatedProperties[i].Rates[j].ID)
 						}
 						table = append(table, row)
 					}
-					logger.Infof("table: %+v", table)
 					var matrix = [][]uint{}
 					vector := make([]int, len(table))
 					for counter := 0; ; counter++ {
@@ -883,19 +886,13 @@ func putVariationHandler(c *fiber.Ctx) error {
 							break
 						}
 					}
-					if len(matrix) > 250 {
-						c.Status(http.StatusInternalServerError)
-						return c.JSON(HTTPError{"Too many properties combinations, please reduce property values count"})
-					}
 					var existingPrices []*models.Price
 					if existingPrices, err = models.GetPricesByVariationId(common.Database, variation.ID); err != nil {
 						c.Status(http.StatusInternalServerError)
 						return c.JSON(HTTPError{err.Error()})
 					}
-					logger.Infof("matrix: %+v", matrix)
 					//
 					for _, row := range matrix {
-						logger.Infof("row: %+v", row)
 						if len(row) > 0 {
 							price := &models.Price{
 								Enabled: true,
@@ -956,7 +953,6 @@ func putVariationHandler(c *fiber.Ctx) error {
 					logger.Warningf("%+v", err)
 				}
 			}
-			logger.Infof("AFTER Properties: %+v", variation.Prices)
 			// Prices
 			if v, found := data.Value["Prices"]; found && len(v) > 0 {
 				var newPrices []*PriceView

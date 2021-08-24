@@ -33,7 +33,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/securecookie v1.1.1
 	github.com/gorilla/sessions v1.2.0
-	github.com/jinzhu/now v1.1.1
+	github.com/jinzhu/now v1.1.2
 	github.com/justinas/nosurf v1.1.1
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/mholt/archiver v3.1.1+incompatible // indirect
@@ -69,5 +69,5 @@ require (
 	gorm.io/driver/mysql v1.0.1
 	gorm.io/driver/postgres v1.0.6
 	gorm.io/driver/sqlite v1.1.1
-	gorm.io/gorm v1.20.8
+	gorm.io/gorm v1.21.13
 )

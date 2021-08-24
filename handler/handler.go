@@ -859,15 +859,21 @@ func getInfoHandler(c *fiber.Ctx) error {
 		}); err != nil {
 			logger.Warningf("%+v", err)
 		}
+		var timestamp string
 		for _, file := range files {
 			if _, err := os.Stat(file); err == nil {
 				if bts, err := ioutil.ReadFile(file); err == nil {
 					if res := reBuild.FindStringSubmatch(string(bts)); len(res) > 1 {
-						CACHE.Set("goshop-admin-build", res[1], 5 * time.Minute)
-						view.Ui = res[1]
+						if timestamp < res[1] {
+							timestamp = res[1]
+						}
 					}
 				}
 			}
+		}
+		if timestamp != "" {
+			CACHE.Set("goshop-admin-build", timestamp, 5 * time.Minute)
+			view.Ui = timestamp
 		}
 	}else{
 		view.Ui = v.(string)

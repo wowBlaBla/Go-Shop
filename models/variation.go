@@ -48,7 +48,7 @@ type Variation struct {
 	TimeId uint
 	Time       *Time `gorm:"foreignKey:time_id;"`
 	//
-	ProductId uint
+	ProductId uint `gorm:"index:product_id"`
 	Stock uint
 }
 

@@ -11,10 +11,10 @@ type Property struct {
 	Mode string // image (default) / color
 	Name        string
 	Title       string
-	ProductId uint
-	VariationId uint
+	ProductId uint `gorm:"index:product_id"`
+	VariationId uint `gorm:"index:variation_id"`
 	Option      *Option `gorm:"foreignKey:OptionId"`
-	OptionId    uint
+	OptionId    uint `gorm:"index:option_id"`
 	Sku string
 	Filtering   bool
 	Stock uint
@@ -22,9 +22,9 @@ type Property struct {
 	Rates []*Rate `gorm:"foreignKey:PropertyId"`
 }
 
-func (p *Property) AfterDelete(tx *gorm.DB) error {
+/*func (p *Property) AfterDelete(tx *gorm.DB) error {
 	return tx.Model(&Rate{}).Where("property_id = ?", p.ID).Unscoped().Delete(&Rate{}).Error
-}
+}*/
 
 func GetProperties(connector *gorm.DB) ([]*Property, error) {
 	db := connector

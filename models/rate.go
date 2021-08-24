@@ -9,9 +9,9 @@ import (
 type Rate struct {
 	gorm.Model // ID is here
 	Property *Property `gorm:"foreignKey:PropertyId"`
-	PropertyId uint
+	PropertyId uint `gorm:"index:property_id"`
 	Value *Value `gorm:"foreignKey:ValueId"`
-	ValueId uint
+	ValueId uint `gorm:"index:value_id"`
 	//
 	Enabled bool
 	Price float64

@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"github.com/google/logger"
 	"gorm.io/gorm"
 	"sort"
 	"time"
@@ -107,7 +108,11 @@ func GetProductsWithImages(connector *gorm.DB) ([]*Product, error) {
 func GetProductsByCategoryId(connector *gorm.DB, id uint) ([]*Product, error) {
 	db := connector
 	var products []*Product
-	db.Model(&Product{}).Preload("Image").Joins("inner join categories_products on categories_products.product_id = products.id").Joins("left join categories_products_sort on categories_products_sort.ProductId = products.id").Where("categories_products.category_id = ?", id).Order("categories_products_sort.Value desc").Find(&products)
+	db.Model(&Product{}).Preload("Image").
+		Joins("inner join categories_products on categories_products.product_id = products.id").
+		Joins("left join categories_products_sort on categories_products_sort.ProductId = products.id").
+		Where("categories_products.category_id = ?", id).
+		Order("categories_products_sort.Value desc").Find(&products)
 	if err :=  db.Error; err != nil {
 		return nil, err
 	}
@@ -127,9 +132,22 @@ func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	db := connector
 	var product Product
-	if err := db.Preload("Categories").Preload("Parameters").Preload("Parameters.Option").Preload("Parameters.Value").Preload("Properties").Preload("Properties.Option").Preload("Properties.Rates").Preload("Properties.Rates.Prices").Preload("Properties.Rates.Value").Preload("Prices").Preload("Prices.Rates").Preload("Prices.Rates.Property").Preload("Prices.Rates.Value").Preload("Files").Preload("Images").Preload("Variations").Preload("Variations.Properties").Preload("Variations.Properties.Option").Preload("Variations.Properties.Rates").Preload("Variations.Properties.Rates.Value").Preload("Variations.Prices").Preload("Variations.Prices.Rates").Preload("Variations.Prices.Rates.Property").Preload("Variations.Prices.Rates.Value").Preload("Variations.Images").Preload("Variations.Files").Preload("Variations.Time").Preload("Vendor").Preload("Time").Preload("Tags").First(&product, id).Error; err != nil {
+	t1 := time.Now()
+	if err := db.Debug().Preload("Parameters").Preload("Parameters.Option").
+		Preload("Parameters.Value").Preload("Properties").Preload("Properties.Option").
+		Preload("Properties.Rates").Preload("Properties.Rates.Prices").
+		Preload("Properties.Rates.Value").Preload("Prices").Preload("Prices.Rates").
+		Preload("Prices.Rates.Property").Preload("Prices.Rates.Value").Preload("Files").
+		Preload("Images").Preload("Variations").Preload("Variations.Properties").
+		Preload("Variations.Properties.Option").Preload("Variations.Properties.Rates").
+		Preload("Variations.Properties.Rates.Value").Preload("Variations.Prices").
+		Preload("Variations.Prices.Rates").Preload("Variations.Prices.Rates.Property").
+		Preload("Variations.Prices.Rates.Value").Preload("Variations.Images").
+		Preload("Variations.Files").Preload("Variations.Time").Preload("Vendor").
+		Preload("Time").Preload("Tags").Find(&product, id).Error; err != nil {
 		return nil, err
 	}
+	logger.Infof("GetProductFull(%d) ~ %.3f ms", id, float64(time.Since(t1).Nanoseconds())/1000000)
 	var customization struct {
 		Images struct {
 			Order []uint
@@ -151,68 +169,72 @@ func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	})
 	product.Parameters = parameters
 	// Customization
-	if err := json.Unmarshal([]byte(product.Customization), &customization); err == nil {
-		// images
-		images := product.Images
-		sort.SliceStable(images, func(i, j int) bool {
-			var x, y = -1, -1
-			for k, id := range customization.Images.Order {
-				if id == images[i].ID {
-					x = k
+	if product.Customization != "" {
+		if err := json.Unmarshal([]byte(product.Customization), &customization); err == nil {
+			// images
+			images := product.Images
+			sort.SliceStable(images, func(i, j int) bool {
+				var x, y = -1, -1
+				for k, id := range customization.Images.Order {
+					if id == images[i].ID {
+						x = k
+					}
+					if id == images[j].ID {
+						y = k
+					}
 				}
-				if id == images[j].ID {
-					y = k
+				if x == -1 || y == -1 {
+					return images[i].ID < images[j].ID
+				} else {
+					return x < y
 				}
-			}
-			if x == -1 || y == -1 {
-				return images[i].ID < images[j].ID
-			}else{
-				return x < y
-			}
-		})
-		product.Images = images
-		// variations
-		variations := product.Variations
-		sort.SliceStable(variations, func(i, j int) bool {
-			var x, y = -1, -1
-			for k, id := range customization.Variations.Order {
-				if id == variations[i].ID {
-					x = k
+			})
+			product.Images = images
+			// variations
+			variations := product.Variations
+			sort.SliceStable(variations, func(i, j int) bool {
+				var x, y = -1, -1
+				for k, id := range customization.Variations.Order {
+					if id == variations[i].ID {
+						x = k
+					}
+					if id == variations[j].ID {
+						y = k
+					}
 				}
-				if id == variations[j].ID {
-					y = k
+				if x == -1 || y == -1 {
+					return variations[i].ID < variations[j].ID
+				} else {
+					return x < y
 				}
-			}
-			if x == -1 || y == -1 {
-				return variations[i].ID < variations[j].ID
-			}else{
-				return x < y
-			}
-		})
-		product.Variations = variations
+			})
+			product.Variations = variations
+		}
 	}
 	//
 	if len(product.Variations) > 0 {
 		for i, variation := range product.Variations {
-			if err := json.Unmarshal([]byte(variation.Customization), &customization); err == nil {
-				images := variation.Images
-				sort.SliceStable(images, func(i, j int) bool {
-					var x, y = -1, -1
-					for k, id := range customization.Images.Order {
-						if id == images[i].ID {
-							x = k
+			if variation.Customization != "" {
+				if err := json.Unmarshal([]byte(variation.Customization), &customization); err == nil {
+					images := variation.Images
+					sort.SliceStable(images, func(i, j int) bool {
+						var x, y = -1, -1
+						for k, id := range customization.Images.Order {
+							if id == images[i].ID {
+								x = k
+							}
+							if id == images[j].ID {
+								y = k
+							}
 						}
-						if id == images[j].ID {
-							y = k
+						if x == -1 || y == -1 {
+							return images[i].ID < images[j].ID
+						} else {
+							return x < y
 						}
-					}
-					if x == -1 || y == -1 {
-						return images[i].ID < images[j].ID
-					} else {
-						return x < y
-					}
-				})
-				product.Variations[i].Images = images
+					})
+					product.Variations[i].Images = images
+				}
 			}
 		}
 	}
