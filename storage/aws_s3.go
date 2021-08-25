@@ -14,8 +14,10 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
+	"io"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -126,11 +128,19 @@ func (storage *AWSS3Storage) upload(src, location string) (string, error) {
 		return url, err
 	}
 
+	buff := make([]byte, 512)
+	if _, err = file.Read(buff); err != nil {
+		return url, err
+	}
+	contentType := http.DetectContentType(buff)
+	file.Seek(0, io.SeekStart)
+
 	if up, err := uploader.Upload(&s3manager.UploadInput{
 		Bucket: aws.String(storage.Bucket),
 		ACL:    aws.String("public-read"),
 		Key:    aws.String(path.Join(storage.prefix, location)),
 		Body:   file,
+		ContentType: &contentType,
 	}); err == nil {
 		url = up.Location
 	} else {

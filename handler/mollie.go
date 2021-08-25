@@ -23,6 +23,7 @@ type MollieOrderView struct {
 }
 
 type MollieSubmitRequest struct {
+	ApiEndpoint string `json:"api_endpoint"`
 	Language string `json:"language"`
 	Method string
 }
@@ -60,8 +61,12 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 			return c.JSON(fiber.Map{"ERROR": "You are not allowed to do that"})
 		}
 		// PAYLOAD
-		//logger.Infof("order: %+v", order)
-
+		var request MollieSubmitRequest
+		if err := c.BodyParser(&request); err != nil {
+			return err
+		}
+		logger.Infof("request: %+v", request)
+		//
 		var base string
 		var redirectUrl string
 		//
@@ -73,7 +78,7 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 		}else{
 			source = common.Config.Url
 		}
-		//
+		// Base
 		if u, err := url.Parse(source); err == nil {
 			u.Path = ""
 			u.RawQuery = ""
@@ -86,10 +91,19 @@ func postAccountOrderMollieSubmitHandler(c *fiber.Ctx) error {
 			}
 			redirectUrl = u.String()
 		}
-
-		var request MollieSubmitRequest
-		if err := c.BodyParser(&request); err != nil {
-			return err
+		// Redirect
+		if request.ApiEndpoint != "" {
+			if u, err := url.Parse(request.ApiEndpoint); err == nil {
+				u.Path = ""
+				u.RawQuery = ""
+				u.Path = fmt.Sprintf("/api/v1/account/orders/%v/mollie/success", order.ID)
+				values := url.Values{}
+				if v := c.Query("method", ""); v != "" {
+					values.Set("method", v)
+					u.RawQuery = values.Encode()
+				}
+				redirectUrl = u.String()
+			}
 		}
 		//
 		o := &mollie.Order{
