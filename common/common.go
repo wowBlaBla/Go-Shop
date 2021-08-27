@@ -31,13 +31,13 @@ const (
 	SECRET = "goshop"
 	//
 	AVAILABILITY_AVAILABLE = "available"
-	MAX_PRICES = 100
+	MAX_PRICES = 1000
 )
 
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210825145657"
+	COMPILED = "20210827164715"
 	STORAGE storage.Storage
 	//
 	Started          time.Time

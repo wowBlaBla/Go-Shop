@@ -32,6 +32,7 @@ import (
 var (
 	CACHE = cmap.New()
 	//VALUES = cmap.New()
+	CACHE_CATEGORIES = cmap.New()
 	CACHE_IMAGES = cmap.New()
 	CACHE_VALUES = cmap.New()
 	CACHE_PRICES = cmap.New()
@@ -450,10 +451,12 @@ var renderCmd = &cobra.Command{
 									name = name[:32]
 								}
 								filename := fmt.Sprintf("%d-%s-%d%v", category.ID, name, fi.ModTime().Unix(), path.Ext(p1))
-								logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "categories", filename), fi.Size())
-								if thumbnails, err = common.STORAGE.PutImage(p1, path.Join("images", "categories", filename), common.Config.Resize.Thumbnail.Size); err != nil {
+								location := path.Join("images", "categories", filename)
+								t2 := time.Now()
+								if thumbnails, err = common.STORAGE.PutImage(p1, location, common.Config.Resize.Thumbnail.Size); err != nil {
 									logger.Warningf("%v", err)
 								}
+								logger.Infof("Copy %v => %v %v bytes in ~ %.3f ms", p1, location, fi.Size(), float64(time.Since(t2).Nanoseconds())/1000000)
 							}
 						}
 					}
@@ -509,10 +512,41 @@ var renderCmd = &cobra.Command{
 		t2 := time.Now()
 		if products, err := models.GetProducts(common.Database); err == nil {
 			logger.Infof("Products found: %v", len(products))
+			/*if _, err := os.Stat(path.Join(dir, "temp", "products")); err != nil {
+				if err = os.MkdirAll(path.Join(dir, "temp", "products"), 0755); err != nil {
+					logger.Warningf("%+v", err)
+				}
+			}*/
 			for i, product := range products {
 				if product.Enabled {
 					logger.Infof("[%d] Product ID: %+v Name: %v Title: %v", i, product.ID, product.Name, product.Title)
+
 					product, _ = models.GetProductFull(common.Database, int(product.ID))
+					/*p := path.Join(dir, "temp", "products", fmt.Sprintf("%d-%v.json", product.ID, product.Name))
+					if fi, err := os.Stat(p); err != nil || !product.UpdatedAt.Equal(fi.ModTime()){
+						logger.Infof("[MISS]")
+						t2 := time.Now()
+						product, _ = models.GetProductFull(common.Database, int(product.ID))
+						if bts, err := json.Marshal(product); err == nil {
+							if err = ioutil.WriteFile(p, bts, 0755); err == nil {
+								if err = os.Chtimes(p, product.UpdatedAt, product.UpdatedAt); err != nil {
+									logger.Warningf("%+v", err)
+								}
+							} else {
+								logger.Warningf("%+v", err)
+							}
+						}
+						logger.Infof("Cached in ~ %.3f ms", float64(time.Since(t2).Nanoseconds())/1000000)
+					} else {
+						t2 := time.Now()
+						if bts, err := ioutil.ReadFile(p); err == nil {
+							if err = json.Unmarshal(bts, &product); err != nil {
+								logger.Warningf("%+v", err)
+							}
+						}
+						logger.Infof("Uncached in ~ %.3f ms", float64(time.Since(t2).Nanoseconds())/1000000)
+					}*/
+					t3 := time.Now()
 					// Common actions independent of category
 					productFile := &common.ProductFile{
 						ID:         product.ID,
@@ -552,13 +586,14 @@ var renderCmd = &cobra.Command{
 								name = reSanitizeFilename.ReplaceAllString(name, "_")
 								filename := fmt.Sprintf("%d-%s-%d%v", product.ID, name, fi.ModTime().Unix(), path.Ext(p1))
 								location := path.Join("images", filename)
-								logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
+								t2 := time.Now()
 								if thumbnails, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Image.Size); err == nil {
 									productFile.Thumbnail = strings.Join(thumbnails, ",")
 									productView.Thumbnail = strings.Join(thumbnails, ",")
 								} else {
 									logger.Warningf("%v", err)
 								}
+								logger.Infof("Copy %v => %v %v bytes in ~ %.3f ms", p1, location, fi.Size(), float64(time.Since(t2).Nanoseconds())/1000000)
 							}
 						}
 					}
@@ -706,12 +741,15 @@ var renderCmd = &cobra.Command{
 												images = append(images, strings.Join(images2, ","))
 												//
 												// Cache
-												if found := models.HasCacheImageByImageId(common.Database, image.ID); !found {
+												key := fmt.Sprintf("%v", image.ID)
+												if !CACHE_IMAGES.Has(key) && (clear || !models.HasCacheImageByImageId(common.Database, image.ID)) {
 													if _, err = models.CreateCacheImage(common.Database, &models.CacheImage{
 														ImageId:   image.ID,
 														Name:      image.Name,
 														Thumbnail: strings.Join(images2, ","),
-													}); err != nil {
+													}); err == nil {
+														CACHE_IMAGES.Set(key, true)
+													} else {
 														logger.Warningf("%v", err)
 													}
 												}
@@ -745,7 +783,7 @@ var renderCmd = &cobra.Command{
 										}
 										filename := fmt.Sprintf("%d-%s-%d%v", file.ID, name, fi.ModTime().Unix(), path.Ext(p1))
 										location := path.Join("files", filename)
-										logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
+										t2 := time.Now()
 										if url, err := common.STORAGE.PutFile(p1, location); err == nil {
 											files = append(files, common.FilePF{
 												Id:   file.ID,
@@ -764,6 +802,7 @@ var renderCmd = &cobra.Command{
 													logger.Warningf("%v", err)
 												}
 											}
+											logger.Infof("Copy %v => %v %v bytes in ~ %.3f ms", p1, location, fi.Size(), float64(time.Since(t2).Nanoseconds())/1000000)
 										} else {
 											logger.Warningf("%v", err)
 										}
@@ -928,12 +967,15 @@ var renderCmd = &cobra.Command{
 													if images2, err := common.STORAGE.PutImage(p1, path.Join("images", filename), common.Config.Resize.Thumbnail.Size); err == nil {
 														images = append(images, strings.Join(images2, ","))
 														// Cache
-														if found := models.HasCacheImageByImageId(common.Database, image.ID); !found {
+														key := fmt.Sprintf("%v", image.ID)
+														if !CACHE_IMAGES.Has(key) && (clear || !models.HasCacheImageByImageId(common.Database, image.ID)) {
 															if _, err = models.CreateCacheImage(common.Database, &models.CacheImage{
 																ImageId:   image.ID,
 																Name:      image.Name,
 																Thumbnail: strings.Join(images2, ","),
-															}); err != nil {
+															}); err == nil {
+																CACHE_IMAGES.Set(key, true)
+															} else {
 																logger.Warningf("%v", err)
 															}
 														}
@@ -965,7 +1007,7 @@ var renderCmd = &cobra.Command{
 														}
 														filename := fmt.Sprintf("%d-%s-%d%v", file.ID, name, fi.ModTime().Unix(), path.Ext(p1))
 														location := path.Join("files", filename)
-														logger.Infof("Copy %v => %v %v bytes", p1, location, fi.Size())
+														t2 := time.Now()
 														if url, err := common.STORAGE.PutFile(p1, location); err == nil {
 															files = append(files, common.FilePF{
 																Id:   file.ID,
@@ -987,6 +1029,7 @@ var renderCmd = &cobra.Command{
 														} else {
 															logger.Warningf("%v", err)
 														}
+														logger.Infof("Copy %v => %v %v bytes in ~ %.3f ms", p1, location, fi.Size(), float64(time.Since(t2).Nanoseconds())/1000000)
 													}
 												}
 											}
@@ -1060,8 +1103,9 @@ var renderCmd = &cobra.Command{
 													if fi, err := os.Stat(p1); err == nil {
 														filename := filepath.Base(p1)
 														filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-														logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-														if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+														location := path.Join("images", "values", filename)
+														t2 := time.Now()
+														if thumbnails, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Thumbnail.Size); err == nil {
 															valueView.Thumbnail = strings.Join(thumbnails, ",")
 															CACHE_VALUES.Set(rate.Value.Thumbnail, valueView.Thumbnail)
 															//
@@ -1076,6 +1120,7 @@ var renderCmd = &cobra.Command{
 														} else {
 															logger.Warningf("%v", err)
 														}
+														logger.Infof("Copy %v => %v %v bytes in ~ %.3f ms", p1, location, fi.Size(), float64(time.Since(t2).Nanoseconds())/1000000)
 													}
 												}
 											} else {
@@ -1182,24 +1227,7 @@ var renderCmd = &cobra.Command{
 						var canonical string
 						for i, category := range categories {
 							breadcrumbs := &[]*models.Category{}
-							var f3 func(connector *gorm.DB, id uint)
-							f3 = func(connector *gorm.DB, id uint) {
-								if id != 0 {
-									if category, err := models.GetCategory(common.Database, int(id)); err == nil {
-										//*names = append([]string{category.Country}, *names...)
-										if category.Thumbnail == "" {
-											if len(*breadcrumbs) > 0 {
-												category.Thumbnail = (*breadcrumbs)[0].Thumbnail
-											} else if product.Image != nil {
-												category.Thumbnail = product.Image.Url
-											}
-										}
-										*breadcrumbs = append([]*models.Category{category}, *breadcrumbs...)
-										f3(connector, category.ParentId)
-									}
-								}
-							}
-							f3(common.Database, category.ID)
+							createBreadcrumbs(common.Database, category.ID, breadcrumbs, product)
 							if common.Config.Products != "" {
 								*breadcrumbs = append([]*models.Category{{Name: strings.ToLower(common.Config.Products), Title: common.Config.Products, Model: gorm.Model{UpdatedAt: time.Now()}}}, *breadcrumbs...)
 							}
@@ -1226,6 +1254,7 @@ var renderCmd = &cobra.Command{
 								}
 								//
 								var arr = []string{}
+								t6 := time.Now()
 								for _, category := range *breadcrumbs {
 									arr = append(arr, category.Name)
 									for _, language := range languages {
@@ -1344,12 +1373,14 @@ var renderCmd = &cobra.Command{
 																				if fi, err := os.Stat(p1); err == nil {
 																					filename := filepath.Base(p1)
 																					filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																					logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-																					if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+																					location := path.Join("images", "values", filename)
+																					t2 := time.Now()
+																					if thumbnails, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Thumbnail.Size); err == nil {
 																						thumbnail = strings.Join(thumbnails, ",")
 																					} else {
 																						logger.Warningf("%v", err)
 																					}
+																					logger.Infof("Copy %v => %v %v bytes in ~ %.3f ms", p1, location, fi.Size(), float64(time.Since(t2).Nanoseconds())/1000000)
 																				}
 																			}
 																		}
@@ -1380,12 +1411,14 @@ var renderCmd = &cobra.Command{
 																		if fi, err := os.Stat(p1); err == nil {
 																			filename := filepath.Base(p1)
 																			filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																			logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-																			if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+																			location := path.Join("images", "values", filename)
+																			t2 := time.Now()
+																			if thumbnails, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Thumbnail.Size); err == nil {
 																				thumbnail = strings.Join(thumbnails, ",")
 																			} else {
 																				logger.Warningf("%v", err)
 																			}
+																			logger.Infof("Copy %v => %v %v bytes in ~ %.3f ms", p1, location, fi.Size(), float64(time.Since(t2).Nanoseconds())/1000000)
 																		}
 																	}
 																}
@@ -1425,12 +1458,14 @@ var renderCmd = &cobra.Command{
 																					if fi, err := os.Stat(p1); err == nil {
 																						filename := filepath.Base(p1)
 																						filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																						logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-																						if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+																						location := path.Join("images", "values", filename)
+																						t2 := time.Now()
+																						if thumbnails, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Thumbnail.Size); err == nil {
 																							thumbnail = strings.Join(thumbnails, ",")
 																						} else {
 																							logger.Warningf("%v", err)
 																						}
+																						logger.Infof("Copy %v => %v %v bytes in ~ %.3f ms", p1, location, fi.Size(), float64(time.Since(t2).Nanoseconds())/1000000)
 																					}
 																				}
 																			}
@@ -1467,12 +1502,14 @@ var renderCmd = &cobra.Command{
 																				if fi, err := os.Stat(p1); err == nil {
 																					filename := filepath.Base(p1)
 																					filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																					logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-																					if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+																					location := path.Join("images", "values", filename)
+																					t2 := time.Now()
+																					if thumbnails, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Thumbnail.Size); err == nil {
 																						thumbnail = strings.Join(thumbnails, ",")
 																					} else {
 																						logger.Warningf("%v", err)
 																					}
+																					logger.Infof("Copy %v => %v %v bytes in ~ %.3f ms", p1, location, fi.Size(), float64(time.Since(t2).Nanoseconds())/1000000)
 																				}
 																			}
 																		}
@@ -1516,12 +1553,14 @@ var renderCmd = &cobra.Command{
 																					if fi, err := os.Stat(p1); err == nil {
 																						filename := filepath.Base(p1)
 																						filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																						logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-																						if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+																						location := path.Join("images", "values", filename)
+																						t2 := time.Now()
+																						if thumbnails, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Thumbnail.Size); err == nil {
 																							thumbnail = strings.Join(thumbnails, ",")
 																						} else {
 																							logger.Warningf("%v", err)
 																						}
+																						logger.Infof("Copy %v => %v %v bytes in ~ %.3f ms", p1, location, fi.Size(), float64(time.Since(t2).Nanoseconds())/1000000)
 																					}
 																				}
 																			}
@@ -1558,12 +1597,13 @@ var renderCmd = &cobra.Command{
 																				if fi, err := os.Stat(p1); err == nil {
 																					filename := filepath.Base(p1)
 																					filename = fmt.Sprintf("%v-%d%v", filename[:len(filename)-len(filepath.Ext(filename))], fi.ModTime().Unix(), filepath.Ext(filename))
-																					logger.Infof("Copy %v => %v %v bytes", p1, path.Join("images", "values", filename), fi.Size())
-																					if thumbnails, err := common.STORAGE.PutImage(p1, path.Join("images", "values", filename), common.Config.Resize.Thumbnail.Size); err == nil {
+																					location := path.Join("images", "values", filename)
+																					if thumbnails, err := common.STORAGE.PutImage(p1, location, common.Config.Resize.Thumbnail.Size); err == nil {
 																						thumbnail = strings.Join(thumbnails, ",")
 																					} else {
 																						logger.Warningf("%v", err)
 																					}
+																					logger.Infof("Copy %v => %v %v bytes in ~ %.3f ms", p1, location, fi.Size(), float64(time.Since(t2).Nanoseconds())/1000000)
 																				}
 																			}
 																		}
@@ -1600,6 +1640,8 @@ var renderCmd = &cobra.Command{
 									}
 									productFile.Categories = append(productFile.Categories, category.Title)
 								}
+								logger.Infof("Breadcrumbs ~ %.3f ms", float64(time.Since(t6).Nanoseconds())/1000000)
+								t6 = time.Now()
 								productFile.Product.CategoryId = category.ID
 
 								/*if p := path.Join(p1, product.Name); p != "" {
@@ -1702,13 +1744,16 @@ var renderCmd = &cobra.Command{
 									}
 									cacheProduct.SalePrice = minPrice
 								}
+								t7 := time.Now()
 								if _, err = models.CreateCacheProduct(common.Database, cacheProduct); err != nil {
 									logger.Warningf("%v", err)
 								}
+								logger.Infof("CreateCache ~ %.3f ms", float64(time.Since(t7).Nanoseconds())/1000000)
+								logger.Infof("Rest ~ %.3f ms", float64(time.Since(t6).Nanoseconds())/1000000)
 							}
 						}
 					}
-					logger.Infof("[%d] Product ID: %+v Name: %v Title: %v ~ %.3f ms", i, product.ID, product.Name, product.Title, float64(time.Since(t2).Nanoseconds())/1000000)
+					logger.Infof("[%d] Product ID: %+v ~ %.3f ms", i, product.ID, float64(time.Since(t3).Nanoseconds())/1000000)
 				}
 			}
 		}else{
@@ -1721,7 +1766,18 @@ var renderCmd = &cobra.Command{
 		// Catalog
 		if tree, err := models.GetCategoriesView(common.Database, 0, 999, false, true, true); err == nil {
 			if bts, err := json.Marshal(tree); err == nil {
+				// Data
 				p := path.Join(dir, "hugo", "data")
+				if _, err = os.Stat(p); err != nil {
+					if err = os.MkdirAll(p, 0755); err != nil {
+						logger.Warningf("%+v", err)
+					}
+				}
+				if err = ioutil.WriteFile(path.Join(p, "catalog.json"), bts, 0755); err != nil {
+					logger.Warningf("%+v", err)
+				}
+				// Static / catalog.json
+				p = path.Join(dir, "hugo", "static")
 				if _, err = os.Stat(p); err != nil {
 					if err = os.MkdirAll(p, 0755); err != nil {
 						logger.Warningf("%+v", err)
@@ -2005,6 +2061,32 @@ func createMenu(root *common.MenuItemView, bts []byte) {
 				createMenu(item, bts2)
 			}
 			root.Children = append(root.Children, item)
+		}
+	}
+}
+
+func createBreadcrumbs(connector *gorm.DB, id uint, breadcrumbs *[]*models.Category, product *models.Product) {
+	if id != 0 {
+		key := fmt.Sprintf("%+v", id)
+		var category *models.Category
+		if v, found := CACHE_CATEGORIES.Get(key); found {
+			category = v.(*models.Category)
+		}else{
+			var err error
+			if category, err = models.GetCategory(common.Database, int(id)); err == nil {
+				if category.Thumbnail == "" {
+					if len(*breadcrumbs) > 0 {
+						category.Thumbnail = (*breadcrumbs)[0].Thumbnail
+					} else if product.Image != nil {
+						category.Thumbnail = product.Image.Url
+					}
+				}
+				CACHE_CATEGORIES.Set(key, category)
+			}
+		}
+		if category != nil {
+			*breadcrumbs = append([]*models.Category{category}, *breadcrumbs...)
+			createBreadcrumbs(connector, category.ParentId, breadcrumbs, product)
 		}
 	}
 }

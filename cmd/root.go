@@ -18,6 +18,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	gorm_logger "gorm.io/gorm/logger"
 	"io/ioutil"
 	"log"
 	"net"
@@ -216,7 +217,17 @@ var RootCmd = &cobra.Command{
 		}
 		var err error
 		common.Database, err = gorm.Open(dialer, &gorm.Config{
+			CreateBatchSize: 150,
 			DisableForeignKeyConstraintWhenMigrating: true,
+			Logger: gorm_logger.New(
+				log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
+				gorm_logger.Config{
+					SlowThreshold:             100 * time.Millisecond,
+					LogLevel:                  gorm_logger.Silent,
+					IgnoreRecordNotFoundError: true,
+					Colorful:                  true,
+				},
+			),
 		})
 		if err != nil {
 			logger.Errorf("%v", err)

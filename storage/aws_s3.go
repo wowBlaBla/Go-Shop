@@ -358,7 +358,7 @@ func (storage *AWSS3Storage) PutImage(src, location, sizes string) ([]string, er
 	for key, value := range urls {
 		storage.Database[key] = value
 	}
-	if rand.Intn(10) == 0 {
+	if rand.Intn(100) == 0 {
 		if err = storage.Save(); err != nil {
 			logger.Warningf("%+v", err)
 		}
