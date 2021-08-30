@@ -77,7 +77,7 @@ func GetPrice(connector *gorm.DB, id int) (*Price, error) {
 
 func CreatePrice(connector *gorm.DB, price *Price) (uint, error) {
 	db := connector
-	db.Debug().Create(&price)
+	db.Create(&price)
 	if err := db.Error; err != nil {
 		return 0, err
 	}
@@ -86,12 +86,13 @@ func CreatePrice(connector *gorm.DB, price *Price) (uint, error) {
 
 func UpdatePrice(connector *gorm.DB, price *Price) error {
 	db := connector
-	db.Debug().Save(&price)
+	db.Save(&price)
 	return db.Error
 }
 
 func DeletePrice(connector *gorm.DB, price *Price) error {
 	db := connector
-	db.Debug().Unscoped().Delete(&price)
+	db.Model(&price).Association("Rates").Clear()
+	db.Unscoped().Delete(&price)
 	return db.Error
 }

@@ -68,6 +68,7 @@ var (
 	reMain = regexp.MustCompile(`^main(\..*)\.js$`)
 	reBuild = regexp.MustCompile(`build:([0-9]{14}),`)
 	CACHE = go_cache.New(time.Minute, time.Minute)
+	RATES = go_cache.New(time.Minute, time.Minute)
 )
 
 

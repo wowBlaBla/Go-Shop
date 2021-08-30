@@ -171,7 +171,7 @@ func DeleteSubcategoryFromCategory(connector *gorm.DB, category *Category, subca
 
 func AddProductToCategory(connector *gorm.DB, category *Category, product *Product) error {
 	db := connector
-	return db.Model(&category).Association("Products").Append(product)
+	return db.Debug().Model(&category).Association("Products").Append(product)
 }
 
 func DeleteProductFromCategory(connector *gorm.DB, category *Category, product *Product) error {

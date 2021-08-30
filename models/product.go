@@ -2,7 +2,6 @@ package models
 
 import (
 	"encoding/json"
-	"github.com/google/logger"
 	"gorm.io/gorm"
 	"sort"
 	"time"
@@ -132,8 +131,8 @@ func GetProduct(connector *gorm.DB, id int) (*Product, error) {
 func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 	db := connector
 	var product Product
-	t1 := time.Now()
-	if err := db.Debug().Preload("Parameters").Preload("Parameters.Option").
+	//t1 := time.Now()
+	if err := db.Preload("Categories").Preload("Parameters").Preload("Parameters.Option").
 		Preload("Parameters.Value").Preload("Properties").Preload("Properties.Option").
 		Preload("Properties.Rates").Preload("Properties.Rates.Prices").
 		Preload("Properties.Rates.Value").Preload("Prices").Preload("Prices.Rates").
@@ -147,7 +146,7 @@ func GetProductFull(connector *gorm.DB, id int) (*Product, error) {
 		Preload("Time").Preload("Tags").Find(&product, id).Error; err != nil {
 		return nil, err
 	}
-	logger.Infof("GetProductFull(%d) ~ %.3f ms", id, float64(time.Since(t1).Nanoseconds())/1000000)
+	//logger.Infof("GetProductFull(%d) ~ %.3f ms", id, float64(time.Since(t1).Nanoseconds())/1000000)
 	var customization struct {
 		Images struct {
 			Order []uint

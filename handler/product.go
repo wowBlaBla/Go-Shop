@@ -1614,11 +1614,18 @@ func putProductHandler(c *fiber.Ctx) error {
 							}
 							var ids = []uint{product.ID, 0}
 							for _, rateId := range row {
-								if rateId > 0 {
-									if rate, err := models.GetRate(common.Database, int(rateId)); err == nil {
-										ids = append(ids, rate.ID)
-										price.Rates = append(price.Rates, rate)
+								var rate *models.Rate
+								key := fmt.Sprintf("%v", rateId)
+								if v, found := RATES.Get(key); !found {
+									if rate, err = models.GetRate(common.Database, int(rateId)); err == nil {
+										RATES.Set(key, rate, time.Minute)
 									}
+								}else {
+									rate = v.(*models.Rate)
+								}
+								if rate != nil {
+									ids = append(ids, rate.ID)
+									price.Rates = append(price.Rates, rate)
 								}
 							}
 

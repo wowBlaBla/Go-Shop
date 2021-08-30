@@ -775,7 +775,6 @@ func putVariationHandler(c *fiber.Ctx) error {
 						updatedProperties = append(updatedProperties, property)
 						resized = true
 					}
-
 					// Properties
 					for _, property := range updatedProperties {
 						for _, rate := range property.Rates {
@@ -839,7 +838,6 @@ func putVariationHandler(c *fiber.Ctx) error {
 							}
 						}
 					}
-
 					// Prices
 					if resized {
 						variation.Prices = []*models.Price{}
@@ -902,7 +900,16 @@ func putVariationHandler(c *fiber.Ctx) error {
 							var ids = []uint{variation.ProductId, variation.ID}
 							for _, rateId := range row {
 								if rateId > 0 {
-									if rate, err := models.GetRate(common.Database, int(rateId)); err == nil {
+									var rate *models.Rate
+									key := fmt.Sprintf("%v", rateId)
+									if v, found := RATES.Get(key); !found {
+										if rate, err = models.GetRate(common.Database, int(rateId)); err == nil {
+											RATES.Set(key, rate, time.Minute)
+										}
+									}else {
+										rate = v.(*models.Rate)
+									}
+									if rate != nil {
 										ids = append(ids, rate.ID)
 										price.Rates = append(price.Rates, rate)
 									}
