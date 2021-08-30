@@ -2023,6 +2023,7 @@ func createMenu(root *common.MenuItemView, bts []byte) {
 				root.Name = categoriesView.Name
 				root.Title = categoriesView.Title
 				root.Path = categoriesView.Path
+				root.Count = categoriesView.Count
 				if v, found := common.THUMBNAILS.Get(categoriesView.Thumbnail); !found {
 					if cache, err := models.GetCacheCategoryByCategoryId(common.Database, categoriesView.ID); err == nil {
 						common.THUMBNAILS.Set(categoriesView.Thumbnail, cache.Thumbnail, time.Duration(60 + rand.Intn(60)) * time.Second)
