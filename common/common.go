@@ -37,7 +37,7 @@ const (
 var (
 	APPLICATION = "GoShop"
 	VERSION = "1.0.0"
-	COMPILED = "20210827164715"
+	COMPILED = "20210827191344"
 	STORAGE storage.Storage
 	//
 	Started          time.Time
@@ -908,6 +908,7 @@ type MenuView2 struct {
 	Location string
 	Children []interface{}
 	//Children []MenuX
+	Count int `json:",omitempty"`
 }
 
 type MenuView3 struct {
@@ -935,4 +936,6 @@ type MenuItemView struct {
 	Title string `json:",omitempty"`
 	Thumbnail string `json:",omitempty"`
 	Children []interface{} `json:",omitempty"`
+	// special case for category
+	Count int `json:",omitempty"`
 }
